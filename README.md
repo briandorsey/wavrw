@@ -1,5 +1,7 @@
 # wavrw
-Draft learning project to read and write WAV files. 
+`wavrw` is a command line tool to read and write WAV files with a focus on visualizing the structure of files and parsing metadata.
+
+It's initially intended as a personal learning project with aspirations to be generally useful. It's currently in *very* early days and unlikely to be useful to anyone else. (It doesn't yet even parse the basics of WAV files.)
 
 ## Help overview
 
