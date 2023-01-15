@@ -27,3 +27,9 @@ fn main() {
         }
     }
 }
+
+#[test]
+fn verify_args() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}
