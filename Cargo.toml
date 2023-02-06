@@ -10,4 +10,5 @@ description = "WAV file metadata read/write utility"
 anyhow = "1.0.68"
 clap = { version = "4.1.1", features = ["derive"] }
 hex = "0.4.3"
+hexdump = "0.1.1"
 nom = "7.1.2"

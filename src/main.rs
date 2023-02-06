@@ -27,15 +27,18 @@ fn main() -> Result<()> {
 
     match &args.command {
         Commands::View { wav_path } => {
-            // TODO: move command logic into a function, fix unwrap()
+            // TODO: move command logic into a function
             for path in wav_path {
-                println!("path: {}", path);
+                println!("path: {path}");
                 let mut f = File::open(path)?;
                 let mut buffer = [0; 8];
 
                 f.read_exact(&mut buffer)?;
-                let (_, wav_data) = wav::parse(&buffer).unwrap();
-                println!("wav_data: {:?}", wav_data);
+                // map_err to work around reference lifetimes
+                let (_, wav_data) = wav::parse(&buffer).map_err(|err| {
+                    err.map(|err| nom::error::Error::new(err.input.len().to_string(), err.code))
+                })?;
+                println!("wav_data: {wav_data:?}");
             }
         }
     }
