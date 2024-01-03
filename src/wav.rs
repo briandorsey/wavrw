@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[binrw]
 #[brw(big)]
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
@@ -32,28 +32,65 @@ pub struct Wav {
     pub chunks: Vec<Chunk>,
 }
 
+// based on http://soundfile.sapp.org/doc/WaveFormat/
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct FmtChunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    chunk_id: FourCC,
+    chunk_size: u32,
+    audio_format: u16,
+    num_channels: u16,
+    sample_rate: u32,
+    byte_rate: u32,
+    block_align: u16,
+    bits_per_sample: u16,
+}
+
+impl FmtChunk {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} chan, {}/{}",
+            self.num_channels,
+            self.bits_per_sample,
+            self.sample_rate,
+            // TODO: audio_format
+        )
+    }
+}
+
+// based on https://mediaarea.net/BWFMetaEdit/md5
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct Md5Chunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    chunk_id: FourCC,
+    chunk_size: u32,
+    md5: u128,
+}
+
+impl Md5Chunk {
+    pub fn summary(&self) -> String {
+        format!("MD5: {:X}", self.md5)
+    }
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Chunk {
-    #[br(magic = b"fmt ")]
-    Fmt {
-        #[br(seek_before = SeekFrom::Current(-4))]
-        chunk_id: FourCC,
-        chunk_size: u32,
-        audio_format: u16,
-        num_channels: u16,
-        sample_rate: u32,
-        byte_rate: u32,
-        block_align: u16,
-        bits_per_sample: u16,
-    },
-    #[br(magic = b"MD5 ")]
-    Md5 { chunk_size: u32, md5: u128 },
+    // TODO: add DATA parsing which skips actual data
+    #[brw(magic = b"fmt ")]
+    Fmt(FmtChunk),
+    #[brw(magic = b"MD5 ")]
+    Md5(Md5Chunk),
     Unknown {
         chunk_id: FourCC,
         chunk_size: u32,
         #[br(count = chunk_size )]
+        #[bw()]
         raw: Vec<u8>,
     },
 }
@@ -61,37 +98,24 @@ pub enum Chunk {
 impl Chunk {
     pub fn chunk_id(&self) -> FourCC {
         match self {
-            Chunk::Fmt { chunk_id, .. } => chunk_id.clone(),
-            Chunk::Md5 { .. } => FourCC(*b"MD5 "),
-            Chunk::Unknown { chunk_id, .. } => chunk_id.clone(),
+            Chunk::Fmt(e) => e.chunk_id,
+            Chunk::Md5(e) => e.chunk_id,
+            Chunk::Unknown { chunk_id, .. } => *chunk_id,
         }
     }
 
-    pub fn chunk_size(&self) -> &u32 {
+    pub fn chunk_size(&self) -> u32 {
         match self {
-            Chunk::Fmt { chunk_size, .. } => chunk_size,
-            Chunk::Md5 { chunk_size, .. } => chunk_size,
-            Chunk::Unknown { chunk_size, .. } => chunk_size,
+            Chunk::Fmt(e) => e.chunk_size,
+            Chunk::Md5(e) => e.chunk_size,
+            Chunk::Unknown { chunk_size, .. } => *chunk_size,
         }
     }
 
     pub fn summary(&self) -> String {
         match self {
-            Chunk::Fmt {
-                num_channels,
-                bits_per_sample,
-                sample_rate,
-                ..
-            } => {
-                format!(
-                    "{} chan, {}/{}",
-                    num_channels,
-                    bits_per_sample,
-                    sample_rate,
-                    // TODO: audio_format
-                )
-            }
-            Chunk::Md5 { md5, .. } => format!("MD5: {:X}", md5),
+            Chunk::Fmt(e) => e.summary(),
+            Chunk::Md5(e) => e.summary(),
             Chunk::Unknown { .. } => "...".to_owned(),
         }
     }
@@ -159,7 +183,7 @@ mod test {
                 chunk_id: FourCC(*b"RIFF"),
                 chunk_size: 2398,
                 form_type: FourCC(*b"WAVE"),
-                chunks: vec![Chunk::Fmt {
+                chunks: vec![Chunk::Fmt(FmtChunk {
                     chunk_id: FourCC(*b"fmt "),
                     chunk_size: 16,
                     audio_format: 1,
@@ -168,7 +192,7 @@ mod test {
                     byte_rate: 144000,
                     block_align: 3,
                     bits_per_sample: 24,
-                }],
+                })],
             },
         )];
         for (mut input, expected_output) in tests {
