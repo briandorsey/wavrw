@@ -259,7 +259,13 @@ fn main() -> Result<()> {
                 let wav = Wav::read(&mut file)?;
                 let mut offset: u32 = 12;
                 for chunk in wav.chunks {
-                    println!("{}, {}, {}", offset, chunk.chunk_id(), chunk.chunk_size());
+                    println!(
+                        "{}, {}, {}, {}",
+                        offset,
+                        chunk.chunk_id(),
+                        chunk.chunk_size(),
+                        chunk.summary()
+                    );
                     offset += chunk.chunk_size();
                 }
             }

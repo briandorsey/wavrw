@@ -1,9 +1,9 @@
-use binrw::{binrw, helpers, BinRead};
+use binrw::{binrw, helpers, io::SeekFrom};
 use std::fmt::{Debug, Display, Formatter};
 
 #[binrw]
 #[brw(big)]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
@@ -36,6 +36,20 @@ pub struct Wav {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Chunk {
+    #[br(magic = b"fmt ")]
+    Fmt {
+        #[br(seek_before = SeekFrom::Current(-4))]
+        chunk_id: FourCC,
+        chunk_size: u32,
+        audio_format: u16,
+        num_channels: u16,
+        sample_rate: u32,
+        byte_rate: u32,
+        block_align: u16,
+        bits_per_sample: u16,
+    },
+    #[br(magic = b"MD5 ")]
+    Md5 { chunk_size: u32, md5: u128 },
     Unknown {
         chunk_id: FourCC,
         chunk_size: u32,
@@ -45,14 +59,40 @@ pub enum Chunk {
 }
 
 impl Chunk {
-    pub fn chunk_id(&self) -> &FourCC {
+    pub fn chunk_id(&self) -> FourCC {
         match self {
-            Chunk::Unknown { chunk_id, .. } => chunk_id,
+            Chunk::Fmt { chunk_id, .. } => chunk_id.clone(),
+            Chunk::Md5 { .. } => FourCC(*b"MD5 "),
+            Chunk::Unknown { chunk_id, .. } => chunk_id.clone(),
         }
     }
+
     pub fn chunk_size(&self) -> &u32 {
         match self {
+            Chunk::Fmt { chunk_size, .. } => chunk_size,
+            Chunk::Md5 { chunk_size, .. } => chunk_size,
             Chunk::Unknown { chunk_size, .. } => chunk_size,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        match self {
+            Chunk::Fmt {
+                num_channels,
+                bits_per_sample,
+                sample_rate,
+                ..
+            } => {
+                format!(
+                    "{} chan, {}/{}",
+                    num_channels,
+                    bits_per_sample,
+                    sample_rate,
+                    // TODO: audio_format
+                )
+            }
+            Chunk::Md5 { md5, .. } => format!("MD5: {:X}", md5),
+            Chunk::Unknown { .. } => "...".to_owned(),
         }
     }
 }
@@ -60,11 +100,11 @@ impl Chunk {
 // TODO: test  offset += chunk.chunk_size(); equals actual chunk_id locaiton
 #[cfg(test)]
 mod test {
+    use binrw::BinRead; // don't understand why this is needed in this scope
     use std::io::Cursor;
 
     use super::*;
     use hex::decode;
-    // use hexdump::hexdump;
 
     fn hex_to_cursor(input: &str) -> Cursor<Vec<u8>> {
         let data = decode(input.replace(' ', "")).unwrap();
@@ -119,10 +159,15 @@ mod test {
                 chunk_id: FourCC(*b"RIFF"),
                 chunk_size: 2398,
                 form_type: FourCC(*b"WAVE"),
-                chunks: vec![Chunk::Unknown {
+                chunks: vec![Chunk::Fmt {
                     chunk_id: FourCC(*b"fmt "),
                     chunk_size: 16,
-                    raw: decode("0100010080BB00008032020003001800").unwrap(),
+                    audio_format: 1,
+                    num_channels: 1,
+                    sample_rate: 48000,
+                    byte_rate: 144000,
+                    block_align: 3,
+                    bits_per_sample: 24,
                 }],
             },
         )];
