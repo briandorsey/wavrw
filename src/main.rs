@@ -1,5 +1,6 @@
 use anyhow::Result;
 use binrw::BinRead;
+use binrw::NullString;
 use clap::{Parser, Subcommand};
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
@@ -7,6 +8,9 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
+
+mod wav;
+use wav::Wav;
 
 struct FileChunk {
     offset: u32,
@@ -33,7 +37,6 @@ impl Display for FileChunk {
 #[br(little)]
 #[allow(dead_code)]
 struct FmtChunk {
-    #[br(big)]
     audio_format: u16,
     num_channels: u16,
     sample_rate: u32,
@@ -63,9 +66,75 @@ impl Display for FmtChunk {
     }
 }
 
+#[derive(BinRead, Debug)]
+#[br(little)]
+#[allow(dead_code)]
+struct ListChunk {
+    #[br(big)]
+    chunk_id: [u8; 4],
+    chunk_size: u32,
+    list_type: [u8; 4],
+    // need to add magic here to choose the right enum
+    // items: ListType,
+}
+
+impl Display for ListChunk {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        writeln!(
+            f,
+            "{}",
+            String::from_utf8_lossy(&self.list_type),
+            // self.items
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(BinRead, Debug)]
+#[br(little)]
+//#[allow(dead_code)]
+struct InfoItem {
+    #[br(big)]
+    chunk_id: [u8; 4],
+    chunk_size: u32,
+    content: NullString,
+}
+
+impl Display for InfoItem {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "{:12}     {:4} {:-10} {}",
+            "???",
+            String::from_utf8_lossy(&self.chunk_id),
+            self.chunk_size,
+            self.content,
+        )
+    }
+}
+
+// #[derive(BinRead, Debug)]
+// #[br(little)]
+#[allow(dead_code)]
+enum ListType {
+    UnParsed,
+    // #[br(args { default: ListType::UnParsed})]
+    // Info(Vec<InfoItem>),
+}
+
+impl Display for ListType {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            ListType::UnParsed => write!(f, "Unparsed"),
+            // ListType::Info(item) => write!(f, "\n{item:?}"),
+        }
+    }
+}
+
 enum Chunk {
     UnParsed,
     Fmt(FmtChunk),
+    List(ListChunk),
 }
 
 impl Display for Chunk {
@@ -73,6 +142,7 @@ impl Display for Chunk {
         let output = match self {
             Chunk::UnParsed => "...".to_string(),
             Chunk::Fmt(chunk) => format!("{chunk}"),
+            Chunk::List(chunk) => format!("{chunk}"),
         };
         write!(f, "{}", output)
     }
@@ -117,6 +187,11 @@ fn parse_wav(file: &mut File) -> Result<WavInfo> {
                 let fmt = FmtChunk::read(file)?;
                 Chunk::Fmt(fmt)
             }
+            b"LIST" => {
+                file.seek(SeekFrom::Current(-8))?;
+                let list = ListChunk::read(file)?;
+                Chunk::List(list)
+            }
             _ => Chunk::UnParsed,
         };
 
@@ -153,7 +228,7 @@ enum Commands {
         wav_path: Vec<OsString>,
 
         #[arg(long, short)]
-        detailed: bool,
+        _detailed: bool,
     },
 }
 
@@ -161,7 +236,10 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match &args.command {
-        Commands::View { wav_path, detailed } => {
+        Commands::View {
+            wav_path,
+            _detailed,
+        } => {
             // TODO: move command logic into a function
             for path in wav_path {
                 println!("{}", path.to_string_lossy());
@@ -176,6 +254,14 @@ fn main() -> Result<()> {
                     println!();
                 }
                 println!();
+                file.seek(SeekFrom::Start(0))?;
+                // wav module version
+                let wav = Wav::read(&mut file)?;
+                let mut offset: u32 = 12;
+                for chunk in wav.chunks {
+                    println!("{}, {}, {}", offset, chunk.chunk_id(), chunk.chunk_size());
+                    offset += chunk.chunk_size();
+                }
             }
         }
     }
