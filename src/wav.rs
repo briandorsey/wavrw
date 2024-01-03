@@ -60,6 +60,27 @@ impl FmtChunk {
     }
 }
 
+#[binrw]
+#[br(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct ListChunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    chunk_id: FourCC,
+    chunk_size: u32,
+    list_type: FourCC,
+    // need to add magic here to choose the right enum
+    // items: ListType,
+    #[br(count = chunk_size -4 )]
+    #[bw()]
+    raw: Vec<u8>,
+}
+
+impl ListChunk {
+    pub fn summary(&self) -> String {
+        format!("{}", self.list_type)
+    }
+}
+
 // based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
@@ -84,6 +105,8 @@ pub enum Chunk {
     // TODO: add DATA parsing which skips actual data
     #[brw(magic = b"fmt ")]
     Fmt(FmtChunk),
+    #[brw(magic = b"LIST")]
+    List(ListChunk),
     #[brw(magic = b"MD5 ")]
     Md5(Md5Chunk),
     Unknown {
@@ -99,6 +122,7 @@ impl Chunk {
     pub fn chunk_id(&self) -> FourCC {
         match self {
             Chunk::Fmt(e) => e.chunk_id,
+            Chunk::List(e) => e.chunk_id,
             Chunk::Md5(e) => e.chunk_id,
             Chunk::Unknown { chunk_id, .. } => *chunk_id,
         }
@@ -107,6 +131,7 @@ impl Chunk {
     pub fn chunk_size(&self) -> u32 {
         match self {
             Chunk::Fmt(e) => e.chunk_size,
+            Chunk::List(e) => e.chunk_size,
             Chunk::Md5(e) => e.chunk_size,
             Chunk::Unknown { chunk_size, .. } => *chunk_size,
         }
@@ -115,6 +140,7 @@ impl Chunk {
     pub fn summary(&self) -> String {
         match self {
             Chunk::Fmt(e) => e.summary(),
+            Chunk::List(e) => e.summary(),
             Chunk::Md5(e) => e.summary(),
             Chunk::Unknown { .. } => "...".to_owned(),
         }
