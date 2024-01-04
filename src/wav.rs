@@ -1,5 +1,16 @@
 use binrw::{binrw, helpers, io::SeekFrom};
+use std::cmp::min;
+use std::ffi::CStr;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
+
+// TODO: test  offset += chunk.chunk_size(); equals actual chunk_id locaiton
+// TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on bw attributes.
+// consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
+// TODO: chunk_id -> id, chunk_size -> size
+
+// helper types
+// ----
 
 #[binrw]
 #[brw(big)]
@@ -19,6 +30,44 @@ impl Debug for FourCC {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+struct FixedStrErr;
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+/// FixedStr holds Null terminated fixed length strings (from BEXT for example)
+struct FixedStr<const N: usize>([u8; N]);
+
+impl<const N: usize> Display for FixedStr<N> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        let s: String = {
+            if N > 0 && self.0[N - 1] == 0u8 {
+                // TODO: fix unwrap()
+                let cstr = CStr::from_bytes_until_nul(&self.0).unwrap();
+                cstr.to_string_lossy().to_string()
+            } else {
+                String::from_utf8_lossy(&self.0).to_string()
+            }
+        };
+        write!(f, "{}", s)?;
+        Ok(())
+    }
+}
+
+impl<const N: usize> FromStr for FixedStr<N> {
+    type Err = FixedStrErr;
+
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        let mut array_tmp = [0u8; N];
+        array_tmp[..min(s.len(), N)].copy_from_slice(&s.as_bytes()[..min(s.len(), N)]);
+        Ok(FixedStr::<N>(array_tmp))
+    }
+}
+
+// parsing structs
+// ----
 
 #[binrw]
 #[brw(little)]
@@ -81,6 +130,32 @@ impl ListChunk {
     }
 }
 
+// BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct BextChunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    chunk_id: FourCC,
+    chunk_size: u32,
+    // #[br(map = |x: [u8;256]| String::from_utf8_lossy(&x).to_string())]
+    // #[bw(map = |x| {
+    //     let mut array_tmp = [0u8; 256];
+    //     array_tmp[..x.len()].copy_from_slice(x.as_bytes())
+    // })]
+    description: FixedStr<256>,
+    #[br(count = chunk_size - 256 )]
+    #[bw()]
+    raw: Vec<u8>,
+}
+
+impl BextChunk {
+    pub fn summary(&self) -> String {
+        let s = format!("{}", self.description);
+        format!("... BEXT\n{} {}", self.description, s.len())
+    }
+}
+
 // based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
@@ -107,6 +182,8 @@ pub enum Chunk {
     Fmt(FmtChunk),
     #[brw(magic = b"LIST")]
     List(ListChunk),
+    #[brw(magic = b"bext")]
+    Bext(BextChunk),
     #[brw(magic = b"MD5 ")]
     Md5(Md5Chunk),
     Unknown {
@@ -123,6 +200,7 @@ impl Chunk {
         match self {
             Chunk::Fmt(e) => e.chunk_id,
             Chunk::List(e) => e.chunk_id,
+            Chunk::Bext(e) => e.chunk_id,
             Chunk::Md5(e) => e.chunk_id,
             Chunk::Unknown { chunk_id, .. } => *chunk_id,
         }
@@ -132,6 +210,7 @@ impl Chunk {
         match self {
             Chunk::Fmt(e) => e.chunk_size,
             Chunk::List(e) => e.chunk_size,
+            Chunk::Bext(e) => e.chunk_size,
             Chunk::Md5(e) => e.chunk_size,
             Chunk::Unknown { chunk_size, .. } => *chunk_size,
         }
@@ -141,13 +220,13 @@ impl Chunk {
         match self {
             Chunk::Fmt(e) => e.summary(),
             Chunk::List(e) => e.summary(),
+            Chunk::Bext(e) => e.summary(),
             Chunk::Md5(e) => e.summary(),
             Chunk::Unknown { .. } => "...".to_owned(),
         }
     }
 }
 
-// TODO: test  offset += chunk.chunk_size(); equals actual chunk_id locaiton
 #[cfg(test)]
 mod test {
     use binrw::BinRead; // don't understand why this is needed in this scope
@@ -159,6 +238,21 @@ mod test {
     fn hex_to_cursor(input: &str) -> Cursor<Vec<u8>> {
         let data = decode(input.replace(' ', "")).unwrap();
         Cursor::new(data)
+    }
+
+    #[test]
+    fn fixed_string() {
+        let fs = FixedStr::<6>(*b"abc\0\0\0");
+        assert_eq!(6, fs.0.len());
+        let s = fs.to_string();
+        assert_eq!("abc".to_string(), s);
+        assert_eq!(3, s.len());
+        let new_fs = FixedStr::<6>::from_str(&s).unwrap();
+        assert_eq!(fs, new_fs);
+
+        let long_str = "this is a longer str";
+        let fs = FixedStr::<6>::from_str(long_str).unwrap();
+        assert_eq!("this i", fs.to_string());
     }
 
     #[test]
