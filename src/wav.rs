@@ -1,6 +1,5 @@
 use binrw::{binrw, helpers, io::SeekFrom};
 use std::cmp::min;
-use std::ffi::CStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
@@ -36,23 +35,25 @@ struct FixedStrErr;
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 /// FixedStr holds Null terminated fixed length strings (from BEXT for example)
 struct FixedStr<const N: usize>([u8; N]);
 
+impl<const N: usize> Debug for FixedStr<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "FixedStr<{}>(\"{}\")", N, self.to_string())
+    }
+}
+
 impl<const N: usize> Display for FixedStr<N> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        let s: String = {
-            if N > 0 && self.0[N - 1] == 0u8 {
-                // TODO: fix unwrap()
-                let cstr = CStr::from_bytes_until_nul(&self.0).unwrap();
-                cstr.to_string_lossy().to_string()
-            } else {
-                String::from_utf8_lossy(&self.0).to_string()
-            }
-        };
-        write!(f, "{}", s)?;
-        Ok(())
+        write!(
+            f,
+            "{}",
+            String::from_utf8_lossy(&self.0)
+                .trim_end_matches("\0")
+                .to_string()
+        )
     }
 }
 
@@ -61,7 +62,8 @@ impl<const N: usize> FromStr for FixedStr<N> {
 
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         let mut array_tmp = [0u8; N];
-        array_tmp[..min(s.len(), N)].copy_from_slice(&s.as_bytes()[..min(s.len(), N)]);
+        let l = min(s.len(), N);
+        array_tmp[..l].copy_from_slice(&s.as_bytes()[..l]);
         Ok(FixedStr::<N>(array_tmp))
     }
 }
@@ -131,6 +133,8 @@ impl ListChunk {
 }
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
+// BEXT is specified to use ASCII, but we're parsing it as utf8, since
+// that is a superset of ASCII and many WAV files contain utf8 strings here
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -249,7 +253,14 @@ mod test {
         assert_eq!(3, s.len());
         let new_fs = FixedStr::<6>::from_str(&s).unwrap();
         assert_eq!(fs, new_fs);
+        assert_eq!(6, fs.0.len());
+        assert_eq!(
+            b"\0\0\0"[..],
+            new_fs.0[3..6],
+            "extra space after the string should be null bytes"
+        );
 
+        // strings longer than fixed size should get truncated
         let long_str = "this is a longer str";
         let fs = FixedStr::<6>::from_str(long_str).unwrap();
         assert_eq!("this i", fs.to_string());
