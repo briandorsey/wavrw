@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
 // TODO: test  offset += chunk.chunk_size(); equals actual chunk_id locaiton
-// TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on bw attributes.
+// TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on brw attributes.
 // consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
 // TODO: chunk_id -> id, chunk_size -> size
 
@@ -142,21 +142,47 @@ pub struct BextChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
     chunk_id: FourCC,
     chunk_size: u32,
-    // #[br(map = |x: [u8;256]| String::from_utf8_lossy(&x).to_string())]
-    // #[bw(map = |x| {
-    //     let mut array_tmp = [0u8; 256];
-    //     array_tmp[..x.len()].copy_from_slice(x.as_bytes())
-    // })]
-    description: FixedStr<256>,
-    #[br(count = chunk_size - 256 )]
-    #[bw()]
-    raw: Vec<u8>,
+    /// Description of the sound sequence
+    description: FixedStr<256>, // Description
+    /// Name of the originator
+    originator: FixedStr<32>, // Originator
+    /// Reference of the originator
+    originator_reference: FixedStr<32>, // OriginatorReference
+    /// yyyy:mm:dd
+    origination_date: FixedStr<10>, // OriginationDate
+    /// hh:mm:ss
+    origination_time: FixedStr<8>, // OriginationTime
+    // TODO: validate endianness
+    /// First sample count since midnight
+    time_reference: u64, // TimeReference
+    /// Version of the BWF; unsigned binary number
+    version: u16, // Version
+    /// SMPTE UMID
+    // TODO: write UMID parser, based on: SMPTE 330M
+    umid: [u8; 64], // UMID
+    /// Integrated Loudness Value of the file in LUFS (multiplied by 100)
+    loudness_value: i16, // LoudnessValue
+    /// Integrated Loudness Range of the file in LUFS (multiplied by 100)
+    loudness_range: i16, // LoudnessRange
+    /// Maximum True Peak Level of the file expressed as dBTP (multiplied by 100)
+    max_true_peak_level: i16, // MaxTruePeakLevel
+    /// Highest value of the Momentary Loudness Level of the file in LUFS (multiplied by 100)
+    max_momentary_loudness: i16, // MaxMomentaryLoudness
+    /// Highest value of the Short-Term Loudness Level of the file in LUFS (multiplied by 100)
+    max_short_term_loudness: i16, // MaxShortTermLoudness
+    /// 180 bytes, reserved for future use, set to “NULL”
+    reserved: [u8; 180], // Reserved
+    /// History coding
+    // interpret the remaining bytes as string
+    #[br(align_after = 2, count = chunk_size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
+    #[bw(align_after = 2, map = |s: &String| s.as_bytes())]
+    coding_history: String, // CodingHistory
+                            // raw: Vec<u8>,
 }
 
 impl BextChunk {
     pub fn summary(&self) -> String {
-        let s = format!("{}", self.description);
-        format!("... BEXT\n{} {}", self.description, s.len())
+        format!("... BEXT\n{:?}", self)
     }
 }
 
@@ -201,6 +227,7 @@ pub enum Chunk {
 
 impl Chunk {
     pub fn chunk_id(&self) -> FourCC {
+        // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
             Chunk::Fmt(e) => e.chunk_id,
             Chunk::List(e) => e.chunk_id,
@@ -239,8 +266,10 @@ mod test {
     use super::*;
     use hex::decode;
 
-    fn hex_to_cursor(input: &str) -> Cursor<Vec<u8>> {
-        let data = decode(input.replace(' ', "")).unwrap();
+    fn hex_to_cursor(data: &str) -> Cursor<Vec<u8>> {
+        let data = data.replace(' ', "");
+        let data = data.replace('\n', "");
+        let data = decode(data).unwrap();
         Cursor::new(data)
     }
 
@@ -332,6 +361,82 @@ mod test {
             assert_eq!(expected_output, output);
             // hexdump(remaining_input);
         }
+    }
+
+    #[test]
+    fn parse_bext() {
+        // example bext chunk data from BWF MetaEdit
+        let mut buff = hex_to_cursor(
+            r#"62657874 67020000 44657363 72697074 696F6E00 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 4F726967 696E6174 6F720000 
+            00000000 00000000 00000000 00000000 00000000 4F726967 696E6174 
+            6F725265 66657265 6E636500 00000000 00000000 00000000 32303036 
+            2F30312F 30323033 3A30343A 30353930 00000000 00000200 060A2B34 
+            01010101 01010210 13000000 00FF122A 69370580 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 6400C800 2C019001 F4010000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+            00000000 00000000 00000000 00000000 00000000 00000000 0000436F 
+            64696E67 48697374 6F7279"#,
+        );
+        // work around for FourCC parsing location... TODO: can we move this seek to enclosing enum?
+        buff.set_position(4);
+        let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
+        print!("{:?}", bext);
+        assert_eq!(
+            bext.description,
+            FixedStr::<256>::from_str("Description").unwrap(),
+            "description"
+        );
+        assert_eq!(
+            bext.originator,
+            FixedStr::<32>::from_str("Originator").unwrap(),
+            "originator"
+        );
+        assert_eq!(
+            bext.originator_reference,
+            FixedStr::<32>::from_str("OriginatorReference").unwrap(),
+            "originator_reference"
+        );
+        assert_eq!(
+            bext.origination_date,
+            FixedStr::<10>::from_str("2006/01/02").unwrap(),
+            "origination_date"
+        );
+        assert_eq!(
+            bext.origination_time,
+            FixedStr::<8>::from_str("03:04:05").unwrap(),
+            "origination_time"
+        );
+        assert_eq!(bext.time_reference, 12345, "time_reference");
+        assert_eq!(bext.version, 2);
+        assert_eq!(
+            bext.umid,
+            <Vec<u8> as TryInto<[u8; 64]>>::try_into(
+                decode("060A2B3401010101010102101300000000FF122A6937058000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()
+            )
+            .unwrap(),
+            "version"
+        );
+        assert_eq!(bext.loudness_value, 100, "loudness_value");
+        assert_eq!(bext.loudness_range, 200, "loudness_range");
+        assert_eq!(bext.max_true_peak_level, 300, "max_true_peak_level");
+        assert_eq!(bext.max_momentary_loudness, 400, "max_momentary_loudness");
+        assert_eq!(bext.max_short_term_loudness, 500, "max_short_term_loudness");
+        assert_eq!(bext.reserved.len(), 180, "reserved");
+        assert_eq!(bext.coding_history, "CodingHistory", "coding_history");
     }
 
     #[test]
