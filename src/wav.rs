@@ -41,7 +41,7 @@ struct FixedStr<const N: usize>([u8; N]);
 
 impl<const N: usize> Debug for FixedStr<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "FixedStr<{}>(\"{}\")", N, self.to_string())
+        write!(f, "FixedStr<{}>(\"{}\")", N, self)
     }
 }
 
@@ -50,9 +50,7 @@ impl<const N: usize> Display for FixedStr<N> {
         write!(
             f,
             "{}",
-            String::from_utf8_lossy(&self.0)
-                .trim_end_matches("\0")
-                .to_string()
+            String::from_utf8_lossy(&self.0).trim_end_matches('\0')
         )
     }
 }
@@ -80,6 +78,7 @@ pub struct Wav {
     pub chunk_size: u32,
     pub form_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
+    // TODO: revisit this enum design... chunks are large... maybe it should be a Vec of Traits instead? Research how binrw parsing might work in that case. Maybe go back to parsing each chunk while manually iterating through the file?
     pub chunks: Vec<Chunk>,
 }
 
@@ -152,7 +151,7 @@ pub struct BextChunk {
     origination_date: FixedStr<10>, // OriginationDate
     /// hh:mm:ss
     origination_time: FixedStr<8>, // OriginationTime
-    // TODO: validate endianness
+    // TODO: validate endianness, spec has DWORD high then DWORD low
     /// First sample count since midnight
     time_reference: u64, // TimeReference
     /// Version of the BWF; unsigned binary number
@@ -182,7 +181,10 @@ pub struct BextChunk {
 
 impl BextChunk {
     pub fn summary(&self) -> String {
-        format!("... BEXT\n{:?}", self)
+        format!(
+            "{}, {}, {}",
+            self.origination_date, self.origination_time, self.description
+        )
     }
 }
 
@@ -199,7 +201,7 @@ pub struct Md5Chunk {
 
 impl Md5Chunk {
     pub fn summary(&self) -> String {
-        format!("MD5: {:X}", self.md5)
+        format!("0x{:X}", self.md5)
     }
 }
 
@@ -213,7 +215,7 @@ pub enum Chunk {
     #[brw(magic = b"LIST")]
     List(ListChunk),
     #[brw(magic = b"bext")]
-    Bext(BextChunk),
+    Bext(Box<BextChunk>),
     #[brw(magic = b"MD5 ")]
     Md5(Md5Chunk),
     Unknown {

@@ -52,6 +52,7 @@ fn main() -> Result<()> {
                         offset,
                         chunk.chunk_id(),
                         chunk.chunk_size(),
+                        // TODO: truncate summary & add ... when long
                         chunk.summary()
                     );
                     offset += chunk.chunk_size();
