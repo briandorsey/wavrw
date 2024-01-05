@@ -7,7 +7,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 
 mod wav;
-use wav::Wav;
+use wav::WavMetadata;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
                 println!("{}", path.to_string_lossy());
                 let mut file = File::open(path)?;
                 file.seek(SeekFrom::Start(0))?;
-                let wav = Wav::read(&mut file)?;
+                let wav = WavMetadata::read(&mut file)?;
                 let mut offset: u32 = 12;
                 println!("      offset id   size summary");
 

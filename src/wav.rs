@@ -1,4 +1,7 @@
+use binrw::io::TakeSeekExt;
+use binrw::NullString;
 use binrw::{binrw, helpers, io::SeekFrom};
+use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -72,7 +75,7 @@ impl<const N: usize> FromStr for FixedStr<N> {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 // http://www.tactilemedia.com/info/MCI_Control_Info.html
-pub struct Wav {
+pub struct WavMetadata {
     pub id: FourCC,
     pub size: u32,
     pub form_type: FourCC,
@@ -109,13 +112,98 @@ impl FmtChunk {
     }
 }
 
+// based on http://soundfile.sapp.org/doc/WaveFormat/
+/// data chunk parser which skips all audio data
 #[binrw]
-#[br(little)]
+#[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListChunk {
+pub struct DataChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
+    #[brw(seek_before = SeekFrom::Current(size.clone().into()), ignore)]
+    end_of_chunk: [u8; 0],
+}
+
+impl DataChunk {
+    pub fn summary(&self) -> String {
+        format!("audio data, len: {} bytes", self.size)
+    }
+}
+
+#[binrw]
+#[br(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct ListInfoChunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    id: FourCC,
+    size: u32,
+    #[brw(magic = b"INFO", seek_before = SeekFrom::Current(-4))]
+    list_type: FourCC,
+    #[br(map_stream = |reader| reader.take_seek(size as u64 - 4u64), parse_with = helpers::until_eof)]
+    #[bw()]
+    chunks: Vec<InfoChunk>,
+}
+
+impl ListInfoChunk {
+    pub fn summary(&self) -> String {
+        format!(
+            "{}: {}",
+            self.list_type,
+            self.chunks.iter().map(|c| c.id()).join(", ")
+        )
+    }
+}
+
+#[binrw]
+#[br(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum InfoChunk {
+    // TODO: the rest of the INFO chunks
+    #[brw(magic = b"ISFT")]
+    Isft {
+        #[br(seek_before = SeekFrom::Current(-4))]
+        id: FourCC,
+        size: u32,
+        #[brw(pad_size_to= size.to_owned())]
+        value: NullString,
+    },
+    Unknown {
+        id: FourCC,
+        size: u32,
+        #[brw(pad_size_to= size.to_owned())]
+        value: NullString,
+    },
+}
+
+impl InfoChunk {
+    pub fn id(&self) -> FourCC {
+        match self {
+            InfoChunk::Isft { id, .. } => *id,
+            InfoChunk::Unknown { id, .. } => *id,
+        }
+    }
+
+    pub fn _value(&self) -> String {
+        match self {
+            InfoChunk::Isft { value, .. } => (*value).to_string(),
+            InfoChunk::Unknown { value, .. } => (*value).to_string(),
+        }
+    }
+
+    pub fn _summary(&self) -> String {
+        format!("{}: {}", self.id(), self._value())
+    }
+}
+
+#[binrw]
+#[br(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct ListAdtlChunk {
+    #[brw(seek_before = SeekFrom::Current(-4))]
+    id: FourCC,
+    size: u32,
+    #[brw(magic = b"adtl", seek_before = SeekFrom::Current(-4))]
     list_type: FourCC,
     // need to add magic here to choose the right enum
     // items: ListType,
@@ -124,7 +212,7 @@ pub struct ListChunk {
     raw: Vec<u8>,
 }
 
-impl ListChunk {
+impl ListAdtlChunk {
     pub fn summary(&self) -> String {
         format!("{}", self.list_type)
     }
@@ -175,7 +263,6 @@ pub struct BextChunk {
     #[br(align_after = 2, count = size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
     #[bw(align_after = 2, map = |s: &String| s.as_bytes())]
     coding_history: String, // CodingHistory
-                            // raw: Vec<u8>,
 }
 
 impl BextChunk {
@@ -211,8 +298,12 @@ pub enum Chunk {
     // TODO: add DATA parsing which skips actual data
     #[brw(magic = b"fmt ")]
     Fmt(FmtChunk),
+    #[brw(magic = b"data")]
+    Data(DataChunk),
     #[brw(magic = b"LIST")]
-    List(ListChunk),
+    Info(ListInfoChunk),
+    #[brw(magic = b"LIST")]
+    Adtl(ListAdtlChunk),
     #[brw(magic = b"bext")]
     Bext(Box<BextChunk>),
     #[brw(magic = b"MD5 ")]
@@ -231,7 +322,9 @@ impl Chunk {
         // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
             Chunk::Fmt(e) => e.id,
-            Chunk::List(e) => e.id,
+            Chunk::Data(e) => e.id,
+            Chunk::Info(e) => e.id,
+            Chunk::Adtl(e) => e.id,
             Chunk::Bext(e) => e.id,
             Chunk::Md5(e) => e.id,
             Chunk::Unknown { id, .. } => *id,
@@ -241,7 +334,9 @@ impl Chunk {
     pub fn size(&self) -> u32 {
         match self {
             Chunk::Fmt(e) => e.size,
-            Chunk::List(e) => e.size,
+            Chunk::Data(e) => e.size,
+            Chunk::Info(e) => e.size,
+            Chunk::Adtl(e) => e.size,
             Chunk::Bext(e) => e.size,
             Chunk::Md5(e) => e.size,
             Chunk::Unknown { size, .. } => *size,
@@ -251,7 +346,9 @@ impl Chunk {
     pub fn summary(&self) -> String {
         match self {
             Chunk::Fmt(e) => e.summary(),
-            Chunk::List(e) => e.summary(),
+            Chunk::Data(e) => e.summary(),
+            Chunk::Info(e) => e.summary(),
+            Chunk::Adtl(e) => e.summary(),
             Chunk::Bext(e) => e.summary(),
             Chunk::Md5(e) => e.summary(),
             Chunk::Unknown { .. } => "...".to_owned(),
@@ -302,9 +399,9 @@ mod test {
         let header = "524946465E09000057415645";
         let mut data = hex_to_cursor(header);
         println!("{header:?}");
-        let wavfile = Wav::read(&mut data).unwrap();
+        let wavfile = WavMetadata::read(&mut data).unwrap();
         assert_eq!(
-            Wav {
+            WavMetadata {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),
@@ -340,7 +437,7 @@ mod test {
         );
         let tests = [(
             data,
-            Wav {
+            WavMetadata {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),
@@ -358,7 +455,7 @@ mod test {
         )];
         for (mut input, expected_output) in tests {
             // hexdump(input);
-            let output = Wav::read(&mut input).expect("error parsing wav");
+            let output = WavMetadata::read(&mut input).expect("error parsing wav");
             assert_eq!(expected_output, output);
             // hexdump(remaining_input);
         }
