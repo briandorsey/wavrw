@@ -3,10 +3,9 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
-// TODO: test  offset += chunk.chunk_size(); equals actual chunk_id locaiton
+// TODO: test  offset += chunk.size(); equals actual id locaiton
 // TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on brw attributes.
 // consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
-// TODO: chunk_id -> id, chunk_size -> size
 
 // helper types
 // ----
@@ -74,8 +73,8 @@ impl<const N: usize> FromStr for FixedStr<N> {
 #[derive(Debug, PartialEq, Eq)]
 // http://www.tactilemedia.com/info/MCI_Control_Info.html
 pub struct Wav {
-    pub chunk_id: FourCC,
-    pub chunk_size: u32,
+    pub id: FourCC,
+    pub size: u32,
     pub form_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     // TODO: revisit this enum design... chunks are large... maybe it should be a Vec of Traits instead? Research how binrw parsing might work in that case. Maybe go back to parsing each chunk while manually iterating through the file?
@@ -88,8 +87,8 @@ pub struct Wav {
 #[derive(Debug, PartialEq, Eq)]
 pub struct FmtChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
-    chunk_id: FourCC,
-    chunk_size: u32,
+    id: FourCC,
+    size: u32,
     audio_format: u16,
     num_channels: u16,
     sample_rate: u32,
@@ -115,12 +114,12 @@ impl FmtChunk {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
-    chunk_id: FourCC,
-    chunk_size: u32,
+    id: FourCC,
+    size: u32,
     list_type: FourCC,
     // need to add magic here to choose the right enum
     // items: ListType,
-    #[br(count = chunk_size -4 )]
+    #[br(count = size -4 )]
     #[bw()]
     raw: Vec<u8>,
 }
@@ -139,8 +138,8 @@ impl ListChunk {
 #[derive(Debug, PartialEq, Eq)]
 pub struct BextChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
-    chunk_id: FourCC,
-    chunk_size: u32,
+    id: FourCC,
+    size: u32,
     /// Description of the sound sequence
     description: FixedStr<256>, // Description
     /// Name of the originator
@@ -173,7 +172,7 @@ pub struct BextChunk {
     reserved: [u8; 180], // Reserved
     /// History coding
     // interpret the remaining bytes as string
-    #[br(align_after = 2, count = chunk_size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
+    #[br(align_after = 2, count = size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
     #[bw(align_after = 2, map = |s: &String| s.as_bytes())]
     coding_history: String, // CodingHistory
                             // raw: Vec<u8>,
@@ -194,8 +193,8 @@ impl BextChunk {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Md5Chunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
-    chunk_id: FourCC,
-    chunk_size: u32,
+    id: FourCC,
+    size: u32,
     md5: u128,
 }
 
@@ -219,33 +218,33 @@ pub enum Chunk {
     #[brw(magic = b"MD5 ")]
     Md5(Md5Chunk),
     Unknown {
-        chunk_id: FourCC,
-        chunk_size: u32,
-        #[br(count = chunk_size )]
+        id: FourCC,
+        size: u32,
+        #[br(count = size )]
         #[bw()]
         raw: Vec<u8>,
     },
 }
 
 impl Chunk {
-    pub fn chunk_id(&self) -> FourCC {
+    pub fn id(&self) -> FourCC {
         // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
-            Chunk::Fmt(e) => e.chunk_id,
-            Chunk::List(e) => e.chunk_id,
-            Chunk::Bext(e) => e.chunk_id,
-            Chunk::Md5(e) => e.chunk_id,
-            Chunk::Unknown { chunk_id, .. } => *chunk_id,
+            Chunk::Fmt(e) => e.id,
+            Chunk::List(e) => e.id,
+            Chunk::Bext(e) => e.id,
+            Chunk::Md5(e) => e.id,
+            Chunk::Unknown { id, .. } => *id,
         }
     }
 
-    pub fn chunk_size(&self) -> u32 {
+    pub fn size(&self) -> u32 {
         match self {
-            Chunk::Fmt(e) => e.chunk_size,
-            Chunk::List(e) => e.chunk_size,
-            Chunk::Bext(e) => e.chunk_size,
-            Chunk::Md5(e) => e.chunk_size,
-            Chunk::Unknown { chunk_size, .. } => *chunk_size,
+            Chunk::Fmt(e) => e.size,
+            Chunk::List(e) => e.size,
+            Chunk::Bext(e) => e.size,
+            Chunk::Md5(e) => e.size,
+            Chunk::Unknown { size, .. } => *size,
         }
     }
 
@@ -306,8 +305,8 @@ mod test {
         let wavfile = Wav::read(&mut data).unwrap();
         assert_eq!(
             Wav {
-                chunk_id: FourCC(*b"RIFF"),
-                chunk_size: 2398,
+                id: FourCC(*b"RIFF"),
+                size: 2398,
                 form_type: FourCC(*b"WAVE"),
                 chunks: vec![],
             },
@@ -316,13 +315,13 @@ mod test {
     }
 
     // #[test]
-    // fn parse_chunk_length() {
+    // fn parse_length() {
     //     let tests = [(
     //         &decode("666D7420 10000000 01000100 80BB0000 80320200 03001800".replace(' ', ""))
     //             .unwrap(),
     //         UnknownChunk {
-    //             chunk_id: "fmt ".as_bytes().try_into().unwrap(),
-    //             chunk_size: 16,
+    //             id: "fmt ".as_bytes().try_into().unwrap(),
+    //             size: 16,
     //         },
     //         &[] as &[u8],
     //     )];
@@ -342,12 +341,12 @@ mod test {
         let tests = [(
             data,
             Wav {
-                chunk_id: FourCC(*b"RIFF"),
-                chunk_size: 2398,
+                id: FourCC(*b"RIFF"),
+                size: 2398,
                 form_type: FourCC(*b"WAVE"),
                 chunks: vec![Chunk::Fmt(FmtChunk {
-                    chunk_id: FourCC(*b"fmt "),
-                    chunk_size: 16,
+                    id: FourCC(*b"fmt "),
+                    size: 16,
                     audio_format: 1,
                     num_channels: 1,
                     sample_rate: 48000,

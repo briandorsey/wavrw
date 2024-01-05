@@ -44,18 +44,18 @@ fn main() -> Result<()> {
                 file.seek(SeekFrom::Start(0))?;
                 let wav = Wav::read(&mut file)?;
                 let mut offset: u32 = 12;
-                println!("      offset chunk_id   size summary");
+                println!("      offset id   size summary");
 
                 for chunk in wav.chunks {
                     println!(
                         "{:12} {:8} {:>10} {}",
                         offset,
-                        chunk.chunk_id(),
-                        chunk.chunk_size(),
+                        chunk.id(),
+                        chunk.size(),
                         // TODO: truncate summary & add ... when long
                         chunk.summary()
                     );
-                    offset += chunk.chunk_size();
+                    offset += chunk.size();
                 }
             }
         }
