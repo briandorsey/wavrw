@@ -6,6 +6,7 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
+// TODO: enum for fmt chunk
 // TODO: test  offset += chunk.size(); equals actual id locaiton
 // TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on brw attributes.
 // consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
@@ -27,7 +28,8 @@ impl Display for FourCC {
 
 impl Debug for FourCC {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "FourCC({})", String::from_utf8_lossy(&self.0),)?;
+        write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
+        write!(f, "{:?})", &self.0)?;
         Ok(())
     }
 }
@@ -40,6 +42,8 @@ struct FixedStrErr;
 #[derive(PartialEq, Eq)]
 /// FixedStr holds Null terminated fixed length strings (from BEXT for example)
 struct FixedStr<const N: usize>([u8; N]);
+
+// FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
 
 impl<const N: usize> Debug for FixedStr<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -99,6 +103,7 @@ pub struct FmtChunk {
     block_align: u16,
     bits_per_sample: u16,
 }
+// TODO: properly handle different fmt chunk additions from later specs
 
 impl FmtChunk {
     pub fn summary(&self) -> String {
@@ -113,7 +118,7 @@ impl FmtChunk {
 }
 
 // based on http://soundfile.sapp.org/doc/WaveFormat/
-/// data chunk parser which skips all audio data
+/// `data` chunk parser which skips all audio data
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -162,16 +167,26 @@ pub enum InfoChunk {
     // TODO: the rest of the INFO chunks
     #[brw(magic = b"ISFT")]
     Isft {
-        #[br(seek_before = SeekFrom::Current(-4))]
+        #[brw(seek_before = SeekFrom::Current(-4))]
         id: FourCC,
         size: u32,
-        #[brw(pad_size_to= size.to_owned())]
+        #[brw(align_after = 2, pad_size_to= size.to_owned())]
+        value: NullString,
+    },
+    #[brw(magic = b"ICMT")]
+    Icmt {
+        #[brw(seek_before = SeekFrom::Current(-4))]
+        id: FourCC,
+        size: u32,
+        #[brw(align_after = 2, pad_size_to= size.to_owned())]
         value: NullString,
     },
     Unknown {
+        // #[br(dbg)]
         id: FourCC,
+        // #[br(dbg)]
         size: u32,
-        #[brw(pad_size_to= size.to_owned())]
+        #[brw(align_after=2, pad_size_to= size.to_owned())]
         value: NullString,
     },
 }
@@ -180,6 +195,7 @@ impl InfoChunk {
     pub fn id(&self) -> FourCC {
         match self {
             InfoChunk::Isft { id, .. } => *id,
+            InfoChunk::Icmt { id, .. } => *id,
             InfoChunk::Unknown { id, .. } => *id,
         }
     }
@@ -187,6 +203,7 @@ impl InfoChunk {
     pub fn _value(&self) -> String {
         match self {
             InfoChunk::Isft { value, .. } => (*value).to_string(),
+            InfoChunk::Icmt { value, .. } => (*value).to_string(),
             InfoChunk::Unknown { value, .. } => (*value).to_string(),
         }
     }
