@@ -7,6 +7,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 
 mod wav;
+use wav::Chunk;
 use wav::WavMetadata;
 
 #[derive(Parser, Debug)]
@@ -25,7 +26,7 @@ enum Commands {
         wav_path: Vec<OsString>,
 
         #[arg(long, short)]
-        _detailed: bool,
+        detailed: bool,
     },
 }
 
@@ -33,10 +34,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match &args.command {
-        Commands::View {
-            wav_path,
-            _detailed,
-        } => {
+        Commands::View { wav_path, detailed } => {
             // TODO: move command logic into a function
             for path in wav_path {
                 println!("{}", path.to_string_lossy());
@@ -55,6 +53,13 @@ fn main() -> Result<()> {
                         // TODO: truncate summary & add ... when long
                         chunk.summary()
                     );
+                    if *detailed {
+                        if let Chunk::Fmt(ref fmt) = chunk {
+                            for (key, value) in fmt {
+                                println!("{key:>27} : {value}");
+                            }
+                        }
+                    }
                     offset += chunk.size();
                 }
             }

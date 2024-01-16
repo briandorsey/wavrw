@@ -96,10 +96,10 @@ pub struct FmtChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
-    audio_format: u16,
-    num_channels: u16,
-    sample_rate: u32,
-    byte_rate: u32,
+    format_tag: u16,
+    channels: u16,
+    samples_per_sec: u32,
+    avg_bytes_per_sec: u32,
     block_align: u16,
     bits_per_sample: u16,
 }
@@ -109,11 +109,53 @@ impl FmtChunk {
     pub fn summary(&self) -> String {
         format!(
             "{} chan, {}/{}",
-            self.num_channels,
+            self.channels,
             self.bits_per_sample,
-            self.sample_rate,
-            // TODO: audio_format
+            self.samples_per_sec,
+            // TODO: format_tag
         )
+    }
+}
+
+impl<'a> IntoIterator for &'a FmtChunk {
+    type Item = (String, String);
+    type IntoIter = FmtChunkIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FmtChunkIterator {
+            fmt: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct FmtChunkIterator<'a> {
+    fmt: &'a FmtChunk,
+    index: usize,
+}
+
+impl<'a> Iterator for FmtChunkIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("format_tag".to_string(), self.fmt.format_tag.to_string())),
+            2 => Some(("channels".to_string(), self.fmt.channels.to_string())),
+            3 => Some((
+                "samples_per_sec".to_string(),
+                self.fmt.samples_per_sec.to_string(),
+            )),
+            4 => Some((
+                "avg_bytes_per_sec".to_string(),
+                self.fmt.avg_bytes_per_sec.to_string(),
+            )),
+            5 => Some(("block_align".to_string(), self.fmt.block_align.to_string())),
+            6 => Some((
+                "bits_per_sample".to_string(),
+                self.fmt.bits_per_sample.to_string(),
+            )),
+            _ => None,
+        }
     }
 }
 
@@ -461,10 +503,10 @@ mod test {
                 chunks: vec![Chunk::Fmt(FmtChunk {
                     id: FourCC(*b"fmt "),
                     size: 16,
-                    audio_format: 1,
-                    num_channels: 1,
-                    sample_rate: 48000,
-                    byte_rate: 144000,
+                    format_tag: 1,
+                    channels: 1,
+                    samples_per_sec: 48000,
+                    avg_bytes_per_sec: 144000,
                     block_align: 3,
                     bits_per_sample: 24,
                 })],

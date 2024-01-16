@@ -73,6 +73,17 @@ need_stdout = true
 allow_warnings = true
 background = true
 
+[jobs.run_view_detailed]
+command = [
+    "cargo", "run",
+    "--color", "always",
+    # put launch parameters for your program behind a `--` separator
+    "--", "view", "--detailed", "test_wavs/1khz_sine_48k_mono_region_marker-metadata.wav",
+]
+need_stdout = true
+allow_warnings = true
+background = true
+
 # This parameterized job runs the example of your choice, as soon
 # as the code compiles.
 # Call it as
@@ -89,3 +100,4 @@ allow_warnings = true
 [keybindings]
 # alt-m = "job:my-job"
 v = "job:run_view"
+d = "job:run_view_detailed"
