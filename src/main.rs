@@ -7,7 +7,6 @@ use std::io::Seek;
 use std::io::SeekFrom;
 
 mod wav;
-use wav::Chunk;
 use wav::WavMetadata;
 
 #[derive(Parser, Debug)]
@@ -42,7 +41,7 @@ fn main() -> Result<()> {
                 file.seek(SeekFrom::Start(0))?;
                 let wav = WavMetadata::read(&mut file)?;
                 let mut offset: u32 = 12;
-                println!("      offset id   size summary");
+                println!("      offset id         size summary");
 
                 for chunk in wav.chunks {
                     println!(
@@ -54,10 +53,8 @@ fn main() -> Result<()> {
                         chunk.summary()
                     );
                     if *detailed {
-                        if let Chunk::Fmt(ref fmt) = chunk {
-                            for (key, value) in fmt {
-                                println!("{key:>27} : {value}");
-                            }
+                        for (key, value) in chunk.items() {
+                            println!("             |{key:>23} : {value}");
                         }
                     }
                     offset += chunk.size();

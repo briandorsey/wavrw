@@ -115,7 +115,13 @@ impl FmtChunk {
             // TODO: format_tag
         )
     }
+
+    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
 }
+
+// Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
 impl<'a> IntoIterator for &'a FmtChunk {
     type Item = (String, String);
@@ -200,8 +206,11 @@ impl ListInfoChunk {
             self.chunks.iter().map(|c| c.id()).join(", ")
         )
     }
-}
 
+    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
+    }
+}
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -242,16 +251,16 @@ impl InfoChunk {
         }
     }
 
-    pub fn _value(&self) -> String {
+    pub fn value(&self) -> String {
         match self {
             InfoChunk::Isft { value, .. } => (*value).to_string(),
             InfoChunk::Icmt { value, .. } => (*value).to_string(),
-            InfoChunk::Unknown { value, .. } => (*value).to_string(),
+            InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
         }
     }
 
     pub fn _summary(&self) -> String {
-        format!("{}: {}", self.id(), self._value())
+        format!("{}: {}", self.id(), self.value())
     }
 }
 
@@ -331,6 +340,87 @@ impl BextChunk {
             self.origination_date, self.origination_time, self.description
         )
     }
+
+    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
+}
+
+impl<'a> IntoIterator for &'a BextChunk {
+    type Item = (String, String);
+    type IntoIter = BextChunkIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BextChunkIterator {
+            bext: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct BextChunkIterator<'a> {
+    bext: &'a BextChunk,
+    index: usize,
+}
+
+impl<'a> Iterator for BextChunkIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("description".to_string(), self.bext.description.to_string())),
+            2 => Some(("originator".to_string(), self.bext.originator.to_string())),
+            3 => Some((
+                "origination_date".to_string(),
+                self.bext.origination_date.to_string(),
+            )),
+            4 => Some((
+                "origination_time".to_string(),
+                self.bext.origination_time.to_string(),
+            )),
+            5 => Some((
+                "time_reference".to_string(),
+                self.bext.time_reference.to_string(),
+            )),
+            6 => Some(("version".to_string(), self.bext.version.to_string())),
+            7 => Some((
+                "umid".to_string(),
+                format!(
+                    "0x{:}",
+                    self.bext
+                        .umid
+                        .iter()
+                        .map(|b| format!("{:02X}", b))
+                        .collect::<String>()
+                ),
+            )),
+            8 => Some((
+                "loudness_value".to_string(),
+                self.bext.loudness_value.to_string(),
+            )),
+            9 => Some((
+                "loudness_range".to_string(),
+                self.bext.loudness_range.to_string(),
+            )),
+            10 => Some((
+                "max_true_peak_level".to_string(),
+                self.bext.max_true_peak_level.to_string(),
+            )),
+            11 => Some((
+                "max_momentary_loudness".to_string(),
+                self.bext.max_momentary_loudness.to_string(),
+            )),
+            12 => Some((
+                "max_short_term_loudness".to_string(),
+                self.bext.max_short_term_loudness.to_string(),
+            )),
+            13 => Some((
+                "coding_history".to_string(),
+                self.bext.coding_history.to_string(),
+            )),
+            _ => None,
+        }
+    }
 }
 
 // based on https://mediaarea.net/BWFMetaEdit/md5
@@ -377,6 +467,7 @@ pub enum Chunk {
 }
 
 impl Chunk {
+    /// Returns the [FourCC] (chunk id) for the contained chunk.
     pub fn id(&self) -> FourCC {
         // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
@@ -390,6 +481,7 @@ impl Chunk {
         }
     }
 
+    /// Returns the logical (used) size in bytes of the contained chunk.
     pub fn size(&self) -> u32 {
         match self {
             Chunk::Fmt(e) => e.size,
@@ -402,6 +494,7 @@ impl Chunk {
         }
     }
 
+    /// Returns a short text summary of the contents of the contained chunk.
     pub fn summary(&self) -> String {
         match self {
             Chunk::Fmt(e) => e.summary(),
@@ -411,6 +504,17 @@ impl Chunk {
             Chunk::Bext(e) => e.summary(),
             Chunk::Md5(e) => e.summary(),
             Chunk::Unknown { .. } => "...".to_owned(),
+        }
+    }
+
+    /// Returns an iterator over a sequence of contents of the contained
+    /// chunk as (field, value).
+    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        match self {
+            Chunk::Fmt(e) => Box::new(e.into_iter()),
+            Chunk::Info(e) => Box::new(e.items()),
+            Chunk::Bext(e) => Box::new(e.items()),
+            _ => Box::new(std::iter::empty()),
         }
     }
 }
