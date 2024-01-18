@@ -13,3 +13,10 @@ clap = { version = "4.1.1", features = ["derive"] }
 hex = "0.4.3"
 hexdump = "0.1.1"
 itertools = "0.12.0"
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+
+[[bench]]
+name = "my_benchmark"
+harness = false

@@ -383,17 +383,7 @@ impl<'a> Iterator for BextChunkIterator<'a> {
                 self.bext.time_reference.to_string(),
             )),
             6 => Some(("version".to_string(), self.bext.version.to_string())),
-            7 => Some((
-                "umid".to_string(),
-                format!(
-                    "0x{:}",
-                    self.bext
-                        .umid
-                        .iter()
-                        .map(|b| format!("{:02X}", b))
-                        .collect::<String>()
-                ),
-            )),
+            7 => Some(("umid".to_string(), hex::encode(self.bext.umid))),
             8 => Some((
                 "loudness_value".to_string(),
                 self.bext.loudness_value.to_string(),
