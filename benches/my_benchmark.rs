@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use hex;
+use std::fmt::Write;
 
 fn hex_benchmark(c: &mut Criterion) {
     let input_int = 73968139221736414906607698143988937859_u128;
@@ -25,8 +25,10 @@ fn hex_iter(input: u128) -> String {
     input
         .to_be_bytes()
         .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect::<String>()
+        .fold(String::new(), |mut output, b| {
+            let _ = write!(&mut output, "{:02X}", b);
+            output
+        })
 }
 
 criterion_group!(benches, hex_benchmark);

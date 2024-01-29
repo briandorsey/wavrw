@@ -86,7 +86,7 @@ pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Err
         reader.read_exact(&mut buff)?;
         // TODO: convert assert into returned wav error type
         assert_eq!(&buff, b"RIFF", "{} != RIFF", String::from_utf8_lossy(&buff));
-        buff.clone()
+        buff
     };
     let data_size = {
         reader.read_exact(&mut buff)?;
@@ -96,7 +96,7 @@ pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Err
         reader.read_exact(&mut buff)?;
         // TODO: convert assert into returned wav error type
         assert_eq!(&buff, b"WAVE", "{} != WAVE", String::from_utf8_lossy(&buff));
-        buff.clone()
+        buff
     };
     let mut offset = 12;
     let mut chunks: Vec<BinResult<Chunk>> = Vec::new();
@@ -105,7 +105,7 @@ pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Err
         // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
         let current = {
             reader.read_exact(&mut buff)?;
-            FourCC(buff.clone())
+            FourCC(buff)
         };
         // dbg!(current);
         let current_size = {
