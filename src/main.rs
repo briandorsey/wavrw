@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binrw::BinRead;
+// use binrw::BinRead;
 use clap::{Parser, Subcommand};
 use std::ffi::OsString;
 use std::fs::File;
@@ -7,7 +7,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 
 mod wav;
-use wav::WavMetadata;
+// use wav::WavMetadata;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -20,7 +20,6 @@ struct Args {
 enum Commands {
     /// Summarize WAV file structure and metadata
     View {
-        // TODO: figure out the right way to make this an OS path safe string
         /// One or more paths to WAV files
         wav_path: Vec<OsString>,
 
@@ -39,25 +38,36 @@ fn main() -> Result<()> {
                 println!("{}", path.to_string_lossy());
                 let mut file = File::open(path)?;
                 file.seek(SeekFrom::Start(0))?;
-                let wav = WavMetadata::read(&mut file)?;
                 let mut offset: u32 = 12;
                 println!("      offset id         size summary");
 
-                for chunk in wav.chunks {
-                    println!(
-                        "{:12} {:8} {:>10} {}",
-                        offset,
-                        chunk.id(),
-                        chunk.size(),
-                        // TODO: truncate summary & add ... when long
-                        chunk.summary()
-                    );
-                    if *detailed {
-                        for (key, value) in chunk.items() {
-                            println!("             |{key:>23} : {value}");
+                for res in wav::metadata_chunks(file)? {
+                    match res {
+                        Ok(chunk) => {
+                            println!(
+                                "{:12} {:8} {:>10} {}",
+                                offset,
+                                chunk.id(),
+                                chunk.size(),
+                                // TODO: truncate summary & add ... when long
+                                chunk.summary()
+                            );
+                            if *detailed {
+                                for (key, value) in chunk.items() {
+                                    println!("             |{key:>23} : {value}");
+                                }
+                            }
+                            // remove offset calculations once handled by metadata_chunks()
+                            offset += chunk.size() + 8;
+                            // RIFF offsets must be on word boundaries (divisible by 2)
+                            if offset % 2 == 1 {
+                                offset += 1;
+                            };
+                        }
+                        Err(err) => {
+                            println!("ERROR: {err}");
                         }
                     }
-                    offset += chunk.size();
                 }
             }
         }

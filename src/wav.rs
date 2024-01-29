@@ -1,9 +1,11 @@
 use binrw::io::TakeSeekExt;
 use binrw::NullString;
-use binrw::{binrw, helpers, io::SeekFrom};
+use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult};
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
+use std::fs::File;
+use std::io::{Read, Seek};
 use std::str::FromStr;
 
 // TODO: enum for fmt chunk
@@ -70,6 +72,70 @@ impl<const N: usize> FromStr for FixedStr<N> {
         array_tmp[..l].copy_from_slice(&s.as_bytes()[..l]);
         Ok(FixedStr::<N>(array_tmp))
     }
+}
+
+// parsing helpers
+// ----
+
+pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Error> {
+    // let mut reader = BufReader::new(file);
+    let mut reader = file;
+    // TODO, return (offset, BinResult<Chunk>) tuple
+    let mut buff: [u8; 4] = [0; 4];
+    let _riff = {
+        reader.read_exact(&mut buff)?;
+        // TODO: convert assert into returned wav error type
+        assert_eq!(&buff, b"RIFF", "{} != RIFF", String::from_utf8_lossy(&buff));
+        buff.clone()
+    };
+    let data_size = {
+        reader.read_exact(&mut buff)?;
+        u32::from_le_bytes(buff)
+    };
+    let _wave = {
+        reader.read_exact(&mut buff)?;
+        // TODO: convert assert into returned wav error type
+        assert_eq!(&buff, b"WAVE", "{} != WAVE", String::from_utf8_lossy(&buff));
+        buff.clone()
+    };
+    let mut offset = 12;
+    let mut chunks: Vec<BinResult<Chunk>> = Vec::new();
+
+    loop {
+        // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
+        let current = {
+            reader.read_exact(&mut buff)?;
+            FourCC(buff.clone())
+        };
+        // dbg!(current);
+        let current_size = {
+            reader.read_exact(&mut buff)?;
+            u32::from_le_bytes(buff)
+        };
+        // dbg!(current_size);
+        reader.seek(SeekFrom::Current(-8))?;
+        let res = Chunk::read(&mut reader);
+
+        // setup for next iteration
+        offset += current_size + 8;
+        // RIFF offsets must be on word boundaries (divisible by 2)
+        if offset % 2 == 1 {
+            offset += 1;
+        };
+        if u64::from(offset) != reader.stream_position()? {
+            // TODO: inject error into chunk vec and remove print
+            println!("WARNING: {}: parsed less data than chunk size", current);
+            reader.seek(SeekFrom::Start(offset.into()))?;
+        }
+
+        chunks.push(res);
+
+        // eprintln!("after: {offset}, pos: {:?}", reader.stream_position());
+        if offset >= data_size {
+            break;
+        };
+    }
+    Ok(chunks)
 }
 
 // parsing structs
@@ -837,7 +903,7 @@ pub struct ListAdtlChunk {
 
 impl ListAdtlChunk {
     pub fn summary(&self) -> String {
-        format!("{}", self.list_type)
+        format!("{} ...", self.list_type)
     }
 }
 
