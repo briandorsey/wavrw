@@ -4,7 +4,6 @@ use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult};
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
-use std::fs::File;
 use std::io::{Read, Seek};
 use std::str::FromStr;
 
@@ -77,9 +76,12 @@ impl<const N: usize> FromStr for FixedStr<N> {
 // parsing helpers
 // ----
 
-pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Error> {
+pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Chunk>>, std::io::Error>
+where
+    R: Read + Seek,
+{
     // let mut reader = BufReader::new(file);
-    let mut reader = file;
+    let mut reader = reader;
     // TODO, return (offset, BinResult<Chunk>) tuple
     let mut buff: [u8; 4] = [0; 4];
     let _riff = {
@@ -145,13 +147,10 @@ pub fn metadata_chunks(file: File) -> Result<Vec<BinResult<Chunk>>, std::io::Err
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 // http://www.tactilemedia.com/info/MCI_Control_Info.html
-pub struct WavMetadata {
+pub struct RiffChunk {
     pub id: FourCC,
     pub size: u32,
     pub form_type: FourCC,
-    #[br(parse_with = helpers::until_eof)]
-    // TODO: revisit this enum design... chunks are large... maybe it should be a Vec of Traits instead? Research how binrw parsing might work in that case. Maybe go back to parsing each chunk while manually iterating through the file?
-    pub chunks: Vec<Chunk>,
 }
 
 #[allow(dead_code)]
@@ -1173,66 +1172,35 @@ mod test {
         let header = "524946465E09000057415645";
         let mut data = hex_to_cursor(header);
         println!("{header:?}");
-        let wavfile = WavMetadata::read(&mut data).unwrap();
+        let wavfile = RiffChunk::read(&mut data).unwrap();
         assert_eq!(
-            WavMetadata {
+            RiffChunk {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),
-                chunks: vec![],
             },
             wavfile
         );
     }
 
-    // #[test]
-    // fn parse_length() {
-    //     let tests = [(
-    //         &decode("666D7420 10000000 01000100 80BB0000 80320200 03001800".replace(' ', ""))
-    //             .unwrap(),
-    //         UnknownChunk {
-    //             id: "fmt ".as_bytes().try_into().unwrap(),
-    //             size: 16,
-    //         },
-    //         &[] as &[u8],
-    //     )];
-    //     for (input, expected_output, expected_remaining_input) in tests {
-    //         hexdump(input);
-    //         let (remaining_input, output) = parse_chunk(input).unwrap();
-    //         assert_eq!(expected_output, output);
-    //         assert_eq!(expected_remaining_input, remaining_input);
-    //     }
-    // }
-
     #[test]
-    fn parse_header_fmt() {
-        let data = hex_to_cursor(
-            "52494646 5E090000 57415645 666D7420 10000000 01000100 80BB0000 80320200 03001800",
-        );
-        let tests = [(
-            data,
-            WavMetadata {
-                id: FourCC(*b"RIFF"),
-                size: 2398,
-                form_type: FourCC(*b"WAVE"),
-                chunks: vec![Chunk::Fmt(FmtChunk {
-                    id: FourCC(*b"fmt "),
-                    size: 16,
-                    format_tag: FormatTag::Pcm,
-                    channels: 1,
-                    samples_per_sec: 48000,
-                    avg_bytes_per_sec: 144000,
-                    block_align: 3,
-                    bits_per_sample: 24,
-                })],
-            },
-        )];
-        for (mut input, expected_output) in tests {
-            // hexdump(input);
-            let output = WavMetadata::read(&mut input).expect("error parsing wav");
-            assert_eq!(expected_output, output);
-            // hexdump(remaining_input);
-        }
+    fn parse_fmt() {
+        let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
+        // work around for FourCC parsing location... TODO: can we move this seek to enclosing enum?
+        buff.set_position(4);
+        let expected = FmtChunk {
+            id: FourCC(*b"fmt "),
+            size: 16,
+            format_tag: FormatTag::Pcm,
+            channels: 1,
+            samples_per_sec: 48000,
+            avg_bytes_per_sec: 144000,
+            block_align: 3,
+            bits_per_sample: 24,
+        };
+        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
+        assert_eq!(expected, chunk);
+        // hexdump(remaining_input);
     }
 
     #[test]
