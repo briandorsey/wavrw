@@ -41,6 +41,12 @@ struct FixedStrErr;
 
 #[derive(BinWrite, PartialEq, Eq)]
 /// FixedStr holds Null terminated fixed length strings (from BEXT for example)
+///
+/// FixedStr is intended to be used via binrw's [BinRead] trait and its
+/// Null parsing is implmented there. Do not directly create the struct
+/// or that logic will be bypassed. If there is a future need, we should
+/// implement a ::new() constructor which in turn calls the [FixedStr::read_options()]
+/// implementation.
 struct FixedStr<const N: usize>([u8; N]);
 
 // FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
