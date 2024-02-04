@@ -1,6 +1,7 @@
 use binrw::io::TakeSeekExt;
+use binrw::Endian;
 use binrw::NullString;
-use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult};
+use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error};
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
@@ -38,9 +39,7 @@ impl Debug for FourCC {
 #[derive(Debug)]
 struct FixedStrErr;
 
-#[binrw]
-#[brw(little)]
-#[derive(PartialEq, Eq)]
+#[derive(BinWrite, PartialEq, Eq)]
 /// FixedStr holds Null terminated fixed length strings (from BEXT for example)
 struct FixedStr<const N: usize>([u8; N]);
 
@@ -70,6 +69,41 @@ impl<const N: usize> FromStr for FixedStr<N> {
         let l = min(s.len(), N);
         array_tmp[..l].copy_from_slice(&s.as_bytes()[..l]);
         Ok(FixedStr::<N>(array_tmp))
+    }
+}
+
+impl<const N: usize> BinRead for FixedStr<N> {
+    type Args<'a> = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        endian: Endian,
+        (): Self::Args<'_>,
+    ) -> BinResult<Self> {
+        let mut values: [u8; N] = [0; N];
+        let mut index = 0;
+
+        loop {
+            if index >= N {
+                return Ok(Self(values));
+            }
+            let val = <u8>::read_options(reader, endian, ())?;
+            if val == 0 {
+                let offset = (N - index - 1).try_into();
+                return match offset {
+                    Ok(offset) => {
+                        reader.seek(SeekFrom::Current(offset))?;
+                        Ok(Self(values))
+                    }
+                    Err(err) => Err(Error::Custom {
+                        pos: index as u64,
+                        err: Box::new(err),
+                    }),
+                };
+            }
+            values[index] = val;
+            index += 1;
+        }
     }
 }
 
@@ -991,40 +1025,44 @@ impl<'a> Iterator for BextChunkIterator<'a> {
             1 => Some(("description".to_string(), self.bext.description.to_string())),
             2 => Some(("originator".to_string(), self.bext.originator.to_string())),
             3 => Some((
+                "originator_reference".to_string(),
+                self.bext.originator_reference.to_string(),
+            )),
+            4 => Some((
                 "origination_date".to_string(),
                 self.bext.origination_date.to_string(),
             )),
-            4 => Some((
+            5 => Some((
                 "origination_time".to_string(),
                 self.bext.origination_time.to_string(),
             )),
-            5 => Some((
+            6 => Some((
                 "time_reference".to_string(),
                 self.bext.time_reference.to_string(),
             )),
-            6 => Some(("version".to_string(), self.bext.version.to_string())),
-            7 => Some(("umid".to_string(), hex::encode(self.bext.umid))),
-            8 => Some((
+            7 => Some(("version".to_string(), self.bext.version.to_string())),
+            8 => Some(("umid".to_string(), hex::encode(self.bext.umid))),
+            9 => Some((
                 "loudness_value".to_string(),
                 self.bext.loudness_value.to_string(),
             )),
-            9 => Some((
+            10 => Some((
                 "loudness_range".to_string(),
                 self.bext.loudness_range.to_string(),
             )),
-            10 => Some((
+            11 => Some((
                 "max_true_peak_level".to_string(),
                 self.bext.max_true_peak_level.to_string(),
             )),
-            11 => Some((
+            12 => Some((
                 "max_momentary_loudness".to_string(),
                 self.bext.max_momentary_loudness.to_string(),
             )),
-            12 => Some((
+            13 => Some((
                 "max_short_term_loudness".to_string(),
                 self.bext.max_short_term_loudness.to_string(),
             )),
-            13 => Some((
+            14 => Some((
                 "coding_history".to_string(),
                 self.bext.coding_history.to_string(),
             )),
@@ -1285,5 +1323,19 @@ mod test {
             .unwrap();
         let b = &decode("666D7420100000000100010080BB00008032020003001800").unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn parse_fixedstr_data_after_zero() {
+        // REAPER had (still has?) a bug where data from other BEXT fields
+        // can be left in a fixed lenth string field after the terminating
+        // zero byte. This input is an example that starts with "REAPER"
+        // but has part of a path string after the terminating zero.
+        let mut buff = hex_to_cursor(
+            "52454150 45520065 72732F62 7269616E 2F70726F 6A656374 732F7761 7672772F",
+        );
+        let fs = FixedStr::<32>::read_options(&mut buff, binrw::Endian::Big, ())
+            .expect("error parsing FixedStr");
+        assert_eq!(fs, FixedStr::<32>::from_str("REAPER").unwrap());
     }
 }
