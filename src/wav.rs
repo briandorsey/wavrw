@@ -871,54 +871,80 @@ impl ListInfoChunk {
         Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
     }
 }
-#[binrw]
-#[br(little)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum InfoChunk {
-    // TODO: the rest of the INFO chunks
-    #[brw(magic = b"ISFT")]
-    Isft {
-        #[brw(seek_before = SeekFrom::Current(-4))]
-        id: FourCC,
-        size: u32,
-        #[brw(align_after = 2, pad_size_to= size.to_owned())]
-        value: NullString,
-    },
-    #[brw(magic = b"ICMT")]
-    Icmt {
-        #[brw(seek_before = SeekFrom::Current(-4))]
-        id: FourCC,
-        size: u32,
-        #[brw(align_after = 2, pad_size_to= size.to_owned())]
-        value: NullString,
-    },
-    Unknown {
-        // #[br(dbg)]
-        id: FourCC,
-        // #[br(dbg)]
-        size: u32,
-        #[brw(align_after=2, pad_size_to= size.to_owned())]
-        value: NullString,
-    },
+
+macro_rules! info_chunks {
+    ($(($name:ident,$literal:literal)),*$(,)?) => {
+        #[binrw]
+        #[brw(little)]
+        #[derive(Debug, PartialEq, Eq)]
+        pub enum InfoChunk {
+        $(
+            #[brw(magic = $literal)]
+            $name {
+                #[br(map = |_| FourCC(*$literal))]
+                #[bw(ignore)]
+                id: FourCC,
+                size: u32,
+                #[brw(align_after = 2, pad_size_to= size.to_owned())]
+                value: NullString,
+            },
+        )*
+            Unknown {
+                id: FourCC,
+                size: u32,
+                #[brw(align_after=2, pad_size_to= size.to_owned())]
+                value: NullString,
+            },
+        }
+
+        impl InfoChunk {
+            pub fn id(&self) -> FourCC {
+                match self {
+                    $(
+                    InfoChunk::$name{ id, .. } => *id,
+                    )*
+                    InfoChunk::Unknown { id, .. } => *id,
+                }
+            }
+
+            pub fn value(&self) -> String {
+                match self {
+                    $(
+                    InfoChunk::$name{ value, .. } => (*value).to_string(),
+                    )*
+                    InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
+                }
+            }
+        }
+    }
 }
 
+info_chunks!(
+    (Iarl, b"IARL"),
+    (Ignr, b"IGNR"),
+    (Ikey, b"IKEY"),
+    (Ilgt, b"ILGT"),
+    (Imed, b"IMED"),
+    (Inam, b"INAM"),
+    (Iplt, b"IPLT"),
+    (Iprd, b"IPRD"),
+    (Isbj, b"ISBJ"),
+    (Isft, b"ISFT"),
+    (Ishp, b"ISHP"),
+    (Iart, b"IART"),
+    (Isrc, b"ISRC"),
+    (Isrf, b"ISRF"),
+    (Itch, b"ITCH"),
+    (Icms, b"ICMS"),
+    (Icmt, b"ICMT"),
+    (Icop, b"ICOP"),
+    (Icrd, b"ICRD"),
+    (Icrp, b"ICRP"),
+    (Idpi, b"IDPI"),
+    (IENG, b"IENG"),
+);
+
 impl InfoChunk {
-    pub fn id(&self) -> FourCC {
-        match self {
-            InfoChunk::Isft { id, .. } => *id,
-            InfoChunk::Icmt { id, .. } => *id,
-            InfoChunk::Unknown { id, .. } => *id,
-        }
-    }
-
-    pub fn value(&self) -> String {
-        match self {
-            InfoChunk::Isft { value, .. } => (*value).to_string(),
-            InfoChunk::Icmt { value, .. } => (*value).to_string(),
-            InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
-        }
-    }
-
     pub fn _summary(&self) -> String {
         format!("{}: {}", self.id(), self.value())
     }
@@ -1180,6 +1206,7 @@ mod test {
 
     use super::*;
     use hex::decode;
+    use hexdump::hexdump;
 
     fn hex_to_cursor(data: &str) -> Cursor<Vec<u8>> {
         let data = data.replace(' ', "");
@@ -1343,5 +1370,21 @@ mod test {
         let fs = FixedStr::<32>::read_options(&mut buff, binrw::Endian::Big, ())
             .expect("error parsing FixedStr");
         assert_eq!(fs, FixedStr::<32>::from_str("REAPER").unwrap());
+    }
+
+    #[test]
+    fn infochunk_roundtrip() {
+        let icmt = InfoChunk::Icmt {
+            id: FourCC(*b"ICMT"),
+            size: 8,
+            value: NullString("comment".into()),
+        };
+        println!("{icmt:?}");
+        let mut buff = std::io::Cursor::new(Vec::<u8>::new());
+        icmt.write(&mut buff).unwrap();
+        println!("{:?}", hexdump(buff.get_ref()));
+        buff.set_position(0);
+        let after = InfoChunk::read(&mut buff).unwrap();
+        assert_eq!(after, icmt);
     }
 }
