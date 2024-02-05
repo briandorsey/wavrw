@@ -1234,7 +1234,7 @@ mod test {
         // strings longer than fixed size should get truncated
         let long_str = "this is a longer str";
         let fs = FixedStr::<6>::from_str(long_str).unwrap();
-        assert_eq!("this i", fs.to_string());
+        assert_eq!(fs.to_string(), "this i");
     }
 
     #[test]
@@ -1245,12 +1245,12 @@ mod test {
         println!("{header:?}");
         let wavfile = RiffChunk::read(&mut data).unwrap();
         assert_eq!(
+            wavfile,
             RiffChunk {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),
-            },
-            wavfile
+            }
         );
     }
 
@@ -1270,7 +1270,7 @@ mod test {
             bits_per_sample: 24,
         };
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
-        assert_eq!(expected, chunk);
+        assert_eq!(chunk, expected);
         // hexdump(remaining_input);
     }
 
