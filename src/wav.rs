@@ -834,7 +834,7 @@ pub struct DataChunk {
     #[brw(seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
-    #[brw(seek_before = SeekFrom::Current(size.clone().into()), ignore)]
+    #[brw(seek_before = SeekFrom::Current(size.to_owned().into()), ignore)]
     end_of_chunk: [u8; 0],
 }
 
