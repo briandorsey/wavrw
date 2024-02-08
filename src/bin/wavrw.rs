@@ -6,9 +6,6 @@ use std::fs::File;
 use std::io::Seek;
 use std::io::SeekFrom;
 
-mod wav;
-// use wav::WavMetadata;
-
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -41,7 +38,7 @@ fn main() -> Result<()> {
                 let mut offset: u32 = 12;
                 println!("      offset id         size summary");
 
-                for res in wav::metadata_chunks(file)? {
+                for res in wavrw::metadata_chunks(file)? {
                     match res {
                         Ok(chunk) => {
                             println!(
