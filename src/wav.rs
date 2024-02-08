@@ -10,7 +10,6 @@ use std::str::FromStr;
 
 // TODO: enum for fmt chunk
 // TODO: test  offset += chunk.size(); equals actual id locaiton
-// TODO: ensure chunk sizes are always an even number, per RIFF specs. Probably use align_* args on brw attributes.
 // consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
 
 // helper types
@@ -752,7 +751,7 @@ impl Display for FormatTag {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct FmtChunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"fmt ", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     format_tag: FormatTag,
@@ -831,7 +830,7 @@ impl<'a> Iterator for FmtChunkIterator<'a> {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct DataChunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"data", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     #[brw(seek_before = SeekFrom::Current(size.to_owned().into()), ignore)]
@@ -848,7 +847,7 @@ impl DataChunk {
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInfoChunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     #[brw(magic = b"INFO", seek_before = SeekFrom::Current(-4))]
@@ -879,10 +878,8 @@ macro_rules! info_chunks {
         #[derive(Debug, PartialEq, Eq)]
         pub enum InfoChunk {
         $(
-            #[brw(magic = $literal)]
             $name {
-                #[br(map = |_| FourCC(*$literal))]
-                #[bw(ignore)]
+                #[brw(magic = $literal, seek_before = SeekFrom::Current(-4))]
                 id: FourCC,
                 size: u32,
                 #[brw(align_after = 2, pad_size_to= size.to_owned())]
@@ -954,7 +951,7 @@ impl InfoChunk {
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListAdtlChunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     #[brw(magic = b"adtl", seek_before = SeekFrom::Current(-4))]
@@ -979,7 +976,7 @@ impl ListAdtlChunk {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct BextChunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"bext", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     /// Description of the sound sequence
@@ -1108,7 +1105,7 @@ impl<'a> Iterator for BextChunkIterator<'a> {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Md5Chunk {
-    #[brw(seek_before = SeekFrom::Current(-4))]
+    #[brw(magic = b"MD5 ", seek_before = SeekFrom::Current(-4))]
     id: FourCC,
     size: u32,
     md5: u128,
@@ -1124,18 +1121,11 @@ impl Md5Chunk {
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Chunk {
-    // TODO: add DATA parsing which skips actual data
-    #[brw(magic = b"fmt ")]
     Fmt(FmtChunk),
-    #[brw(magic = b"data")]
     Data(DataChunk),
-    #[brw(magic = b"LIST")]
     Info(ListInfoChunk),
-    #[brw(magic = b"LIST")]
     Adtl(ListAdtlChunk),
-    #[brw(magic = b"bext")]
     Bext(Box<BextChunk>),
-    #[brw(magic = b"MD5 ")]
     Md5(Md5Chunk),
     Unknown {
         id: FourCC,
@@ -1257,8 +1247,6 @@ mod test {
     #[test]
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
-        // work around for FourCC parsing location... TODO: can we move this seek to enclosing enum?
-        buff.set_position(4);
         let expected = FmtChunk {
             id: FourCC(*b"fmt "),
             size: 16,
@@ -1302,8 +1290,6 @@ mod test {
             00000000 00000000 00000000 00000000 00000000 00000000 0000436F 
             64696E67 48697374 6F7279"#,
         );
-        // work around for FourCC parsing location... TODO: can we move this seek to enclosing enum?
-        buff.set_position(4);
         let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
