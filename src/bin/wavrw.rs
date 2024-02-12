@@ -38,14 +38,14 @@ fn main() -> Result<()> {
                 let mut offset: u32 = 12;
                 println!("      offset id         size summary");
 
-                for (header, res) in wavrw::metadata_chunks(file)? {
+                for res in wavrw::metadata_chunks(file)? {
                     match res {
                         Ok(chunk) => {
                             println!(
                                 "{:12} {:8} {:>10} {}",
                                 offset,
                                 chunk.id(),
-                                header.size,
+                                chunk.size(),
                                 // TODO: truncate summary & add ... when long
                                 chunk.summary()
                             );
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
                                 }
                             }
                             // remove offset calculations once handled by metadata_chunks()
-                            offset += header.size + 8;
+                            offset += chunk.size() + 8;
                             // RIFF offsets must be on word boundaries (divisible by 2)
                             if offset % 2 == 1 {
                                 offset += 1;

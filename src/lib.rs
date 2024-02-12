@@ -18,6 +18,7 @@ use std::str::FromStr;
 // TODO: naming convention for traits which overlap with types?
 pub trait ChunkT {
     fn id(&self) -> FourCC;
+    fn size(&self) -> u32;
     fn summary(&self) -> String;
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(std::iter::empty())
@@ -128,56 +129,44 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
-pub fn metadata_chunks<R>(
-    reader: R,
-) -> Result<Vec<(ChunkHeader, BinResult<Box<dyn ChunkT>>)>, std::io::Error>
+pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn ChunkT>>>, std::io::Error>
 where
     R: Read + Seek,
 {
     // let mut reader = BufReader::new(file);
     let mut reader = reader;
-    // TODO, return (offset, BinResult<Chunk>) tuple
+
+    // TODO: research errors and figure out an error plan for wavrw
+    let riff = RiffChunk::read(&mut reader).map_err(|e| std::io::Error::other(e))?;
+    // TODO: convert assert into returned wav error type
+    assert_eq!(
+        riff.form_type,
+        FourCC(*b"WAVE"),
+        "{} != WAVE",
+        riff.form_type
+    );
+
     let mut buff: [u8; 4] = [0; 4];
-    let _riff = {
-        reader.read_exact(&mut buff)?;
-        // TODO: convert assert into returned wav error type
-        assert_eq!(&buff, b"RIFF", "{} != RIFF", String::from_utf8_lossy(&buff));
-        buff
-    };
-    let data_size = {
-        reader.read_exact(&mut buff)?;
-        u32::from_le_bytes(buff)
-    };
-    let _wave = {
-        reader.read_exact(&mut buff)?;
-        // TODO: convert assert into returned wav error type
-        assert_eq!(&buff, b"WAVE", "{} != WAVE", String::from_utf8_lossy(&buff));
-        buff
-    };
-    let mut offset = 12;
-    let mut chunks: Vec<(ChunkHeader, BinResult<Box<dyn ChunkT>>)> = Vec::new();
+    let mut offset = reader.stream_position()?;
+    let mut chunks: Vec<BinResult<Box<dyn ChunkT>>> = Vec::new();
 
     loop {
         // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
-        let current = {
+        let chunk_id = {
             reader.read_exact(&mut buff)?;
             buff
         };
         // dbg!(current);
-        let current_size = {
+        let chunk_size = {
             reader.read_exact(&mut buff)?;
             u32::from_le_bytes(buff)
         };
         // dbg!(current_size);
-        let header = ChunkHeader {
-            id: FourCC(current),
-            size: current_size,
-        };
 
         // pick chunk struct and read it
         // TODO: pick a pattern and go with one or the other.
-        let res: BinResult<Box<dyn ChunkT>> = match &current {
-            b"MD5 " => Md5ChunkData::read(&mut reader).map(box_chunk),
+        let res: BinResult<Box<dyn ChunkT>> = match &chunk_id {
+            // b"MD5 " => Md5ChunkData::read(&mut reader).map(box_chunk),
             _ => {
                 reader.seek(SeekFrom::Current(-8))?;
                 Chunk::read(&mut reader).map(box_chunk)
@@ -185,21 +174,24 @@ where
         };
 
         // setup for next iteration
-        offset += current_size + 8;
+        offset += chunk_size as u64 + 8;
         // RIFF offsets must be on word boundaries (divisible by 2)
         if offset % 2 == 1 {
             offset += 1;
         };
         if u64::from(offset) != reader.stream_position()? {
             // TODO: inject error into chunk vec and remove print
-            println!("WARNING: {}: parsed less data than chunk size", header.id);
+            println!(
+                "WARNING: {}: parsed less data than chunk size",
+                FourCC(chunk_id)
+            );
             reader.seek(SeekFrom::Start(offset.into()))?;
         }
 
-        chunks.push((header, res));
+        chunks.push(res);
 
         // eprintln!("after: {offset}, pos: {:?}", reader.stream_position());
-        if offset >= data_size {
+        if offset >= riff.size as u64 {
             break;
         };
     }
@@ -254,15 +246,6 @@ macro_rules! Chunk {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Md5ChunkData {
     md5: u128,
-}
-
-impl ChunkT for Md5ChunkData {
-    fn id(&self) -> FourCC {
-        FourCC(*b"MD5 ")
-    }
-    fn summary(&self) -> String {
-        format!("0x{:X}", self.md5)
-    }
 }
 
 type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
@@ -1246,17 +1229,17 @@ impl ChunkT for Chunk {
     }
 
     // /// Returns the logical (used) size in bytes of the contained chunk.
-    // pub fn size(&self) -> u32 {
-    //     match self {
-    //         Chunk::Fmt(e) => e.size,
-    //         Chunk::Data(e) => e.size,
-    //         Chunk::Info(e) => e.size,
-    //         Chunk::Adtl(e) => e.size,
-    //         Chunk::Bext(e) => e.size,
-    //         Chunk::Md5(e) => e.size,
-    //         Chunk::Unknown { size, .. } => *size,
-    //     }
-    // }
+    fn size(&self) -> u32 {
+        match self {
+            Chunk::Fmt(e) => e.size,
+            Chunk::Data(e) => e.size,
+            Chunk::Info(e) => e.size,
+            Chunk::Adtl(e) => e.size,
+            Chunk::Bext(e) => e.size,
+            Chunk::Md5(e) => e.size,
+            Chunk::Unknown { size, .. } => *size,
+        }
+    }
 
     /// Returns a short text summary of the contents of the contained chunk.
     fn summary(&self) -> String {
