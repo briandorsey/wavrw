@@ -1,7 +1,7 @@
 use binrw::io::TakeSeekExt;
 use binrw::Endian;
 use binrw::NullString;
-use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error};
+use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
@@ -14,6 +14,19 @@ use std::str::FromStr;
 
 // helper types
 // ----
+
+// TODO: naming convention for traits which overlap with types?
+pub trait ChunkT {
+    fn id(&self) -> FourCC;
+    fn summary(&self) -> String;
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(std::iter::empty())
+    }
+}
+
+fn box_chunk<T: ChunkT + 'static>(t: T) -> Box<dyn ChunkT> {
+    Box::new(t)
+}
 
 #[binrw]
 #[brw(big)]
@@ -115,7 +128,9 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
-pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Chunk>>, std::io::Error>
+pub fn metadata_chunks<R>(
+    reader: R,
+) -> Result<Vec<(ChunkHeader, BinResult<Box<dyn ChunkT>>)>, std::io::Error>
 where
     R: Read + Seek,
 {
@@ -140,13 +155,13 @@ where
         buff
     };
     let mut offset = 12;
-    let mut chunks: Vec<BinResult<Chunk>> = Vec::new();
+    let mut chunks: Vec<(ChunkHeader, BinResult<Box<dyn ChunkT>>)> = Vec::new();
 
     loop {
         // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
         let current = {
             reader.read_exact(&mut buff)?;
-            FourCC(buff)
+            buff
         };
         // dbg!(current);
         let current_size = {
@@ -154,8 +169,20 @@ where
             u32::from_le_bytes(buff)
         };
         // dbg!(current_size);
-        reader.seek(SeekFrom::Current(-8))?;
-        let res = Chunk::read(&mut reader);
+        let header = ChunkHeader {
+            id: FourCC(current),
+            size: current_size,
+        };
+
+        // pick chunk struct and read it
+        // TODO: pick a pattern and go with one or the other.
+        let res: BinResult<Box<dyn ChunkT>> = match &current {
+            b"MD5 " => Md5ChunkData::read(&mut reader).map(box_chunk),
+            _ => {
+                reader.seek(SeekFrom::Current(-8))?;
+                Chunk::read(&mut reader).map(box_chunk)
+            }
+        };
 
         // setup for next iteration
         offset += current_size + 8;
@@ -165,11 +192,11 @@ where
         };
         if u64::from(offset) != reader.stream_position()? {
             // TODO: inject error into chunk vec and remove print
-            println!("WARNING: {}: parsed less data than chunk size", current);
+            println!("WARNING: {}: parsed less data than chunk size", header.id);
             reader.seek(SeekFrom::Start(offset.into()))?;
         }
 
-        chunks.push(res);
+        chunks.push((header, res));
 
         // eprintln!("after: {offset}, pos: {:?}", reader.stream_position());
         if offset >= data_size {
@@ -181,6 +208,73 @@ where
 
 // parsing structs
 // ----
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ChunkHeader {
+    pub id: FourCC,
+    pub size: u32,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+// const generics don't support array types yet, so let's just encode it into a u32
+pub struct KnownChunk<
+    const MAGIC: u32,
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+> {
+    #[br(temp, assert(id == MAGIC))]
+    #[bw(calc = MAGIC)]
+    id: u32,
+
+    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    size: u32,
+
+    #[br(temp)]
+    #[bw(ignore)]
+    begin_pos: PosValue<()>,
+    // ensure that we don't read outside the bounds for this chunk
+    #[br(map_stream = |r| r.take_seek(size as u64))]
+    data: T,
+    #[br(temp)]
+    #[bw(ignore)]
+    end_pos: PosValue<()>,
+
+    // calculate how much was read, and read any extra bytes that remain in the chunk
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    extra_bytes: Vec<u8>,
+}
+
+macro_rules! Chunk {
+    ($magic:expr, $content:ty) => { KnownChunk<{ u32::from_le_bytes(*$magic)}, $content> }
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct Md5ChunkData {
+    md5: u128,
+}
+
+impl ChunkT for Md5ChunkData {
+    fn id(&self) -> FourCC {
+        FourCC(*b"MD5 ")
+    }
+    fn summary(&self) -> String {
+        format!("0x{:X}", self.md5)
+    }
+}
+
+type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
+
+impl Md5Chunk {
+    pub fn id(&self) -> FourCC {
+        FourCC(*b"MD5 ")
+    }
+    pub fn summary(&self) -> String {
+        format!("0x{:X}", self.data.md5)
+    }
+}
 
 #[binrw]
 #[brw(little)]
@@ -1101,21 +1195,21 @@ impl<'a> Iterator for BextChunkIterator<'a> {
 }
 
 // based on https://mediaarea.net/BWFMetaEdit/md5
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
-pub struct Md5Chunk {
-    #[brw(magic = b"MD5 ", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    md5: u128,
-}
+// #[binrw]
+// #[brw(little)]
+// #[derive(Debug, PartialEq, Eq)]
+// pub struct Md5Chunk {
+//     #[brw(magic = b"MD5 ", seek_before = SeekFrom::Current(-4))]
+//     id: FourCC,
+//     size: u32,
+//     md5: u128,
+// }
 
-impl Md5Chunk {
-    pub fn summary(&self) -> String {
-        format!("0x{:X}", self.md5)
-    }
-}
+// impl Md5Chunk {
+//     pub fn summary(&self) -> String {
+//         format!("0x{:X}", self.md5)
+//     }
+// }
 
 #[binrw]
 #[brw(little)]
@@ -1136,9 +1230,9 @@ pub enum Chunk {
     },
 }
 
-impl Chunk {
+impl ChunkT for Chunk {
     /// Returns the [FourCC] (chunk id) for the contained chunk.
-    pub fn id(&self) -> FourCC {
+    fn id(&self) -> FourCC {
         // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
             Chunk::Fmt(e) => e.id,
@@ -1146,26 +1240,26 @@ impl Chunk {
             Chunk::Info(e) => e.id,
             Chunk::Adtl(e) => e.id,
             Chunk::Bext(e) => e.id,
-            Chunk::Md5(e) => e.id,
+            Chunk::Md5(e) => e.id(),
             Chunk::Unknown { id, .. } => *id,
         }
     }
 
-    /// Returns the logical (used) size in bytes of the contained chunk.
-    pub fn size(&self) -> u32 {
-        match self {
-            Chunk::Fmt(e) => e.size,
-            Chunk::Data(e) => e.size,
-            Chunk::Info(e) => e.size,
-            Chunk::Adtl(e) => e.size,
-            Chunk::Bext(e) => e.size,
-            Chunk::Md5(e) => e.size,
-            Chunk::Unknown { size, .. } => *size,
-        }
-    }
+    // /// Returns the logical (used) size in bytes of the contained chunk.
+    // pub fn size(&self) -> u32 {
+    //     match self {
+    //         Chunk::Fmt(e) => e.size,
+    //         Chunk::Data(e) => e.size,
+    //         Chunk::Info(e) => e.size,
+    //         Chunk::Adtl(e) => e.size,
+    //         Chunk::Bext(e) => e.size,
+    //         Chunk::Md5(e) => e.size,
+    //         Chunk::Unknown { size, .. } => *size,
+    //     }
+    // }
 
     /// Returns a short text summary of the contents of the contained chunk.
-    pub fn summary(&self) -> String {
+    fn summary(&self) -> String {
         match self {
             Chunk::Fmt(e) => e.summary(),
             Chunk::Data(e) => e.summary(),
@@ -1179,7 +1273,7 @@ impl Chunk {
 
     /// Returns an iterator over a sequence of contents of the contained
     /// chunk as (field, value).
-    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
             Chunk::Fmt(e) => Box::new(e.into_iter()),
             Chunk::Info(e) => Box::new(e.items()),
