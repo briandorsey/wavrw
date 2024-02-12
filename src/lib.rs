@@ -8,23 +8,46 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io::{Read, Seek};
 use std::str::FromStr;
 
-// TODO: enum for fmt chunk
-// TODO: test  offset += chunk.size(); equals actual id locaiton
-// consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
-
 // helper types
 // ----
 
-// TODO: naming convention for traits which overlap with types?
-pub trait ChunkT {
+trait KnownChunkID {
+    const ID: FourCC;
+}
+
+pub trait ChunkID {
+    // TODO: remove &self once no longer using enum
     fn id(&self) -> FourCC;
+}
+
+// TODO: naming convention for traits which overlap with types?
+pub trait ChunkT: ChunkID {
+    /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
+
+    // TODO: these two actually belong on the inner data structs, right?
+    /// Returns a short text summary of the contents of the chunk.
     fn summary(&self) -> String;
+
+    /// Returns an iterator over a sequence of contents of the contained
+    /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(std::iter::empty())
     }
 }
 
+impl<T> ChunkID for T
+where
+    T: KnownChunkID,
+{
+    fn id(&self) -> FourCC {
+        T::ID
+    }
+}
+
+// Helper for cleaner Result.map() calls when boxing inner chunk.
+// Reduces code repetition, but mostly helps the compiler with type
+// inference.
 fn box_chunk<T: ChunkT + 'static>(t: T) -> Box<dyn ChunkT> {
     Box::new(t)
 }
@@ -207,38 +230,38 @@ pub struct ChunkHeader {
     pub size: u32,
 }
 
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
-// const generics don't support array types yet, so let's just encode it into a u32
-pub struct KnownChunk<
-    const MAGIC: u32,
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-> {
-    #[br(temp, assert(id == MAGIC))]
-    #[bw(calc = MAGIC)]
-    id: u32,
-
-    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-    size: u32,
-
-    #[br(temp)]
-    #[bw(ignore)]
-    begin_pos: PosValue<()>,
-    // ensure that we don't read outside the bounds for this chunk
-    #[br(map_stream = |r| r.take_seek(size as u64))]
-    data: T,
-    #[br(temp)]
-    #[bw(ignore)]
-    end_pos: PosValue<()>,
-
-    // calculate how much was read, and read any extra bytes that remain in the chunk
-    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
-    extra_bytes: Vec<u8>,
-}
-
 macro_rules! Chunk {
-    ($magic:expr, $content:ty) => { KnownChunk<{ u32::from_le_bytes(*$magic)}, $content> }
+    ($name: ident, $magic:expr, $data:ty) => {
+        #[binrw]
+        #[brw(little)]
+        #[derive(Debug, PartialEq, Eq)]
+        pub struct $name {
+            #[br(temp, assert(id == *$magic))]
+            #[bw(calc = *$magic)]
+            id: [u8; 4],
+
+            // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+            size: u32,
+
+            #[br(temp)]
+            #[bw(ignore)]
+            begin_pos: PosValue<()>,
+            // ensure that we don't read outside the bounds for this chunk
+            #[br(map_stream = |r| r.take_seek(size as u64))]
+            data: $data,
+            #[br(temp)]
+            #[bw(ignore)]
+            end_pos: PosValue<()>,
+
+            // calculate how much was read, and read any extra bytes that remain in the chunk
+            #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+            extra_bytes: Vec<u8>,
+        }
+
+        impl KnownChunkID for $name {
+            const ID: FourCC = FourCC(*$magic);
+        }
+    };
 }
 
 #[binrw]
@@ -248,13 +271,14 @@ pub struct Md5ChunkData {
     md5: u128,
 }
 
-type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
+Chunk!(Md5Chunk, b"MD5 ", Md5ChunkData);
 
-impl Md5Chunk {
-    pub fn id(&self) -> FourCC {
-        FourCC(*b"MD5 ")
+impl ChunkT for Md5Chunk {
+    fn size(&self) -> u32 {
+        self.size
     }
-    pub fn summary(&self) -> String {
+
+    fn summary(&self) -> String {
         format!("0x{:X}", self.data.md5)
     }
 }
@@ -1213,10 +1237,9 @@ pub enum Chunk {
     },
 }
 
-impl ChunkT for Chunk {
+impl ChunkID for Chunk {
     /// Returns the [FourCC] (chunk id) for the contained chunk.
     fn id(&self) -> FourCC {
-        // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
             Chunk::Fmt(e) => e.id,
             Chunk::Data(e) => e.id,
@@ -1227,8 +1250,10 @@ impl ChunkT for Chunk {
             Chunk::Unknown { id, .. } => *id,
         }
     }
+}
 
-    // /// Returns the logical (used) size in bytes of the contained chunk.
+impl ChunkT for Chunk {
+    /// Returns the logical (used) size in bytes of the contained chunk.
     fn size(&self) -> u32 {
         match self {
             Chunk::Fmt(e) => e.size,
@@ -1255,7 +1280,7 @@ impl ChunkT for Chunk {
     }
 
     /// Returns an iterator over a sequence of contents of the contained
-    /// chunk as (field, value).
+    /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
             Chunk::Fmt(e) => Box::new(e.into_iter()),
