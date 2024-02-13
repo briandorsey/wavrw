@@ -284,6 +284,66 @@ where
     }
 }
 
+// TODO: maybe generate this struct using a macro?
+//  same macro could also generate all the KnownChunkID impls, if you want.
+#[binrw]
+#[brw(little)]
+#[br(import(id: FourCC))]
+#[derive(Debug, PartialEq, Eq)]
+/// This structure is an enum only around the contents of chunks
+pub enum InvertedChunkEnum {
+    #[br(pre_assert(id == Md5ChunkData::ID))]
+    Md5(Md5ChunkData),
+    Unknown {
+        #[br(calc = id)]
+        #[bw(ignore)]
+        id: FourCC,
+        #[br(parse_with = binrw::helpers::until_eof)]
+        raw: Vec<u8>
+    }
+}
+
+impl ChunkID for InvertedChunkEnum {
+    fn id(&self) -> FourCC {
+        match self {
+            Self::Md5(_) => Md5ChunkData::ID,
+            Self::Unknown { id, ..} => *id,
+        }
+    }
+}
+
+// TODO: implement ChunkT for InvertedChunkEnum, if relevant?
+
+// very similar to KnownChunk, but wraps an enum instead of a generic type.
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+/// This structure allows the user to read *any* chunk
+pub struct InvertedChunk {
+    #[br(temp)]
+    #[bw(calc = data.id())]
+    id: FourCC,
+
+    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    size: u32,
+
+    #[br(temp)]
+    #[bw(ignore)]
+    begin_pos: PosValue<()>,
+    // ensure that we don't read outside the bounds for this chunk
+    #[br(args(id), map_stream = |r| r.take_seek(size as u64))]
+    data: InvertedChunkEnum,
+    #[br(temp)]
+    #[bw(ignore)]
+    end_pos: PosValue<()>,
+
+    // calculate how much was read, and read any extra bytes that remain in the chunk
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    extra_bytes: Vec<u8>,
+}
+
+// TODO: implement ChunkT for InvertedChunk, if relevant?
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
