@@ -11,7 +11,7 @@ use std::str::FromStr;
 // helper types
 // ----
 
-trait KnownChunkID {
+pub trait KnownChunkID {
     const ID: FourCC;
 }
 
@@ -236,12 +236,11 @@ pub struct ChunkHeader {
 // const generics don't support array types yet, so let's just encode it into a u32
 /// This chunk structure is a helper so the user can choose to just read a single chunk
 pub struct KnownChunk<
-    const MAGIC: u32,
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
-    #[br(temp, assert(id == MAGIC))]
-    #[bw(calc = MAGIC)]
-    id: u32,
+    #[br(temp, assert(id == T::ID))]
+    #[bw(calc = T::ID)]
+    id: FourCC,
 
     // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
     size: u32,
@@ -262,17 +261,17 @@ pub struct KnownChunk<
 }
 
 // TODO: this might be unnecessary in the long run
-impl<const MAGIC: u32, T> KnownChunkID for KnownChunk<MAGIC, T>
+impl<T> KnownChunkID for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID
 {
-    const ID: FourCC = FourCC(MAGIC.to_le_bytes());
+    const ID: FourCC = T::ID;
 }
 
 // TODO: this might be unnecessary in the long run
-impl<const MAGIC: u32, T> ChunkT for KnownChunk<MAGIC, T>
+impl<T> ChunkT for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + ChunkT
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT
 {
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         self.data.items()
@@ -283,11 +282,6 @@ where
     fn summary(&self) -> String {
         self.data.summary()
     }
-}
-
-// TODO: this might be unnecessary in the long run
-macro_rules! Chunk {
-    ($magic:expr, $content:ty) => { KnownChunk<{ u32::from_le_bytes(*$magic)}, $content> }
 }
 
 #[binrw]
@@ -313,7 +307,7 @@ impl ChunkT for Md5ChunkData {
     }
 }
 
-type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
+type Md5Chunk = KnownChunk<Md5ChunkData>;
 
 #[binrw]
 #[brw(little)]
