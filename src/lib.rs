@@ -230,38 +230,64 @@ pub struct ChunkHeader {
     pub size: u32,
 }
 
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+// const generics don't support array types yet, so let's just encode it into a u32
+/// This chunk structure is a helper so the user can choose to just read a single chunk
+pub struct KnownChunk<
+    const MAGIC: u32,
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+> {
+    #[br(temp, assert(id == MAGIC))]
+    #[bw(calc = MAGIC)]
+    id: u32,
+
+    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    size: u32,
+
+    #[br(temp)]
+    #[bw(ignore)]
+    begin_pos: PosValue<()>,
+    // ensure that we don't read outside the bounds for this chunk
+    #[br(map_stream = |r| r.take_seek(size as u64))]
+    data: T,
+    #[br(temp)]
+    #[bw(ignore)]
+    end_pos: PosValue<()>,
+
+    // calculate how much was read, and read any extra bytes that remain in the chunk
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    extra_bytes: Vec<u8>,
+}
+
+// TODO: this might be unnecessary in the long run
+impl<const MAGIC: u32, T> KnownChunkID for KnownChunk<MAGIC, T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>
+{
+    const ID: FourCC = FourCC(MAGIC.to_le_bytes());
+}
+
+// TODO: this might be unnecessary in the long run
+impl<const MAGIC: u32, T> ChunkT for KnownChunk<MAGIC, T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + ChunkT
+{
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        self.data.items()
+    }
+    fn size(&self) -> u32 {
+        self.data.size() + self.extra_bytes.len() as u32
+    }
+    fn summary(&self) -> String {
+        self.data.summary()
+    }
+}
+
+// TODO: this might be unnecessary in the long run
 macro_rules! Chunk {
-    ($name: ident, $magic:expr, $data:ty) => {
-        #[binrw]
-        #[brw(little)]
-        #[derive(Debug, PartialEq, Eq)]
-        pub struct $name {
-            #[br(temp, assert(id == *$magic))]
-            #[bw(calc = *$magic)]
-            id: [u8; 4],
-
-            // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-            size: u32,
-
-            #[br(temp)]
-            #[bw(ignore)]
-            begin_pos: PosValue<()>,
-            // ensure that we don't read outside the bounds for this chunk
-            #[br(map_stream = |r| r.take_seek(size as u64))]
-            data: $data,
-            #[br(temp)]
-            #[bw(ignore)]
-            end_pos: PosValue<()>,
-
-            // calculate how much was read, and read any extra bytes that remain in the chunk
-            #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
-            extra_bytes: Vec<u8>,
-        }
-
-        impl KnownChunkID for $name {
-            const ID: FourCC = FourCC(*$magic);
-        }
-    };
+    ($magic:expr, $content:ty) => { KnownChunk<{ u32::from_le_bytes(*$magic)}, $content> }
 }
 
 #[binrw]
@@ -271,17 +297,23 @@ pub struct Md5ChunkData {
     md5: u128,
 }
 
-Chunk!(Md5Chunk, b"MD5 ", Md5ChunkData);
+impl KnownChunkID for Md5ChunkData {
+    const ID: FourCC = FourCC(*b"MD5 ");
+}
 
-impl ChunkT for Md5Chunk {
-    fn size(&self) -> u32 {
-        self.size
-    }
-
+impl ChunkT for Md5ChunkData {
     fn summary(&self) -> String {
-        format!("0x{:X}", self.data.md5)
+        format!("0x{:X}", self.md5)
+    }
+    fn size(&self) -> u32 {
+        16
+    }
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        unimplemented!()
     }
 }
+
+type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
 
 #[binrw]
 #[brw(little)]
