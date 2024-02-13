@@ -11,7 +11,7 @@ use std::str::FromStr;
 // helper types
 // ----
 
-trait KnownChunkID {
+pub trait KnownChunkID {
     const ID: FourCC;
 }
 
@@ -230,39 +230,119 @@ pub struct ChunkHeader {
     pub size: u32,
 }
 
-macro_rules! Chunk {
-    ($name: ident, $magic:expr, $data:ty) => {
-        #[binrw]
-        #[brw(little)]
-        #[derive(Debug, PartialEq, Eq)]
-        pub struct $name {
-            #[br(temp, assert(id == *$magic))]
-            #[bw(calc = *$magic)]
-            id: [u8; 4],
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+// const generics don't support array types yet, so let's just encode it into a u32
+/// This chunk structure is a helper so the user can choose to just read a single chunk
+pub struct KnownChunk<
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+> {
+    #[br(temp, assert(id == T::ID))]
+    #[bw(calc = T::ID)]
+    id: FourCC,
 
-            // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-            size: u32,
+    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    size: u32,
 
-            #[br(temp)]
-            #[bw(ignore)]
-            begin_pos: PosValue<()>,
-            // ensure that we don't read outside the bounds for this chunk
-            #[br(map_stream = |r| r.take_seek(size as u64))]
-            data: $data,
-            #[br(temp)]
-            #[bw(ignore)]
-            end_pos: PosValue<()>,
+    #[br(temp)]
+    #[bw(ignore)]
+    begin_pos: PosValue<()>,
+    // ensure that we don't read outside the bounds for this chunk
+    #[br(map_stream = |r| r.take_seek(size as u64))]
+    data: T,
+    #[br(temp)]
+    #[bw(ignore)]
+    end_pos: PosValue<()>,
 
-            // calculate how much was read, and read any extra bytes that remain in the chunk
-            #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
-            extra_bytes: Vec<u8>,
-        }
-
-        impl KnownChunkID for $name {
-            const ID: FourCC = FourCC(*$magic);
-        }
-    };
+    // calculate how much was read, and read any extra bytes that remain in the chunk
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    extra_bytes: Vec<u8>,
 }
+
+// TODO: this might be unnecessary in the long run
+impl<T> KnownChunkID for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID
+{
+    const ID: FourCC = T::ID;
+}
+
+// TODO: this might be unnecessary in the long run
+impl<T> ChunkT for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT
+{
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        self.data.items()
+    }
+    fn size(&self) -> u32 {
+        self.data.size() + self.extra_bytes.len() as u32
+    }
+    fn summary(&self) -> String {
+        self.data.summary()
+    }
+}
+
+// TODO: maybe generate this struct using a macro?
+//  same macro could also generate all the KnownChunkID impls, if you want.
+#[binrw]
+#[brw(little)]
+#[br(import(id: FourCC))]
+#[derive(Debug, PartialEq, Eq)]
+/// This structure is an enum only around the contents of chunks
+pub enum InvertedChunkEnum {
+    #[br(pre_assert(id == Md5ChunkData::ID))]
+    Md5(Md5ChunkData),
+    Unknown {
+        #[br(calc = id)]
+        #[bw(ignore)]
+        id: FourCC,
+        #[br(parse_with = binrw::helpers::until_eof)]
+        raw: Vec<u8>
+    }
+}
+
+impl ChunkID for InvertedChunkEnum {
+    fn id(&self) -> FourCC {
+        match self {
+            Self::Md5(_) => Md5ChunkData::ID,
+            Self::Unknown { id, ..} => *id,
+        }
+    }
+}
+
+// TODO: implement ChunkT for InvertedChunkEnum, if relevant?
+
+// very similar to KnownChunk, but wraps an enum instead of a generic type.
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+/// This structure allows the user to read *any* chunk
+pub struct InvertedChunk {
+    #[br(temp)]
+    #[bw(calc = data.id())]
+    id: FourCC,
+
+    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    size: u32,
+
+    #[br(temp)]
+    #[bw(ignore)]
+    begin_pos: PosValue<()>,
+    // ensure that we don't read outside the bounds for this chunk
+    #[br(args(id), map_stream = |r| r.take_seek(size as u64))]
+    data: InvertedChunkEnum,
+    #[br(temp)]
+    #[bw(ignore)]
+    end_pos: PosValue<()>,
+
+    // calculate how much was read, and read any extra bytes that remain in the chunk
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    extra_bytes: Vec<u8>,
+}
+
+// TODO: implement ChunkT for InvertedChunk, if relevant?
 
 #[binrw]
 #[brw(little)]
@@ -271,17 +351,23 @@ pub struct Md5ChunkData {
     md5: u128,
 }
 
-Chunk!(Md5Chunk, b"MD5 ", Md5ChunkData);
+impl KnownChunkID for Md5ChunkData {
+    const ID: FourCC = FourCC(*b"MD5 ");
+}
 
-impl ChunkT for Md5Chunk {
-    fn size(&self) -> u32 {
-        self.size
-    }
-
+impl ChunkT for Md5ChunkData {
     fn summary(&self) -> String {
-        format!("0x{:X}", self.data.md5)
+        format!("0x{:X}", self.md5)
+    }
+    fn size(&self) -> u32 {
+        16
+    }
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        unimplemented!()
     }
 }
+
+type Md5Chunk = KnownChunk<Md5ChunkData>;
 
 #[binrw]
 #[brw(little)]
