@@ -177,7 +177,7 @@ where
 
     // TODO: research errors and figure out an error plan for wavrw
     // remove wrapping Result, and map IO and BinErrors to wavrw errors
-    let riff = RiffChunk::read(&mut reader).map_err(|e| std::io::Error::other(e))?;
+    let riff = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
     // TODO: convert assert into returned wav error type
     assert_eq!(
         riff.form_type,
@@ -209,13 +209,13 @@ where
         if offset % 2 == 1 {
             offset += 1;
         };
-        if u64::from(offset) != reader.stream_position()? {
+        if offset != reader.stream_position()? {
             // TODO: inject error into chunk vec and remove print
             println!(
                 "WARNING: {}: parsed less data than chunk size",
                 FourCC(chunk_id)
             );
-            reader.seek(SeekFrom::Start(offset.into()))?;
+            reader.seek(SeekFrom::Start(offset))?;
         }
 
         chunks.push(res);
@@ -974,7 +974,7 @@ type DataChunk = KnownChunk<DataChunkData>;
 
 impl DataChunk {
     pub fn summary(&self) -> String {
-        format!("audio data")
+        "audio data".to_string()
     }
 }
 
