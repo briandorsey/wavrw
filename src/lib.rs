@@ -5,6 +5,7 @@ use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, P
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
+use std::io::BufReader;
 use std::io::{Read, Seek};
 use std::str::FromStr;
 
@@ -21,6 +22,7 @@ pub trait ChunkID {
 }
 
 // TODO: naming convention for traits which overlap with types?
+// TODO: better name for this trait, maybe after splitting?
 pub trait ChunkT: ChunkID {
     /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
@@ -152,14 +154,16 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
+/// `metadata_chunks` parses a WAV file chunk by chunk, continuing
+///  even if some chunks have parsing errors.
 pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn ChunkT>>>, std::io::Error>
 where
     R: Read + Seek,
 {
-    // let mut reader = BufReader::new(file);
-    let mut reader = reader;
+    let mut reader = BufReader::new(reader);
 
     // TODO: research errors and figure out an error plan for wavrw
+    // remove wrapping Result, and map IO and BinErrors to wavrw errors
     let riff = RiffChunk::read(&mut reader).map_err(|e| std::io::Error::other(e))?;
     // TODO: convert assert into returned wav error type
     assert_eq!(
@@ -174,27 +178,17 @@ where
     let mut chunks: Vec<BinResult<Box<dyn ChunkT>>> = Vec::new();
 
     loop {
-        // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
         let chunk_id = {
             reader.read_exact(&mut buff)?;
             buff
         };
-        // dbg!(current);
         let chunk_size = {
             reader.read_exact(&mut buff)?;
             u32::from_le_bytes(buff)
         };
-        // dbg!(current_size);
 
-        // pick chunk struct and read it
-        // TODO: pick a pattern and go with one or the other.
-        let res: BinResult<Box<dyn ChunkT>> = match &chunk_id {
-            // b"MD5 " => Md5ChunkData::read(&mut reader).map(box_chunk),
-            _ => {
-                reader.seek(SeekFrom::Current(-8))?;
-                Chunk::read(&mut reader).map(box_chunk)
-            }
-        };
+        reader.seek(SeekFrom::Current(-8))?;
+        let res = Chunk::read(&mut reader).map(box_chunk);
 
         // setup for next iteration
         offset += chunk_size as u64 + 8;
@@ -213,7 +207,6 @@ where
 
         chunks.push(res);
 
-        // eprintln!("after: {offset}, pos: {:?}", reader.stream_position());
         if offset >= riff.size as u64 {
             break;
         };
@@ -223,12 +216,6 @@ where
 
 // parsing structs
 // ----
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ChunkHeader {
-    pub id: FourCC,
-    pub size: u32,
-}
 
 #[binrw]
 #[brw(little)]
@@ -263,7 +250,7 @@ pub struct KnownChunk<
 // TODO: this might be unnecessary in the long run
 impl<T> KnownChunkID for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 {
     const ID: FourCC = T::ID;
 }
@@ -271,7 +258,7 @@ where
 // TODO: this might be unnecessary in the long run
 impl<T> ChunkT for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT,
 {
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         self.data.items()
@@ -284,66 +271,7 @@ where
     }
 }
 
-// TODO: maybe generate this struct using a macro?
-//  same macro could also generate all the KnownChunkID impls, if you want.
-#[binrw]
-#[brw(little)]
-#[br(import(id: FourCC))]
-#[derive(Debug, PartialEq, Eq)]
-/// This structure is an enum only around the contents of chunks
-pub enum InvertedChunkEnum {
-    #[br(pre_assert(id == Md5ChunkData::ID))]
-    Md5(Md5ChunkData),
-    Unknown {
-        #[br(calc = id)]
-        #[bw(ignore)]
-        id: FourCC,
-        #[br(parse_with = binrw::helpers::until_eof)]
-        raw: Vec<u8>
-    }
-}
-
-impl ChunkID for InvertedChunkEnum {
-    fn id(&self) -> FourCC {
-        match self {
-            Self::Md5(_) => Md5ChunkData::ID,
-            Self::Unknown { id, ..} => *id,
-        }
-    }
-}
-
-// TODO: implement ChunkT for InvertedChunkEnum, if relevant?
-
-// very similar to KnownChunk, but wraps an enum instead of a generic type.
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
-/// This structure allows the user to read *any* chunk
-pub struct InvertedChunk {
-    #[br(temp)]
-    #[bw(calc = data.id())]
-    id: FourCC,
-
-    // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-    size: u32,
-
-    #[br(temp)]
-    #[bw(ignore)]
-    begin_pos: PosValue<()>,
-    // ensure that we don't read outside the bounds for this chunk
-    #[br(args(id), map_stream = |r| r.take_seek(size as u64))]
-    data: InvertedChunkEnum,
-    #[br(temp)]
-    #[bw(ignore)]
-    end_pos: PosValue<()>,
-
-    // calculate how much was read, and read any extra bytes that remain in the chunk
-    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
-    extra_bytes: Vec<u8>,
-}
-
-// TODO: implement ChunkT for InvertedChunk, if relevant?
-
+// based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -361,9 +289,6 @@ impl ChunkT for Md5ChunkData {
     }
     fn size(&self) -> u32 {
         16
-    }
-    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        unimplemented!()
     }
 }
 
@@ -1286,23 +1211,6 @@ impl<'a> Iterator for BextChunkIterator<'a> {
         }
     }
 }
-
-// based on https://mediaarea.net/BWFMetaEdit/md5
-// #[binrw]
-// #[brw(little)]
-// #[derive(Debug, PartialEq, Eq)]
-// pub struct Md5Chunk {
-//     #[brw(magic = b"MD5 ", seek_before = SeekFrom::Current(-4))]
-//     id: FourCC,
-//     size: u32,
-//     md5: u128,
-// }
-
-// impl Md5Chunk {
-//     pub fn summary(&self) -> String {
-//         format!("0x{:X}", self.md5)
-//     }
-// }
 
 #[binrw]
 #[brw(little)]
