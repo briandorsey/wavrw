@@ -74,6 +74,19 @@ impl Debug for FourCC {
     }
 }
 
+// needed for assert in br() attribute
+impl<'a> PartialEq<&'a FourCC> for FourCC {
+    fn eq(&self, other: &&'a FourCC) -> bool {
+        self == *other
+    }
+}
+
+impl<'a> PartialEq<FourCC> for &'a FourCC {
+    fn eq(&self, other: &FourCC) -> bool {
+        *self == other
+    }
+}
+
 #[derive(Debug)]
 struct FixedStrErr;
 
@@ -238,7 +251,11 @@ pub struct KnownChunk<
     // ensure that we don't read outside the bounds for this chunk
     #[br(map_stream = |r| r.take_seek(size as u64))]
     data: T,
-    #[br(temp)]
+
+    // assert for better error message if too many bytes processed
+    // seems like it should be impossible, but found a case where T
+    // used align_after to pad bytes.
+    #[br(temp, assert((end_pos.pos - begin_pos.pos) <= size as u64, "(end_pos.pos - begin_pos.pos) <= size while parsing {}. end: {}, begin: {}, size: {}", T::ID, end_pos.pos, begin_pos.pos, size))]
     #[bw(ignore)]
     end_pos: PosValue<()>,
 
@@ -247,7 +264,6 @@ pub struct KnownChunk<
     extra_bytes: Vec<u8>,
 }
 
-// TODO: this might be unnecessary in the long run
 impl<T> KnownChunkID for KnownChunk<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
@@ -255,19 +271,18 @@ where
     const ID: FourCC = T::ID;
 }
 
-// TODO: this might be unnecessary in the long run
 impl<T> ChunkT for KnownChunk<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT,
 {
-    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        self.data.items()
-    }
     fn size(&self) -> u32 {
         self.data.size() + self.extra_bytes.len() as u32
     }
     fn summary(&self) -> String {
         self.data.summary()
+    }
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        self.data.items()
     }
 }
 
@@ -284,11 +299,11 @@ impl KnownChunkID for Md5ChunkData {
 }
 
 impl ChunkT for Md5ChunkData {
-    fn summary(&self) -> String {
-        format!("0x{:X}", self.md5)
-    }
     fn size(&self) -> u32 {
         16
+    }
+    fn summary(&self) -> String {
+        format!("0x{:X}", self.md5)
     }
 }
 
@@ -862,10 +877,7 @@ impl Display for FormatTag {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct FmtChunk {
-    #[brw(magic = b"fmt ", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
+pub struct FmtChunkData {
     format_tag: FormatTag,
     channels: u16,
     samples_per_sec: u32,
@@ -876,13 +888,19 @@ pub struct FmtChunk {
 // TODO: properly handle different fmt chunk additions from later specs
 // TODO: if ever extra data (based on cbSize), include as RAW section. Display as hex and preserve when writing
 
+impl KnownChunkID for FmtChunkData {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+type FmtChunk = KnownChunk<FmtChunkData>;
+
 impl FmtChunk {
     pub fn summary(&self) -> String {
         format!(
             "{} chan, {}/{}",
-            self.channels,
-            self.bits_per_sample,
-            self.samples_per_sec,
+            self.data.channels,
+            self.data.bits_per_sample,
+            self.data.samples_per_sec,
             // TODO: format_tag
         )
     }
@@ -916,70 +934,83 @@ impl<'a> Iterator for FmtChunkIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("format_tag".to_string(), self.fmt.format_tag.to_string())),
-            2 => Some(("channels".to_string(), self.fmt.channels.to_string())),
+            1 => Some((
+                "format_tag".to_string(),
+                self.fmt.data.format_tag.to_string(),
+            )),
+            2 => Some(("channels".to_string(), self.fmt.data.channels.to_string())),
             3 => Some((
                 "samples_per_sec".to_string(),
-                self.fmt.samples_per_sec.to_string(),
+                self.fmt.data.samples_per_sec.to_string(),
             )),
             4 => Some((
                 "avg_bytes_per_sec".to_string(),
-                self.fmt.avg_bytes_per_sec.to_string(),
+                self.fmt.data.avg_bytes_per_sec.to_string(),
             )),
-            5 => Some(("block_align".to_string(), self.fmt.block_align.to_string())),
+            5 => Some((
+                "block_align".to_string(),
+                self.fmt.data.block_align.to_string(),
+            )),
             6 => Some((
                 "bits_per_sample".to_string(),
-                self.fmt.bits_per_sample.to_string(),
+                self.fmt.data.bits_per_sample.to_string(),
             )),
             _ => None,
         }
     }
 }
 
-// based on http://soundfile.sapp.org/doc/WaveFormat/
 /// `data` chunk parser which skips all audio data
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct DataChunk {
-    #[brw(magic = b"data", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(seek_before = SeekFrom::Current(size.to_owned().into()), ignore)]
-    end_of_chunk: [u8; 0],
+pub struct DataChunkData {}
+
+impl KnownChunkID for DataChunkData {
+    const ID: FourCC = FourCC(*b"data");
 }
+
+type DataChunk = KnownChunk<DataChunkData>;
 
 impl DataChunk {
     pub fn summary(&self) -> String {
-        format!("audio data, len: {} bytes", self.size)
+        format!("audio data")
     }
 }
 
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListInfoChunk {
-    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(magic = b"INFO", seek_before = SeekFrom::Current(-4))]
+pub struct ListInfoChunkData {
+    #[brw(assert(list_type == FourCC(*b"INFO")))]
     list_type: FourCC,
-    #[br(map_stream = |reader| reader.take_seek(size as u64 - 4u64), parse_with = helpers::until_eof)]
+    #[br(parse_with = helpers::until_eof)]
     #[bw()]
     chunks: Vec<InfoChunk>,
 }
+
+impl KnownChunkID for ListInfoChunkData {
+    const ID: FourCC = FourCC(*b"LIST");
+}
+
+type ListInfoChunk = KnownChunk<ListInfoChunkData>;
 
 impl ListInfoChunk {
     pub fn summary(&self) -> String {
         format!(
             "{}: {}",
-            self.list_type,
-            self.chunks.iter().map(|c| c.id()).join(", ")
+            self.data.list_type,
+            self.data.chunks.iter().map(|c| c.id()).join(", ")
         )
     }
 
     pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
+        Box::new(
+            self.data
+                .chunks
+                .iter()
+                .map(|c| (c.id().to_string(), c.value())),
+        )
     }
 }
 
@@ -1062,22 +1093,24 @@ impl InfoChunk {
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListAdtlChunk {
-    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(magic = b"adtl", seek_before = SeekFrom::Current(-4))]
+pub struct ListAdtlChunkData {
+    #[brw(assert(list_type == FourCC(*b"adtl")))]
     list_type: FourCC,
-    // need to add magic here to choose the right enum
-    // items: ListType,
-    #[br(count = size -4 )]
+    #[br(parse_with = helpers::until_eof)]
     #[bw()]
+    // chunks: Vec<AdtlChunk>,
     raw: Vec<u8>,
 }
 
+impl KnownChunkID for ListAdtlChunkData {
+    const ID: FourCC = FourCC(*b"LIST");
+}
+
+type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
+
 impl ListAdtlChunk {
     pub fn summary(&self) -> String {
-        format!("{} ...", self.list_type)
+        format!("{} ...", self.data.list_type)
     }
 }
 
@@ -1087,10 +1120,7 @@ impl ListAdtlChunk {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct BextChunk {
-    #[brw(magic = b"bext", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
+pub struct BextChunkData {
     /// Description of the sound sequence
     description: FixedStr<256>, // Description
     /// Name of the originator
@@ -1123,16 +1153,22 @@ pub struct BextChunk {
     reserved: [u8; 180], // Reserved
     /// History coding
     // interpret the remaining bytes as string
-    #[br(align_after = 2, count = size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
-    #[bw(align_after = 2, map = |s: &String| s.as_bytes())]
+    #[br(parse_with = helpers::until_eof, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
+    #[bw(map = |s: &String| s.as_bytes())]
     coding_history: String, // CodingHistory
 }
+
+impl KnownChunkID for BextChunkData {
+    const ID: FourCC = FourCC(*b"bext");
+}
+
+type BextChunk = KnownChunk<BextChunkData>;
 
 impl BextChunk {
     pub fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
-            self.origination_date, self.origination_time, self.description
+            self.data.origination_date, self.data.origination_time, self.data.description
         )
     }
 
@@ -1163,49 +1199,55 @@ impl<'a> Iterator for BextChunkIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("description".to_string(), self.bext.description.to_string())),
-            2 => Some(("originator".to_string(), self.bext.originator.to_string())),
+            1 => Some((
+                "description".to_string(),
+                self.bext.data.description.to_string(),
+            )),
+            2 => Some((
+                "originator".to_string(),
+                self.bext.data.originator.to_string(),
+            )),
             3 => Some((
                 "originator_reference".to_string(),
-                self.bext.originator_reference.to_string(),
+                self.bext.data.originator_reference.to_string(),
             )),
             4 => Some((
                 "origination_date".to_string(),
-                self.bext.origination_date.to_string(),
+                self.bext.data.origination_date.to_string(),
             )),
             5 => Some((
                 "origination_time".to_string(),
-                self.bext.origination_time.to_string(),
+                self.bext.data.origination_time.to_string(),
             )),
             6 => Some((
                 "time_reference".to_string(),
-                self.bext.time_reference.to_string(),
+                self.bext.data.time_reference.to_string(),
             )),
-            7 => Some(("version".to_string(), self.bext.version.to_string())),
-            8 => Some(("umid".to_string(), hex::encode(self.bext.umid))),
+            7 => Some(("version".to_string(), self.bext.data.version.to_string())),
+            8 => Some(("umid".to_string(), hex::encode(self.bext.data.umid))),
             9 => Some((
                 "loudness_value".to_string(),
-                self.bext.loudness_value.to_string(),
+                self.bext.data.loudness_value.to_string(),
             )),
             10 => Some((
                 "loudness_range".to_string(),
-                self.bext.loudness_range.to_string(),
+                self.bext.data.loudness_range.to_string(),
             )),
             11 => Some((
                 "max_true_peak_level".to_string(),
-                self.bext.max_true_peak_level.to_string(),
+                self.bext.data.max_true_peak_level.to_string(),
             )),
             12 => Some((
                 "max_momentary_loudness".to_string(),
-                self.bext.max_momentary_loudness.to_string(),
+                self.bext.data.max_momentary_loudness.to_string(),
             )),
             13 => Some((
                 "max_short_term_loudness".to_string(),
-                self.bext.max_short_term_loudness.to_string(),
+                self.bext.data.max_short_term_loudness.to_string(),
             )),
             14 => Some((
                 "coding_history".to_string(),
-                self.bext.coding_history.to_string(),
+                self.bext.data.coding_history.to_string(),
             )),
             _ => None,
         }
@@ -1235,11 +1277,11 @@ impl ChunkID for Chunk {
     /// Returns the [FourCC] (chunk id) for the contained chunk.
     fn id(&self) -> FourCC {
         match self {
-            Chunk::Fmt(e) => e.id,
-            Chunk::Data(e) => e.id,
-            Chunk::Info(e) => e.id,
-            Chunk::Adtl(e) => e.id,
-            Chunk::Bext(e) => e.id,
+            Chunk::Fmt(e) => e.id(),
+            Chunk::Data(e) => e.id(),
+            Chunk::Info(e) => e.id(),
+            Chunk::Adtl(e) => e.id(),
+            Chunk::Bext(e) => e.id(),
             Chunk::Md5(e) => e.id(),
             Chunk::Unknown { id, .. } => *id,
         }
@@ -1344,14 +1386,16 @@ mod test {
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
         let expected = FmtChunk {
-            id: FourCC(*b"fmt "),
             size: 16,
-            format_tag: FormatTag::Pcm,
-            channels: 1,
-            samples_per_sec: 48000,
-            avg_bytes_per_sec: 144000,
-            block_align: 3,
-            bits_per_sample: 24,
+            data: FmtChunkData {
+                format_tag: FormatTag::Pcm,
+                channels: 1,
+                samples_per_sec: 48000,
+                avg_bytes_per_sec: 144000,
+                block_align: 3,
+                bits_per_sample: 24,
+            },
+            extra_bytes: vec![],
         };
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
@@ -1389,47 +1433,53 @@ mod test {
         let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
-            bext.description,
+            bext.data.description,
             FixedStr::<256>::from_str("Description").unwrap(),
             "description"
         );
         assert_eq!(
-            bext.originator,
+            bext.data.originator,
             FixedStr::<32>::from_str("Originator").unwrap(),
             "originator"
         );
         assert_eq!(
-            bext.originator_reference,
+            bext.data.originator_reference,
             FixedStr::<32>::from_str("OriginatorReference").unwrap(),
             "originator_reference"
         );
         assert_eq!(
-            bext.origination_date,
+            bext.data.origination_date,
             FixedStr::<10>::from_str("2006/01/02").unwrap(),
             "origination_date"
         );
         assert_eq!(
-            bext.origination_time,
+            bext.data.origination_time,
             FixedStr::<8>::from_str("03:04:05").unwrap(),
             "origination_time"
         );
-        assert_eq!(bext.time_reference, 12345, "time_reference");
-        assert_eq!(bext.version, 2);
+        assert_eq!(bext.data.time_reference, 12345, "time_reference");
+        assert_eq!(bext.data.version, 2);
         assert_eq!(
-            bext.umid,
+            bext.data.umid,
             <Vec<u8> as TryInto<[u8; 64]>>::try_into(
                 decode("060A2B3401010101010102101300000000FF122A6937058000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()
             )
             .unwrap(),
             "version"
         );
-        assert_eq!(bext.loudness_value, 100, "loudness_value");
-        assert_eq!(bext.loudness_range, 200, "loudness_range");
-        assert_eq!(bext.max_true_peak_level, 300, "max_true_peak_level");
-        assert_eq!(bext.max_momentary_loudness, 400, "max_momentary_loudness");
-        assert_eq!(bext.max_short_term_loudness, 500, "max_short_term_loudness");
-        assert_eq!(bext.reserved.len(), 180, "reserved");
-        assert_eq!(bext.coding_history, "CodingHistory", "coding_history");
+        assert_eq!(bext.data.loudness_value, 100, "loudness_value");
+        assert_eq!(bext.data.loudness_range, 200, "loudness_range");
+        assert_eq!(bext.data.max_true_peak_level, 300, "max_true_peak_level");
+        assert_eq!(
+            bext.data.max_momentary_loudness, 400,
+            "max_momentary_loudness"
+        );
+        assert_eq!(
+            bext.data.max_short_term_loudness, 500,
+            "max_short_term_loudness"
+        );
+        assert_eq!(bext.data.reserved.len(), 180, "reserved");
+        assert_eq!(bext.data.coding_history, "CodingHistory", "coding_history");
     }
 
     #[test]
