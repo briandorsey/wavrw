@@ -3,6 +3,7 @@ use binrw::Endian;
 use binrw::NullString;
 use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
 use itertools::Itertools;
+use paste::paste;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::BufReader;
@@ -1016,18 +1017,28 @@ impl ListInfoChunk {
 
 macro_rules! info_chunks {
     ($(($name:ident,$literal:literal)),*$(,)?) => {
+        paste!{
+        $(
+            #[binrw]
+            #[br(little)]
+            #[derive(Debug, PartialEq, Eq)]
+            pub struct [<$name ChunkData>] {
+                value: NullString,
+            }
+
+            impl KnownChunkID for [<$name ChunkData>] {
+                const ID: FourCC = FourCC(*$literal);
+            }
+
+            type [<$name Chunk>] = KnownChunk<[<$name ChunkData>]>;
+        )*
+
         #[binrw]
         #[brw(little)]
         #[derive(Debug, PartialEq, Eq)]
         pub enum InfoChunk {
         $(
-            $name {
-                #[brw(magic = $literal, seek_before = SeekFrom::Current(-4))]
-                id: FourCC,
-                size: u32,
-                #[brw(align_after = 2, pad_size_to= size.to_owned())]
-                value: NullString,
-            },
+            $name([<$name Chunk>]),
         )*
             Unknown {
                 id: FourCC,
@@ -1041,7 +1052,7 @@ macro_rules! info_chunks {
             pub fn id(&self) -> FourCC {
                 match self {
                     $(
-                    InfoChunk::$name{ id, .. } => *id,
+                    InfoChunk::$name(e) => e.id(),
                     )*
                     InfoChunk::Unknown { id, .. } => *id,
                 }
@@ -1050,11 +1061,12 @@ macro_rules! info_chunks {
             pub fn value(&self) -> String {
                 match self {
                     $(
-                    InfoChunk::$name{ value, .. } => (*value).to_string(),
+                    InfoChunk::$name(e)  => e.data.value.to_string(),
                     )*
                     InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
                 }
             }
+        }
         }
     }
 }
@@ -1083,12 +1095,6 @@ info_chunks!(
     (Idpi, b"IDPI"),
     (IENG, b"IENG"),
 );
-
-impl InfoChunk {
-    pub fn _summary(&self) -> String {
-        format!("{}: {}", self.id(), self.value())
-    }
-}
 
 #[binrw]
 #[br(little)]
