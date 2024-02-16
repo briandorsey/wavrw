@@ -202,7 +202,7 @@ where
         };
 
         reader.seek(SeekFrom::Current(-8))?;
-        let res = Chunk::read(&mut reader).map(box_chunk);
+        let res = ChunkEnum::read(&mut reader).map(box_chunk);
 
         // setup for next iteration
         offset += chunk_size as u64 + 8;
@@ -987,7 +987,7 @@ pub struct ListInfoChunkData {
     list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
-    chunks: Vec<InfoChunk>,
+    chunks: Vec<InfoChunkEnum>,
 }
 
 impl KnownChunkID for ListInfoChunkData {
@@ -1036,7 +1036,7 @@ macro_rules! info_chunks {
         #[binrw]
         #[brw(little)]
         #[derive(Debug, PartialEq, Eq)]
-        pub enum InfoChunk {
+        pub enum InfoChunkEnum {
         $(
             $name([<$name Chunk>]),
         )*
@@ -1048,22 +1048,22 @@ macro_rules! info_chunks {
             },
         }
 
-        impl InfoChunk {
+        impl InfoChunkEnum {
             pub fn id(&self) -> FourCC {
                 match self {
                     $(
-                    InfoChunk::$name(e) => e.id(),
+                    InfoChunkEnum::$name(e) => e.id(),
                     )*
-                    InfoChunk::Unknown { id, .. } => *id,
+                    InfoChunkEnum::Unknown { id, .. } => *id,
                 }
             }
 
             pub fn value(&self) -> String {
                 match self {
                     $(
-                    InfoChunk::$name(e)  => e.data.value.to_string(),
+                    InfoChunkEnum::$name(e)  => e.data.value.to_string(),
                     )*
-                    InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
+                    InfoChunkEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
                 }
             }
         }
@@ -1263,7 +1263,7 @@ impl<'a> Iterator for BextChunkIterator<'a> {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub enum Chunk {
+pub enum ChunkEnum {
     Fmt(FmtChunk),
     Data(DataChunk),
     Info(ListInfoChunk),
@@ -1279,45 +1279,45 @@ pub enum Chunk {
     },
 }
 
-impl ChunkID for Chunk {
+impl ChunkID for ChunkEnum {
     /// Returns the [FourCC] (chunk id) for the contained chunk.
     fn id(&self) -> FourCC {
         match self {
-            Chunk::Fmt(e) => e.id(),
-            Chunk::Data(e) => e.id(),
-            Chunk::Info(e) => e.id(),
-            Chunk::Adtl(e) => e.id(),
-            Chunk::Bext(e) => e.id(),
-            Chunk::Md5(e) => e.id(),
-            Chunk::Unknown { id, .. } => *id,
+            ChunkEnum::Fmt(e) => e.id(),
+            ChunkEnum::Data(e) => e.id(),
+            ChunkEnum::Info(e) => e.id(),
+            ChunkEnum::Adtl(e) => e.id(),
+            ChunkEnum::Bext(e) => e.id(),
+            ChunkEnum::Md5(e) => e.id(),
+            ChunkEnum::Unknown { id, .. } => *id,
         }
     }
 }
 
-impl ChunkT for Chunk {
+impl ChunkT for ChunkEnum {
     /// Returns the logical (used) size in bytes of the contained chunk.
     fn size(&self) -> u32 {
         match self {
-            Chunk::Fmt(e) => e.size,
-            Chunk::Data(e) => e.size,
-            Chunk::Info(e) => e.size,
-            Chunk::Adtl(e) => e.size,
-            Chunk::Bext(e) => e.size,
-            Chunk::Md5(e) => e.size,
-            Chunk::Unknown { size, .. } => *size,
+            ChunkEnum::Fmt(e) => e.size,
+            ChunkEnum::Data(e) => e.size,
+            ChunkEnum::Info(e) => e.size,
+            ChunkEnum::Adtl(e) => e.size,
+            ChunkEnum::Bext(e) => e.size,
+            ChunkEnum::Md5(e) => e.size,
+            ChunkEnum::Unknown { size, .. } => *size,
         }
     }
 
     /// Returns a short text summary of the contents of the contained chunk.
     fn summary(&self) -> String {
         match self {
-            Chunk::Fmt(e) => e.summary(),
-            Chunk::Data(e) => e.summary(),
-            Chunk::Info(e) => e.summary(),
-            Chunk::Adtl(e) => e.summary(),
-            Chunk::Bext(e) => e.summary(),
-            Chunk::Md5(e) => e.summary(),
-            Chunk::Unknown { .. } => "...".to_owned(),
+            ChunkEnum::Fmt(e) => e.summary(),
+            ChunkEnum::Data(e) => e.summary(),
+            ChunkEnum::Info(e) => e.summary(),
+            ChunkEnum::Adtl(e) => e.summary(),
+            ChunkEnum::Bext(e) => e.summary(),
+            ChunkEnum::Md5(e) => e.summary(),
+            ChunkEnum::Unknown { .. } => "...".to_owned(),
         }
     }
 
@@ -1325,9 +1325,9 @@ impl ChunkT for Chunk {
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
-            Chunk::Fmt(e) => Box::new(e.into_iter()),
-            Chunk::Info(e) => Box::new(e.items()),
-            Chunk::Bext(e) => Box::new(e.items()),
+            ChunkEnum::Fmt(e) => Box::new(e.into_iter()),
+            ChunkEnum::Info(e) => Box::new(e.items()),
+            ChunkEnum::Bext(e) => Box::new(e.items()),
             _ => Box::new(std::iter::empty()),
         }
     }
@@ -1512,7 +1512,7 @@ mod test {
 
     #[test]
     fn infochunk_roundtrip() {
-        let icmt = InfoChunk::Icmt(IcmtChunk {
+        let icmt = InfoChunkEnum::Icmt(IcmtChunk {
             size: 8,
             data: IcmtChunkData {
                 value: NullString("comment".into()),
@@ -1524,7 +1524,7 @@ mod test {
         icmt.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = InfoChunk::read(&mut buff).unwrap();
+        let after = InfoChunkEnum::read(&mut buff).unwrap();
         assert_eq!(after, icmt);
     }
 }
