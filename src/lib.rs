@@ -12,6 +12,10 @@ use std::str::FromStr;
 // helper types
 // ----
 
+const fn fourcc(id: &[u8; 4]) -> u32 {
+    u32::from_le_bytes(*id)
+}
+
 pub trait KnownChunkID {
     const ID: FourCC;
 }
@@ -1025,32 +1029,51 @@ impl<const I: u32> KnownChunkID for InfoChunkData<I> {
     const ID: FourCC = FourCC(I.to_le_bytes());
 }
 
-const fn fourcc(id: &[u8; 4]) -> u32 {
-    u32::from_le_bytes(*id)
-}
+type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
+type IgnrChunkData = InfoChunkData<{ fourcc(b"IGNR") }>;
+type IkeyChunkData = InfoChunkData<{ fourcc(b"IKEY") }>;
+type IlgtChunkData = InfoChunkData<{ fourcc(b"ILGT") }>;
+type ImedChunkData = InfoChunkData<{ fourcc(b"IMED") }>;
+type InamChunkData = InfoChunkData<{ fourcc(b"INAM") }>;
+type IpltChunkData = InfoChunkData<{ fourcc(b"IPLT") }>;
+type IprdChunkData = InfoChunkData<{ fourcc(b"IPRD") }>;
+type IsbjChunkData = InfoChunkData<{ fourcc(b"ISBJ") }>;
+type IsftChunkData = InfoChunkData<{ fourcc(b"ISFT") }>;
+type IshpChunkData = InfoChunkData<{ fourcc(b"ISHP") }>;
+type IartChunkData = InfoChunkData<{ fourcc(b"IART") }>;
+type IsrcChunkData = InfoChunkData<{ fourcc(b"ISRC") }>;
+type IsrfChunkData = InfoChunkData<{ fourcc(b"ISRF") }>;
+type ItchChunkData = InfoChunkData<{ fourcc(b"ITCH") }>;
+type IcmsChunkData = InfoChunkData<{ fourcc(b"ICMS") }>;
+type IcmtChunkData = InfoChunkData<{ fourcc(b"ICMT") }>;
+type IcopChunkData = InfoChunkData<{ fourcc(b"ICOP") }>;
+type IcrdChunkData = InfoChunkData<{ fourcc(b"ICRD") }>;
+type IcrpChunkData = InfoChunkData<{ fourcc(b"ICRP") }>;
+type IdpiChunkData = InfoChunkData<{ fourcc(b"IDPI") }>;
+type IengChunkData = InfoChunkData<{ fourcc(b"IENG") }>;
 
-type IarlChunk = KnownChunk<InfoChunkData<{ fourcc(b"IARL") }>>;
-type IgnrChunk = KnownChunk<InfoChunkData<{ fourcc(b"IGNR") }>>;
-type IkeyChunk = KnownChunk<InfoChunkData<{ fourcc(b"IKEY") }>>;
-type IlgtChunk = KnownChunk<InfoChunkData<{ fourcc(b"ILGT") }>>;
-type ImedChunk = KnownChunk<InfoChunkData<{ fourcc(b"IMED") }>>;
-type InamChunk = KnownChunk<InfoChunkData<{ fourcc(b"INAM") }>>;
-type IpltChunk = KnownChunk<InfoChunkData<{ fourcc(b"IPLT") }>>;
-type IprdChunk = KnownChunk<InfoChunkData<{ fourcc(b"IPRD") }>>;
-type IsbjChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISBJ") }>>;
-type IsftChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISFT") }>>;
-type IshpChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISHP") }>>;
-type IartChunk = KnownChunk<InfoChunkData<{ fourcc(b"IART") }>>;
-type IsrcChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISRC") }>>;
-type IsrfChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISRF") }>>;
-type ItchChunk = KnownChunk<InfoChunkData<{ fourcc(b"ITCH") }>>;
-type IcmsChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICMS") }>>;
-type IcmtChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICMT") }>>;
-type IcopChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICOP") }>>;
-type IcrdChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICRD") }>>;
-type IcrpChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICRP") }>>;
-type IdpiChunk = KnownChunk<InfoChunkData<{ fourcc(b"IDPI") }>>;
-type IengChunk = KnownChunk<InfoChunkData<{ fourcc(b"IENG") }>>;
+type IarlChunk = KnownChunk<IarlChunkData>;
+type IgnrChunk = KnownChunk<IgnrChunkData>;
+type IkeyChunk = KnownChunk<IkeyChunkData>;
+type IlgtChunk = KnownChunk<IlgtChunkData>;
+type ImedChunk = KnownChunk<ImedChunkData>;
+type InamChunk = KnownChunk<InamChunkData>;
+type IpltChunk = KnownChunk<IpltChunkData>;
+type IprdChunk = KnownChunk<IprdChunkData>;
+type IsbjChunk = KnownChunk<IsbjChunkData>;
+type IsftChunk = KnownChunk<IsftChunkData>;
+type IshpChunk = KnownChunk<IshpChunkData>;
+type IartChunk = KnownChunk<IartChunkData>;
+type IsrcChunk = KnownChunk<IsrcChunkData>;
+type IsrfChunk = KnownChunk<IsrfChunkData>;
+type ItchChunk = KnownChunk<ItchChunkData>;
+type IcmsChunk = KnownChunk<IcmsChunkData>;
+type IcmtChunk = KnownChunk<IcmtChunkData>;
+type IcopChunk = KnownChunk<IcopChunkData>;
+type IcrdChunk = KnownChunk<IcrdChunkData>;
+type IcrpChunk = KnownChunk<IcrpChunkData>;
+type IdpiChunk = KnownChunk<IdpiChunkData>;
+type IengChunk = KnownChunk<IengChunkData>;
 
 #[binrw]
 #[brw(little)]
@@ -1562,7 +1585,7 @@ mod test {
     fn infochunk_roundtrip() {
         let icmt = InfoChunkEnum::Icmt(IcmtChunk {
             size: 8,
-            data: InfoChunkData::<{ fourcc(b"ICMT") }> {
+            data: IcmtChunkData {
                 value: NullString("comment".into()),
             },
             extra_bytes: vec![],
