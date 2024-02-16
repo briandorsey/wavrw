@@ -1512,11 +1512,13 @@ mod test {
 
     #[test]
     fn infochunk_roundtrip() {
-        let icmt = InfoChunk::Icmt {
-            id: FourCC(*b"ICMT"),
+        let icmt = InfoChunk::Icmt(IcmtChunk {
             size: 8,
-            value: NullString("comment".into()),
-        };
+            data: IcmtChunkData {
+                value: NullString("comment".into()),
+            },
+            extra_bytes: vec![],
+        });
         println!("{icmt:?}");
         let mut buff = std::io::Cursor::new(Vec::<u8>::new());
         icmt.write(&mut buff).unwrap();
