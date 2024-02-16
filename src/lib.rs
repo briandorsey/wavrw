@@ -3,7 +3,6 @@ use binrw::Endian;
 use binrw::NullString;
 use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
 use itertools::Itertools;
-use paste::paste;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::BufReader;
@@ -1015,86 +1014,135 @@ impl ListInfoChunk {
     }
 }
 
-macro_rules! info_chunks {
-    ($(($name:ident,$literal:literal)),*$(,)?) => {
-        paste!{
-        $(
-            #[binrw]
-            #[br(little)]
-            #[derive(Debug, PartialEq, Eq)]
-            pub struct [<$name ChunkData>] {
-                value: NullString,
-            }
+#[binrw]
+#[br(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct InfoChunkData<const I: u32> {
+    value: NullString,
+}
 
-            impl KnownChunkID for [<$name ChunkData>] {
-                const ID: FourCC = FourCC(*$literal);
-            }
+impl<const I: u32> KnownChunkID for InfoChunkData<I> {
+    const ID: FourCC = FourCC(I.to_le_bytes());
+}
 
-            type [<$name Chunk>] = KnownChunk<[<$name ChunkData>]>;
-        )*
+const fn fourcc(id: &[u8; 4]) -> u32 {
+    u32::from_le_bytes(*id)
+}
 
-        #[binrw]
-        #[brw(little)]
-        #[derive(Debug, PartialEq, Eq)]
-        pub enum InfoChunkEnum {
-        $(
-            $name([<$name Chunk>]),
-        )*
-            Unknown {
-                id: FourCC,
-                size: u32,
-                #[brw(align_after=2, pad_size_to= size.to_owned())]
-                value: NullString,
-            },
+type IarlChunk = KnownChunk<InfoChunkData<{ fourcc(b"IARL") }>>;
+type IgnrChunk = KnownChunk<InfoChunkData<{ fourcc(b"IGNR") }>>;
+type IkeyChunk = KnownChunk<InfoChunkData<{ fourcc(b"IKEY") }>>;
+type IlgtChunk = KnownChunk<InfoChunkData<{ fourcc(b"ILGT") }>>;
+type ImedChunk = KnownChunk<InfoChunkData<{ fourcc(b"IMED") }>>;
+type InamChunk = KnownChunk<InfoChunkData<{ fourcc(b"INAM") }>>;
+type IpltChunk = KnownChunk<InfoChunkData<{ fourcc(b"IPLT") }>>;
+type IprdChunk = KnownChunk<InfoChunkData<{ fourcc(b"IPRD") }>>;
+type IsbjChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISBJ") }>>;
+type IsftChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISFT") }>>;
+type IshpChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISHP") }>>;
+type IartChunk = KnownChunk<InfoChunkData<{ fourcc(b"IART") }>>;
+type IsrcChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISRC") }>>;
+type IsrfChunk = KnownChunk<InfoChunkData<{ fourcc(b"ISRF") }>>;
+type ItchChunk = KnownChunk<InfoChunkData<{ fourcc(b"ITCH") }>>;
+type IcmsChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICMS") }>>;
+type IcmtChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICMT") }>>;
+type IcopChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICOP") }>>;
+type IcrdChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICRD") }>>;
+type IcrpChunk = KnownChunk<InfoChunkData<{ fourcc(b"ICRP") }>>;
+type IdpiChunk = KnownChunk<InfoChunkData<{ fourcc(b"IDPI") }>>;
+type IengChunk = KnownChunk<InfoChunkData<{ fourcc(b"IENG") }>>;
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum InfoChunkEnum {
+    Iarl(IarlChunk),
+    Ignr(IgnrChunk),
+    Ikey(IkeyChunk),
+    Ilgt(IlgtChunk),
+    Imed(ImedChunk),
+    Inam(InamChunk),
+    Iplt(IpltChunk),
+    Iprd(IprdChunk),
+    Isbj(IsbjChunk),
+    Isft(IsftChunk),
+    Ishp(IshpChunk),
+    Iart(IartChunk),
+    Isrc(IsrcChunk),
+    Isrf(IsrfChunk),
+    Itch(ItchChunk),
+    Icms(IcmsChunk),
+    Icmt(IcmtChunk),
+    Icop(IcopChunk),
+    Icrd(IcrdChunk),
+    Icrp(IcrpChunk),
+    Idpi(IdpiChunk),
+    Ieng(IengChunk),
+    Unknown {
+        id: FourCC,
+        size: u32,
+        #[brw(align_after=2, pad_size_to= size.to_owned())]
+        value: NullString,
+    },
+}
+
+impl InfoChunkEnum {
+    pub fn id(&self) -> FourCC {
+        match self {
+            InfoChunkEnum::Iarl(e) => e.id(),
+            InfoChunkEnum::Ignr(e) => e.id(),
+            InfoChunkEnum::Ikey(e) => e.id(),
+            InfoChunkEnum::Ilgt(e) => e.id(),
+            InfoChunkEnum::Imed(e) => e.id(),
+            InfoChunkEnum::Inam(e) => e.id(),
+            InfoChunkEnum::Iplt(e) => e.id(),
+            InfoChunkEnum::Iprd(e) => e.id(),
+            InfoChunkEnum::Isbj(e) => e.id(),
+            InfoChunkEnum::Isft(e) => e.id(),
+            InfoChunkEnum::Ishp(e) => e.id(),
+            InfoChunkEnum::Iart(e) => e.id(),
+            InfoChunkEnum::Isrc(e) => e.id(),
+            InfoChunkEnum::Isrf(e) => e.id(),
+            InfoChunkEnum::Itch(e) => e.id(),
+            InfoChunkEnum::Icms(e) => e.id(),
+            InfoChunkEnum::Icmt(e) => e.id(),
+            InfoChunkEnum::Icop(e) => e.id(),
+            InfoChunkEnum::Icrd(e) => e.id(),
+            InfoChunkEnum::Icrp(e) => e.id(),
+            InfoChunkEnum::Idpi(e) => e.id(),
+            InfoChunkEnum::Ieng(e) => e.id(),
+            InfoChunkEnum::Unknown { id, .. } => *id,
         }
+    }
 
-        impl InfoChunkEnum {
-            pub fn id(&self) -> FourCC {
-                match self {
-                    $(
-                    InfoChunkEnum::$name(e) => e.id(),
-                    )*
-                    InfoChunkEnum::Unknown { id, .. } => *id,
-                }
-            }
-
-            pub fn value(&self) -> String {
-                match self {
-                    $(
-                    InfoChunkEnum::$name(e)  => e.data.value.to_string(),
-                    )*
-                    InfoChunkEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
-                }
-            }
-        }
+    pub fn value(&self) -> String {
+        match self {
+            InfoChunkEnum::Iarl(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ignr(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ikey(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ilgt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Imed(e) => e.data.value.to_string(),
+            InfoChunkEnum::Inam(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iplt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iprd(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isbj(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isft(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ishp(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iart(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isrc(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isrf(e) => e.data.value.to_string(),
+            InfoChunkEnum::Itch(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icms(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icmt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icop(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icrd(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icrp(e) => e.data.value.to_string(),
+            InfoChunkEnum::Idpi(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ieng(e) => e.data.value.to_string(),
+            InfoChunkEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
         }
     }
 }
-
-info_chunks!(
-    (Iarl, b"IARL"),
-    (Ignr, b"IGNR"),
-    (Ikey, b"IKEY"),
-    (Ilgt, b"ILGT"),
-    (Imed, b"IMED"),
-    (Inam, b"INAM"),
-    (Iplt, b"IPLT"),
-    (Iprd, b"IPRD"),
-    (Isbj, b"ISBJ"),
-    (Isft, b"ISFT"),
-    (Ishp, b"ISHP"),
-    (Iart, b"IART"),
-    (Isrc, b"ISRC"),
-    (Isrf, b"ISRF"),
-    (Itch, b"ITCH"),
-    (Icms, b"ICMS"),
-    (Icmt, b"ICMT"),
-    (Icop, b"ICOP"),
-    (Icrd, b"ICRD"),
-    (Icrp, b"ICRP"),
-    (Idpi, b"IDPI"),
-    (IENG, b"IENG"),
-);
 
 #[binrw]
 #[br(little)]
@@ -1514,7 +1562,7 @@ mod test {
     fn infochunk_roundtrip() {
         let icmt = InfoChunkEnum::Icmt(IcmtChunk {
             size: 8,
-            data: IcmtChunkData {
+            data: InfoChunkData::<{ fourcc(b"ICMT") }> {
                 value: NullString("comment".into()),
             },
             extra_bytes: vec![],
