@@ -942,7 +942,8 @@ type FmtChunk = KnownChunk<FmtChunkData>;
 impl Summarizable for FmtChunk {
     fn summary(&self) -> String {
         format!(
-            "{} chan, {}/{}",
+            "{}, {} chan, {}/{}",
+            self.data.format_tag.to_string().replace("WAVE_FORMAT_", ""),
             self.data.channels,
             self.data.bits_per_sample,
             self.data.samples_per_sec,
