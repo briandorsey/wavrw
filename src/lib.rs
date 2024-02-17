@@ -5,27 +5,56 @@ use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, P
 use itertools::Itertools;
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
+use std::io::BufReader;
 use std::io::{Read, Seek};
 use std::str::FromStr;
-
-// TODO: enum for fmt chunk
-// TODO: test  offset += chunk.size(); equals actual id locaiton
-// consider refactoring Chunk to hold id, size and raw data, with enum for parsed data
 
 // helper types
 // ----
 
-// TODO: naming convention for traits which overlap with types?
-pub trait ChunkT {
+pub const fn fourcc(id: &[u8; 4]) -> u32 {
+    u32::from_le_bytes(*id)
+}
+
+pub trait KnownChunkID {
+    const ID: FourCC;
+}
+
+pub trait ChunkID {
     fn id(&self) -> FourCC;
+}
+
+pub trait SizedChunk: ChunkID {
+    /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
+}
+
+pub trait Summarizable {
+    /// Returns a short text summary of the contents of the chunk.
     fn summary(&self) -> String;
+
+    /// Returns an iterator over a sequence of contents of the contained
+    /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(std::iter::empty())
     }
 }
 
-fn box_chunk<T: ChunkT + 'static>(t: T) -> Box<dyn ChunkT> {
+pub trait Chunk: SizedChunk + Summarizable {}
+
+impl<T> ChunkID for T
+where
+    T: KnownChunkID,
+{
+    fn id(&self) -> FourCC {
+        T::ID
+    }
+}
+
+// Helper for cleaner Result.map() calls when boxing inner chunk.
+// Reduces code repetition, but mostly helps the compiler with type
+// inference.
+fn box_chunk<T: Chunk + 'static>(t: T) -> Box<dyn Chunk> {
     Box::new(t)
 }
 
@@ -46,6 +75,19 @@ impl Debug for FourCC {
         write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
         write!(f, "{:?})", &self.0)?;
         Ok(())
+    }
+}
+
+// needed for assert in br() attribute
+impl<'a> PartialEq<&'a FourCC> for FourCC {
+    fn eq(&self, other: &&'a FourCC) -> bool {
+        self == *other
+    }
+}
+
+impl<'a> PartialEq<FourCC> for &'a FourCC {
+    fn eq(&self, other: &FourCC) -> bool {
+        *self == other
     }
 }
 
@@ -129,15 +171,17 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
-pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn ChunkT>>>, std::io::Error>
+/// `metadata_chunks` parses a WAV file chunk by chunk, continuing
+///  even if some chunks have parsing errors.
+pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn Chunk>>>, std::io::Error>
 where
     R: Read + Seek,
 {
-    // let mut reader = BufReader::new(file);
-    let mut reader = reader;
+    let mut reader = BufReader::new(reader);
 
     // TODO: research errors and figure out an error plan for wavrw
-    let riff = RiffChunk::read(&mut reader).map_err(|e| std::io::Error::other(e))?;
+    // remove wrapping Result, and map IO and BinErrors to wavrw errors
+    let riff = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
     // TODO: convert assert into returned wav error type
     assert_eq!(
         riff.form_type,
@@ -148,30 +192,20 @@ where
 
     let mut buff: [u8; 4] = [0; 4];
     let mut offset = reader.stream_position()?;
-    let mut chunks: Vec<BinResult<Box<dyn ChunkT>>> = Vec::new();
+    let mut chunks: Vec<BinResult<Box<dyn Chunk>>> = Vec::new();
 
     loop {
-        // eprintln!("before: {offset}, pos: {:?}", reader.stream_position());
         let chunk_id = {
             reader.read_exact(&mut buff)?;
             buff
         };
-        // dbg!(current);
         let chunk_size = {
             reader.read_exact(&mut buff)?;
             u32::from_le_bytes(buff)
         };
-        // dbg!(current_size);
 
-        // pick chunk struct and read it
-        // TODO: pick a pattern and go with one or the other.
-        let res: BinResult<Box<dyn ChunkT>> = match &chunk_id {
-            // b"MD5 " => Md5ChunkData::read(&mut reader).map(box_chunk),
-            _ => {
-                reader.seek(SeekFrom::Current(-8))?;
-                Chunk::read(&mut reader).map(box_chunk)
-            }
-        };
+        reader.seek(SeekFrom::Current(-8))?;
+        let res = ChunkEnum::read(&mut reader).map(box_chunk);
 
         // setup for next iteration
         offset += chunk_size as u64 + 8;
@@ -179,18 +213,17 @@ where
         if offset % 2 == 1 {
             offset += 1;
         };
-        if u64::from(offset) != reader.stream_position()? {
+        if offset != reader.stream_position()? {
             // TODO: inject error into chunk vec and remove print
             println!(
                 "WARNING: {}: parsed less data than chunk size",
                 FourCC(chunk_id)
             );
-            reader.seek(SeekFrom::Start(offset.into()))?;
+            reader.seek(SeekFrom::Start(offset))?;
         }
 
         chunks.push(res);
 
-        // eprintln!("after: {offset}, pos: {:?}", reader.stream_position());
         if offset >= riff.size as u64 {
             break;
         };
@@ -201,23 +234,17 @@ where
 // parsing structs
 // ----
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ChunkHeader {
-    pub id: FourCC,
-    pub size: u32,
-}
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 // const generics don't support array types yet, so let's just encode it into a u32
+/// This chunk structure is a helper so the user can choose to just read a single chunk
 pub struct KnownChunk<
-    const MAGIC: u32,
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
-    #[br(temp, assert(id == MAGIC))]
-    #[bw(calc = MAGIC)]
-    id: u32,
+    #[br(temp, assert(id == T::ID))]
+    #[bw(calc = T::ID)]
+    id: FourCC,
 
     // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
     size: u32,
@@ -228,7 +255,11 @@ pub struct KnownChunk<
     // ensure that we don't read outside the bounds for this chunk
     #[br(map_stream = |r| r.take_seek(size as u64))]
     data: T,
-    #[br(temp)]
+
+    // assert for better error message if too many bytes processed
+    // seems like it should be impossible, but found a case where T
+    // used align_after to pad bytes.
+    #[br(temp, assert((end_pos.pos - begin_pos.pos) <= size as u64, "(end_pos.pos - begin_pos.pos) <= size while parsing {}. end: {}, begin: {}, size: {}", T::ID, end_pos.pos, begin_pos.pos, size))]
     #[bw(ignore)]
     end_pos: PosValue<()>,
 
@@ -237,10 +268,38 @@ pub struct KnownChunk<
     extra_bytes: Vec<u8>,
 }
 
-macro_rules! Chunk {
-    ($magic:expr, $content:ty) => { KnownChunk<{ u32::from_le_bytes(*$magic)}, $content> }
+impl<T> KnownChunkID for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+{
+    const ID: FourCC = T::ID;
 }
 
+impl<T> SizedChunk for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+{
+    fn size(&self) -> u32 {
+        self.size + self.extra_bytes.len() as u32
+    }
+}
+
+impl<T> Summarizable for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable,
+{
+    fn summary(&self) -> String {
+        self.data.summary()
+    }
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        self.data.items()
+    }
+}
+
+// based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -248,16 +307,25 @@ pub struct Md5ChunkData {
     md5: u128,
 }
 
-type Md5Chunk = Chunk!(b"MD5 ", Md5ChunkData);
+impl KnownChunkID for Md5ChunkData {
+    const ID: FourCC = FourCC(*b"MD5 ");
+}
 
-impl Md5Chunk {
-    pub fn id(&self) -> FourCC {
-        FourCC(*b"MD5 ")
-    }
-    pub fn summary(&self) -> String {
-        format!("0x{:X}", self.data.md5)
+impl SizedChunk for Md5ChunkData {
+    fn size(&self) -> u32 {
+        16
     }
 }
+
+impl Summarizable for Md5ChunkData {
+    fn summary(&self) -> String {
+        format!("0x{:X}", self.md5)
+    }
+}
+
+type Md5Chunk = KnownChunk<Md5ChunkData>;
+
+impl Chunk for Md5Chunk {}
 
 #[binrw]
 #[brw(little)]
@@ -827,10 +895,7 @@ impl Display for FormatTag {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct FmtChunk {
-    #[brw(magic = b"fmt ", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
+pub struct FmtChunkData {
     format_tag: FormatTag,
     channels: u16,
     samples_per_sec: u32,
@@ -839,15 +904,20 @@ pub struct FmtChunk {
     bits_per_sample: u16,
 }
 // TODO: properly handle different fmt chunk additions from later specs
-// TODO: if ever extra data (based on cbSize), include as RAW section. Display as hex and preserve when writing
+
+impl KnownChunkID for FmtChunkData {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+type FmtChunk = KnownChunk<FmtChunkData>;
 
 impl FmtChunk {
     pub fn summary(&self) -> String {
         format!(
             "{} chan, {}/{}",
-            self.channels,
-            self.bits_per_sample,
-            self.samples_per_sec,
+            self.data.channels,
+            self.data.bits_per_sample,
+            self.data.samples_per_sec,
             // TODO: format_tag
         )
     }
@@ -881,168 +951,336 @@ impl<'a> Iterator for FmtChunkIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("format_tag".to_string(), self.fmt.format_tag.to_string())),
-            2 => Some(("channels".to_string(), self.fmt.channels.to_string())),
+            1 => Some((
+                "format_tag".to_string(),
+                self.fmt.data.format_tag.to_string(),
+            )),
+            2 => Some(("channels".to_string(), self.fmt.data.channels.to_string())),
             3 => Some((
                 "samples_per_sec".to_string(),
-                self.fmt.samples_per_sec.to_string(),
+                self.fmt.data.samples_per_sec.to_string(),
             )),
             4 => Some((
                 "avg_bytes_per_sec".to_string(),
-                self.fmt.avg_bytes_per_sec.to_string(),
+                self.fmt.data.avg_bytes_per_sec.to_string(),
             )),
-            5 => Some(("block_align".to_string(), self.fmt.block_align.to_string())),
+            5 => Some((
+                "block_align".to_string(),
+                self.fmt.data.block_align.to_string(),
+            )),
             6 => Some((
                 "bits_per_sample".to_string(),
-                self.fmt.bits_per_sample.to_string(),
+                self.fmt.data.bits_per_sample.to_string(),
             )),
             _ => None,
         }
     }
 }
 
-// based on http://soundfile.sapp.org/doc/WaveFormat/
 /// `data` chunk parser which skips all audio data
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct DataChunk {
-    #[brw(magic = b"data", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(seek_before = SeekFrom::Current(size.to_owned().into()), ignore)]
-    end_of_chunk: [u8; 0],
+pub struct DataChunkData {}
+
+impl KnownChunkID for DataChunkData {
+    const ID: FourCC = FourCC(*b"data");
 }
+
+type DataChunk = KnownChunk<DataChunkData>;
 
 impl DataChunk {
     pub fn summary(&self) -> String {
-        format!("audio data, len: {} bytes", self.size)
+        "audio data".to_string()
     }
 }
 
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListInfoChunk {
-    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(magic = b"INFO", seek_before = SeekFrom::Current(-4))]
+pub struct ListInfoChunkData {
+    #[brw(assert(list_type == FourCC(*b"INFO")))]
     list_type: FourCC,
-    #[br(map_stream = |reader| reader.take_seek(size as u64 - 4u64), parse_with = helpers::until_eof)]
+    #[br(parse_with = helpers::until_eof)]
     #[bw()]
-    chunks: Vec<InfoChunk>,
+    chunks: Vec<InfoChunkEnum>,
 }
+
+impl KnownChunkID for ListInfoChunkData {
+    const ID: FourCC = FourCC(*b"LIST");
+}
+
+type ListInfoChunk = KnownChunk<ListInfoChunkData>;
 
 impl ListInfoChunk {
     pub fn summary(&self) -> String {
         format!(
             "{}: {}",
-            self.list_type,
-            self.chunks.iter().map(|c| c.id()).join(", ")
+            self.data.list_type,
+            self.data.chunks.iter().map(|c| c.id()).join(", ")
         )
     }
 
     pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
+        Box::new(
+            self.data
+                .chunks
+                .iter()
+                .map(|c| (c.id().to_string(), c.value())),
+        )
     }
 }
 
-macro_rules! info_chunks {
-    ($(($name:ident,$literal:literal)),*$(,)?) => {
-        #[binrw]
-        #[brw(little)]
-        #[derive(Debug, PartialEq, Eq)]
-        pub enum InfoChunk {
-        $(
-            $name {
-                #[brw(magic = $literal, seek_before = SeekFrom::Current(-4))]
-                id: FourCC,
-                size: u32,
-                #[brw(align_after = 2, pad_size_to= size.to_owned())]
-                value: NullString,
-            },
-        )*
-            Unknown {
-                id: FourCC,
-                size: u32,
-                #[brw(align_after=2, pad_size_to= size.to_owned())]
-                value: NullString,
-            },
-        }
+/// InfoChunkData is a genericised container for LIST INFO chunks
+///
+/// ```
+/// # use wavrw::IcmtChunkData;
+/// let icmt = IcmtChunkData::new("comment");
+/// ```
+///
+/// # Examples:
+///
+/// Since const generics do not support arrays, it's storing the FourCC
+/// id as a `u32`... which makes instantiation awkward. There is a helper
+/// function [fourcc] to make it a bit easier in the general case:
+///
+/// ```
+/// # use wavrw::{InfoChunkData, fourcc};
+/// # use binrw::NullString;
+/// let icmt =  InfoChunkData::<{ fourcc(b"ICMT") }> {
+///     value: NullString("comment".into()),
+/// };
+/// ```
+///
+/// and for all of the INFO types from the original 1991 WAV spec, there
+/// is an additional alias:
+///
+/// ```
+/// # use wavrw::IcmtChunkData;
+/// # use binrw::NullString;
+/// let icmt = IcmtChunkData {
+///     value: NullString("comment".into()),
+/// };
+/// ```
+#[binrw]
+#[br(little)]
+#[derive(PartialEq, Eq)]
+pub struct InfoChunkData<const I: u32> {
+    pub value: NullString,
+}
 
-        impl InfoChunk {
-            pub fn id(&self) -> FourCC {
-                match self {
-                    $(
-                    InfoChunk::$name{ id, .. } => *id,
-                    )*
-                    InfoChunk::Unknown { id, .. } => *id,
-                }
-            }
+impl<const I: u32> KnownChunkID for InfoChunkData<I> {
+    const ID: FourCC = FourCC(I.to_le_bytes());
+}
 
-            pub fn value(&self) -> String {
-                match self {
-                    $(
-                    InfoChunk::$name{ value, .. } => (*value).to_string(),
-                    )*
-                    InfoChunk::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
-                }
-            }
+impl<const I: u32> Debug for InfoChunkData<I> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "InfoChunkData<{}> {{ value: {:?} }}",
+            String::from_utf8_lossy(I.to_le_bytes().as_slice()),
+            self.value,
+        )?;
+        Ok(())
+    }
+}
+
+impl<const I: u32> Summarizable for InfoChunkData<I> {
+    fn summary(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl<const I: u32> InfoChunkData<I> {
+    pub fn new(value: &str) -> Self {
+        InfoChunkData::<I> {
+            value: value.into(),
         }
     }
 }
 
-info_chunks!(
-    (Iarl, b"IARL"),
-    (Ignr, b"IGNR"),
-    (Ikey, b"IKEY"),
-    (Ilgt, b"ILGT"),
-    (Imed, b"IMED"),
-    (Inam, b"INAM"),
-    (Iplt, b"IPLT"),
-    (Iprd, b"IPRD"),
-    (Isbj, b"ISBJ"),
-    (Isft, b"ISFT"),
-    (Ishp, b"ISHP"),
-    (Iart, b"IART"),
-    (Isrc, b"ISRC"),
-    (Isrf, b"ISRF"),
-    (Itch, b"ITCH"),
-    (Icms, b"ICMS"),
-    (Icmt, b"ICMT"),
-    (Icop, b"ICOP"),
-    (Icrd, b"ICRD"),
-    (Icrp, b"ICRP"),
-    (Idpi, b"IDPI"),
-    (IENG, b"IENG"),
-);
+pub type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
+pub type IgnrChunkData = InfoChunkData<{ fourcc(b"IGNR") }>;
+pub type IkeyChunkData = InfoChunkData<{ fourcc(b"IKEY") }>;
+pub type IlgtChunkData = InfoChunkData<{ fourcc(b"ILGT") }>;
+pub type ImedChunkData = InfoChunkData<{ fourcc(b"IMED") }>;
+pub type InamChunkData = InfoChunkData<{ fourcc(b"INAM") }>;
+pub type IpltChunkData = InfoChunkData<{ fourcc(b"IPLT") }>;
+pub type IprdChunkData = InfoChunkData<{ fourcc(b"IPRD") }>;
+pub type IsbjChunkData = InfoChunkData<{ fourcc(b"ISBJ") }>;
+pub type IsftChunkData = InfoChunkData<{ fourcc(b"ISFT") }>;
+pub type IshpChunkData = InfoChunkData<{ fourcc(b"ISHP") }>;
+pub type IartChunkData = InfoChunkData<{ fourcc(b"IART") }>;
+pub type IsrcChunkData = InfoChunkData<{ fourcc(b"ISRC") }>;
+pub type IsrfChunkData = InfoChunkData<{ fourcc(b"ISRF") }>;
+pub type ItchChunkData = InfoChunkData<{ fourcc(b"ITCH") }>;
+pub type IcmsChunkData = InfoChunkData<{ fourcc(b"ICMS") }>;
+pub type IcmtChunkData = InfoChunkData<{ fourcc(b"ICMT") }>;
+pub type IcopChunkData = InfoChunkData<{ fourcc(b"ICOP") }>;
+pub type IcrdChunkData = InfoChunkData<{ fourcc(b"ICRD") }>;
+pub type IcrpChunkData = InfoChunkData<{ fourcc(b"ICRP") }>;
+pub type IdpiChunkData = InfoChunkData<{ fourcc(b"IDPI") }>;
+pub type IengChunkData = InfoChunkData<{ fourcc(b"IENG") }>;
 
-impl InfoChunk {
-    pub fn _summary(&self) -> String {
-        format!("{}: {}", self.id(), self.value())
+pub type IarlChunk = KnownChunk<IarlChunkData>;
+pub type IgnrChunk = KnownChunk<IgnrChunkData>;
+pub type IkeyChunk = KnownChunk<IkeyChunkData>;
+pub type IlgtChunk = KnownChunk<IlgtChunkData>;
+pub type ImedChunk = KnownChunk<ImedChunkData>;
+pub type InamChunk = KnownChunk<InamChunkData>;
+pub type IpltChunk = KnownChunk<IpltChunkData>;
+pub type IprdChunk = KnownChunk<IprdChunkData>;
+pub type IsbjChunk = KnownChunk<IsbjChunkData>;
+pub type IsftChunk = KnownChunk<IsftChunkData>;
+pub type IshpChunk = KnownChunk<IshpChunkData>;
+pub type IartChunk = KnownChunk<IartChunkData>;
+pub type IsrcChunk = KnownChunk<IsrcChunkData>;
+pub type IsrfChunk = KnownChunk<IsrfChunkData>;
+pub type ItchChunk = KnownChunk<ItchChunkData>;
+pub type IcmsChunk = KnownChunk<IcmsChunkData>;
+pub type IcmtChunk = KnownChunk<IcmtChunkData>;
+pub type IcopChunk = KnownChunk<IcopChunkData>;
+pub type IcrdChunk = KnownChunk<IcrdChunkData>;
+pub type IcrpChunk = KnownChunk<IcrpChunkData>;
+pub type IdpiChunk = KnownChunk<IdpiChunkData>;
+pub type IengChunk = KnownChunk<IengChunkData>;
+
+impl Chunk for IarlChunk {}
+impl Chunk for IgnrChunk {}
+impl Chunk for IkeyChunk {}
+impl Chunk for IlgtChunk {}
+impl Chunk for ImedChunk {}
+impl Chunk for InamChunk {}
+impl Chunk for IpltChunk {}
+impl Chunk for IprdChunk {}
+impl Chunk for IsbjChunk {}
+impl Chunk for IsftChunk {}
+impl Chunk for IshpChunk {}
+impl Chunk for IartChunk {}
+impl Chunk for IsrcChunk {}
+impl Chunk for IsrfChunk {}
+impl Chunk for ItchChunk {}
+impl Chunk for IcmsChunk {}
+impl Chunk for IcmtChunk {}
+impl Chunk for IcopChunk {}
+impl Chunk for IcrdChunk {}
+impl Chunk for IcrpChunk {}
+impl Chunk for IdpiChunk {}
+impl Chunk for IengChunk {}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum InfoChunkEnum {
+    Iarl(IarlChunk),
+    Ignr(IgnrChunk),
+    Ikey(IkeyChunk),
+    Ilgt(IlgtChunk),
+    Imed(ImedChunk),
+    Inam(InamChunk),
+    Iplt(IpltChunk),
+    Iprd(IprdChunk),
+    Isbj(IsbjChunk),
+    Isft(IsftChunk),
+    Ishp(IshpChunk),
+    Iart(IartChunk),
+    Isrc(IsrcChunk),
+    Isrf(IsrfChunk),
+    Itch(ItchChunk),
+    Icms(IcmsChunk),
+    Icmt(IcmtChunk),
+    Icop(IcopChunk),
+    Icrd(IcrdChunk),
+    Icrp(IcrpChunk),
+    Idpi(IdpiChunk),
+    Ieng(IengChunk),
+    Unknown {
+        id: FourCC,
+        size: u32,
+        #[brw(align_after=2, pad_size_to= size.to_owned())]
+        value: NullString,
+    },
+}
+
+impl InfoChunkEnum {
+    pub fn id(&self) -> FourCC {
+        match self {
+            InfoChunkEnum::Iarl(e) => e.id(),
+            InfoChunkEnum::Ignr(e) => e.id(),
+            InfoChunkEnum::Ikey(e) => e.id(),
+            InfoChunkEnum::Ilgt(e) => e.id(),
+            InfoChunkEnum::Imed(e) => e.id(),
+            InfoChunkEnum::Inam(e) => e.id(),
+            InfoChunkEnum::Iplt(e) => e.id(),
+            InfoChunkEnum::Iprd(e) => e.id(),
+            InfoChunkEnum::Isbj(e) => e.id(),
+            InfoChunkEnum::Isft(e) => e.id(),
+            InfoChunkEnum::Ishp(e) => e.id(),
+            InfoChunkEnum::Iart(e) => e.id(),
+            InfoChunkEnum::Isrc(e) => e.id(),
+            InfoChunkEnum::Isrf(e) => e.id(),
+            InfoChunkEnum::Itch(e) => e.id(),
+            InfoChunkEnum::Icms(e) => e.id(),
+            InfoChunkEnum::Icmt(e) => e.id(),
+            InfoChunkEnum::Icop(e) => e.id(),
+            InfoChunkEnum::Icrd(e) => e.id(),
+            InfoChunkEnum::Icrp(e) => e.id(),
+            InfoChunkEnum::Idpi(e) => e.id(),
+            InfoChunkEnum::Ieng(e) => e.id(),
+            InfoChunkEnum::Unknown { id, .. } => *id,
+        }
+    }
+
+    pub fn value(&self) -> String {
+        match self {
+            InfoChunkEnum::Iarl(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ignr(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ikey(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ilgt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Imed(e) => e.data.value.to_string(),
+            InfoChunkEnum::Inam(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iplt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iprd(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isbj(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isft(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ishp(e) => e.data.value.to_string(),
+            InfoChunkEnum::Iart(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isrc(e) => e.data.value.to_string(),
+            InfoChunkEnum::Isrf(e) => e.data.value.to_string(),
+            InfoChunkEnum::Itch(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icms(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icmt(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icop(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icrd(e) => e.data.value.to_string(),
+            InfoChunkEnum::Icrp(e) => e.data.value.to_string(),
+            InfoChunkEnum::Idpi(e) => e.data.value.to_string(),
+            InfoChunkEnum::Ieng(e) => e.data.value.to_string(),
+            InfoChunkEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
+        }
     }
 }
 
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListAdtlChunk {
-    #[brw(magic = b"LIST", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
-    #[brw(magic = b"adtl", seek_before = SeekFrom::Current(-4))]
+pub struct ListAdtlChunkData {
+    #[brw(assert(list_type == FourCC(*b"adtl")))]
     list_type: FourCC,
-    // need to add magic here to choose the right enum
-    // items: ListType,
-    #[br(count = size -4 )]
+    #[br(parse_with = helpers::until_eof)]
     #[bw()]
+    // chunks: Vec<AdtlChunk>,
     raw: Vec<u8>,
 }
 
+impl KnownChunkID for ListAdtlChunkData {
+    const ID: FourCC = FourCC(*b"LIST");
+}
+
+type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
+
 impl ListAdtlChunk {
     pub fn summary(&self) -> String {
-        format!("{} ...", self.list_type)
+        format!("{} ...", self.data.list_type)
     }
 }
 
@@ -1052,10 +1290,7 @@ impl ListAdtlChunk {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct BextChunk {
-    #[brw(magic = b"bext", seek_before = SeekFrom::Current(-4))]
-    id: FourCC,
-    size: u32,
+pub struct BextChunkData {
     /// Description of the sound sequence
     description: FixedStr<256>, // Description
     /// Name of the originator
@@ -1066,13 +1301,11 @@ pub struct BextChunk {
     origination_date: FixedStr<10>, // OriginationDate
     /// hh:mm:ss
     origination_time: FixedStr<8>, // OriginationTime
-    // TODO: validate endianness, spec has DWORD high then DWORD low
     /// First sample count since midnight
     time_reference: u64, // TimeReference
     /// Version of the BWF; unsigned binary number
     version: u16, // Version
-    /// SMPTE UMID
-    // TODO: write UMID parser, based on: SMPTE 330M
+    /// SMPTE UMID, raw unparsed data
     umid: [u8; 64], // UMID
     /// Integrated Loudness Value of the file in LUFS (multiplied by 100)
     loudness_value: i16, // LoudnessValue
@@ -1088,16 +1321,22 @@ pub struct BextChunk {
     reserved: [u8; 180], // Reserved
     /// History coding
     // interpret the remaining bytes as string
-    #[br(align_after = 2, count = size -256 -32 -32 -10 -8 -8 -2 -64 -2 -2 -2 -2 -2 -180, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
-    #[bw(align_after = 2, map = |s: &String| s.as_bytes())]
+    #[br(parse_with = helpers::until_eof, map = |v: Vec<u8>| String::from_utf8_lossy(&v).to_string())]
+    #[bw(map = |s: &String| s.as_bytes())]
     coding_history: String, // CodingHistory
 }
+
+impl KnownChunkID for BextChunkData {
+    const ID: FourCC = FourCC(*b"bext");
+}
+
+type BextChunk = KnownChunk<BextChunkData>;
 
 impl BextChunk {
     pub fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
-            self.origination_date, self.origination_time, self.description
+            self.data.origination_date, self.data.origination_time, self.data.description
         )
     }
 
@@ -1128,76 +1367,65 @@ impl<'a> Iterator for BextChunkIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("description".to_string(), self.bext.description.to_string())),
-            2 => Some(("originator".to_string(), self.bext.originator.to_string())),
+            1 => Some((
+                "description".to_string(),
+                self.bext.data.description.to_string(),
+            )),
+            2 => Some((
+                "originator".to_string(),
+                self.bext.data.originator.to_string(),
+            )),
             3 => Some((
                 "originator_reference".to_string(),
-                self.bext.originator_reference.to_string(),
+                self.bext.data.originator_reference.to_string(),
             )),
             4 => Some((
                 "origination_date".to_string(),
-                self.bext.origination_date.to_string(),
+                self.bext.data.origination_date.to_string(),
             )),
             5 => Some((
                 "origination_time".to_string(),
-                self.bext.origination_time.to_string(),
+                self.bext.data.origination_time.to_string(),
             )),
             6 => Some((
                 "time_reference".to_string(),
-                self.bext.time_reference.to_string(),
+                self.bext.data.time_reference.to_string(),
             )),
-            7 => Some(("version".to_string(), self.bext.version.to_string())),
-            8 => Some(("umid".to_string(), hex::encode(self.bext.umid))),
+            7 => Some(("version".to_string(), self.bext.data.version.to_string())),
+            8 => Some(("umid".to_string(), hex::encode(self.bext.data.umid))),
             9 => Some((
                 "loudness_value".to_string(),
-                self.bext.loudness_value.to_string(),
+                self.bext.data.loudness_value.to_string(),
             )),
             10 => Some((
                 "loudness_range".to_string(),
-                self.bext.loudness_range.to_string(),
+                self.bext.data.loudness_range.to_string(),
             )),
             11 => Some((
                 "max_true_peak_level".to_string(),
-                self.bext.max_true_peak_level.to_string(),
+                self.bext.data.max_true_peak_level.to_string(),
             )),
             12 => Some((
                 "max_momentary_loudness".to_string(),
-                self.bext.max_momentary_loudness.to_string(),
+                self.bext.data.max_momentary_loudness.to_string(),
             )),
             13 => Some((
                 "max_short_term_loudness".to_string(),
-                self.bext.max_short_term_loudness.to_string(),
+                self.bext.data.max_short_term_loudness.to_string(),
             )),
             14 => Some((
                 "coding_history".to_string(),
-                self.bext.coding_history.to_string(),
+                self.bext.data.coding_history.to_string(),
             )),
             _ => None,
         }
     }
 }
 
-// based on https://mediaarea.net/BWFMetaEdit/md5
-// #[binrw]
-// #[brw(little)]
-// #[derive(Debug, PartialEq, Eq)]
-// pub struct Md5Chunk {
-//     #[brw(magic = b"MD5 ", seek_before = SeekFrom::Current(-4))]
-//     id: FourCC,
-//     size: u32,
-//     md5: u128,
-// }
-
-// impl Md5Chunk {
-//     pub fn summary(&self) -> String {
-//         format!("0x{:X}", self.md5)
-//     }
-// }
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub enum Chunk {
+pub enum ChunkEnum {
     Fmt(FmtChunk),
     Data(DataChunk),
     Info(ListInfoChunk),
@@ -1213,58 +1441,63 @@ pub enum Chunk {
     },
 }
 
-impl ChunkT for Chunk {
+impl ChunkID for ChunkEnum {
     /// Returns the [FourCC] (chunk id) for the contained chunk.
     fn id(&self) -> FourCC {
-        // TODO: research: is it possible to match on contained structs with a specific trait to reduce repetition?
         match self {
-            Chunk::Fmt(e) => e.id,
-            Chunk::Data(e) => e.id,
-            Chunk::Info(e) => e.id,
-            Chunk::Adtl(e) => e.id,
-            Chunk::Bext(e) => e.id,
-            Chunk::Md5(e) => e.id(),
-            Chunk::Unknown { id, .. } => *id,
+            ChunkEnum::Fmt(e) => e.id(),
+            ChunkEnum::Data(e) => e.id(),
+            ChunkEnum::Info(e) => e.id(),
+            ChunkEnum::Adtl(e) => e.id(),
+            ChunkEnum::Bext(e) => e.id(),
+            ChunkEnum::Md5(e) => e.id(),
+            ChunkEnum::Unknown { id, .. } => *id,
         }
     }
+}
 
-    // /// Returns the logical (used) size in bytes of the contained chunk.
+impl SizedChunk for ChunkEnum {
+    /// Returns the logical (used) size in bytes of the contained chunk.
     fn size(&self) -> u32 {
         match self {
-            Chunk::Fmt(e) => e.size,
-            Chunk::Data(e) => e.size,
-            Chunk::Info(e) => e.size,
-            Chunk::Adtl(e) => e.size,
-            Chunk::Bext(e) => e.size,
-            Chunk::Md5(e) => e.size,
-            Chunk::Unknown { size, .. } => *size,
+            ChunkEnum::Fmt(e) => e.size,
+            ChunkEnum::Data(e) => e.size,
+            ChunkEnum::Info(e) => e.size,
+            ChunkEnum::Adtl(e) => e.size,
+            ChunkEnum::Bext(e) => e.size,
+            ChunkEnum::Md5(e) => e.size,
+            ChunkEnum::Unknown { size, .. } => *size,
         }
     }
+}
 
+impl Summarizable for ChunkEnum {
     /// Returns a short text summary of the contents of the contained chunk.
     fn summary(&self) -> String {
         match self {
-            Chunk::Fmt(e) => e.summary(),
-            Chunk::Data(e) => e.summary(),
-            Chunk::Info(e) => e.summary(),
-            Chunk::Adtl(e) => e.summary(),
-            Chunk::Bext(e) => e.summary(),
-            Chunk::Md5(e) => e.summary(),
-            Chunk::Unknown { .. } => "...".to_owned(),
+            ChunkEnum::Fmt(e) => e.summary(),
+            ChunkEnum::Data(e) => e.summary(),
+            ChunkEnum::Info(e) => e.summary(),
+            ChunkEnum::Adtl(e) => e.summary(),
+            ChunkEnum::Bext(e) => e.summary(),
+            ChunkEnum::Md5(e) => e.summary(),
+            ChunkEnum::Unknown { .. } => "...".to_owned(),
         }
     }
 
     /// Returns an iterator over a sequence of contents of the contained
-    /// chunk as (field, value).
+    /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
-            Chunk::Fmt(e) => Box::new(e.into_iter()),
-            Chunk::Info(e) => Box::new(e.items()),
-            Chunk::Bext(e) => Box::new(e.items()),
+            ChunkEnum::Fmt(e) => Box::new(e.into_iter()),
+            ChunkEnum::Info(e) => Box::new(e.items()),
+            ChunkEnum::Bext(e) => Box::new(e.items()),
             _ => Box::new(std::iter::empty()),
         }
     }
 }
+
+impl Chunk for ChunkEnum {}
 
 #[cfg(test)]
 mod test {
@@ -1325,14 +1558,16 @@ mod test {
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
         let expected = FmtChunk {
-            id: FourCC(*b"fmt "),
             size: 16,
-            format_tag: FormatTag::Pcm,
-            channels: 1,
-            samples_per_sec: 48000,
-            avg_bytes_per_sec: 144000,
-            block_align: 3,
-            bits_per_sample: 24,
+            data: FmtChunkData {
+                format_tag: FormatTag::Pcm,
+                channels: 1,
+                samples_per_sec: 48000,
+                avg_bytes_per_sec: 144000,
+                block_align: 3,
+                bits_per_sample: 24,
+            },
+            extra_bytes: vec![],
         };
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
@@ -1370,47 +1605,53 @@ mod test {
         let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
-            bext.description,
+            bext.data.description,
             FixedStr::<256>::from_str("Description").unwrap(),
             "description"
         );
         assert_eq!(
-            bext.originator,
+            bext.data.originator,
             FixedStr::<32>::from_str("Originator").unwrap(),
             "originator"
         );
         assert_eq!(
-            bext.originator_reference,
+            bext.data.originator_reference,
             FixedStr::<32>::from_str("OriginatorReference").unwrap(),
             "originator_reference"
         );
         assert_eq!(
-            bext.origination_date,
+            bext.data.origination_date,
             FixedStr::<10>::from_str("2006/01/02").unwrap(),
             "origination_date"
         );
         assert_eq!(
-            bext.origination_time,
+            bext.data.origination_time,
             FixedStr::<8>::from_str("03:04:05").unwrap(),
             "origination_time"
         );
-        assert_eq!(bext.time_reference, 12345, "time_reference");
-        assert_eq!(bext.version, 2);
+        assert_eq!(bext.data.time_reference, 12345, "time_reference");
+        assert_eq!(bext.data.version, 2);
         assert_eq!(
-            bext.umid,
+            bext.data.umid,
             <Vec<u8> as TryInto<[u8; 64]>>::try_into(
                 decode("060A2B3401010101010102101300000000FF122A6937058000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap()
             )
             .unwrap(),
             "version"
         );
-        assert_eq!(bext.loudness_value, 100, "loudness_value");
-        assert_eq!(bext.loudness_range, 200, "loudness_range");
-        assert_eq!(bext.max_true_peak_level, 300, "max_true_peak_level");
-        assert_eq!(bext.max_momentary_loudness, 400, "max_momentary_loudness");
-        assert_eq!(bext.max_short_term_loudness, 500, "max_short_term_loudness");
-        assert_eq!(bext.reserved.len(), 180, "reserved");
-        assert_eq!(bext.coding_history, "CodingHistory", "coding_history");
+        assert_eq!(bext.data.loudness_value, 100, "loudness_value");
+        assert_eq!(bext.data.loudness_range, 200, "loudness_range");
+        assert_eq!(bext.data.max_true_peak_level, 300, "max_true_peak_level");
+        assert_eq!(
+            bext.data.max_momentary_loudness, 400,
+            "max_momentary_loudness"
+        );
+        assert_eq!(
+            bext.data.max_short_term_loudness, 500,
+            "max_short_term_loudness"
+        );
+        assert_eq!(bext.data.reserved.len(), 180, "reserved");
+        assert_eq!(bext.data.coding_history, "CodingHistory", "coding_history");
     }
 
     #[test]
@@ -1437,17 +1678,60 @@ mod test {
 
     #[test]
     fn infochunk_roundtrip() {
-        let icmt = InfoChunk::Icmt {
-            id: FourCC(*b"ICMT"),
+        let icmt = InfoChunkEnum::Icmt(IcmtChunk {
             size: 8,
-            value: NullString("comment".into()),
-        };
+            data: IcmtChunkData {
+                value: NullString("comment".into()),
+            },
+            extra_bytes: vec![],
+        });
         println!("{icmt:?}");
         let mut buff = std::io::Cursor::new(Vec::<u8>::new());
         icmt.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = InfoChunk::read(&mut buff).unwrap();
+        let after = InfoChunkEnum::read(&mut buff).unwrap();
         assert_eq!(after, icmt);
+    }
+
+    #[test]
+    fn infochunk_debug_string() {
+        let icmt = IcmtChunkData {
+            value: NullString("comment".into()),
+        };
+        assert!(format!("{icmt:?}").starts_with("InfoChunkData<ICMT>"));
+    }
+
+    #[test]
+    fn icmtchunk_as_trait() {
+        let icmt = IcmtChunk {
+            size: 8,
+            data: IcmtChunkData::new("comment".into()),
+            extra_bytes: vec![],
+        };
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(icmt);
+    }
+
+    #[test]
+    fn knownchunk_as_trait() {
+        let md5 = Md5Chunk {
+            size: 16,
+            data: Md5ChunkData { md5: 0 },
+            extra_bytes: vec![],
+        };
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(md5);
+    }
+
+    #[test]
+    fn chunkenum_as_trait() {
+        let md5 = ChunkEnum::Md5(Md5Chunk {
+            size: 16,
+            data: Md5ChunkData { md5: 0 },
+            extra_bytes: vec![],
+        });
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(md5);
     }
 }
