@@ -1,3 +1,6 @@
+//! `wavrw` provides tools for reading (and someday writing) wave audio  file
+//! chunks with a focus on metadata.
+
 use binrw::io::TakeSeekExt;
 use binrw::Endian;
 use binrw::NullString;
@@ -12,6 +15,10 @@ use std::str::FromStr;
 // helper types
 // ----
 
+// Since const generics do not support arrays, generic structs are storing the
+// FourCC id as a `u32`... which makes instantiation awkward. This is a helper
+// function to make it a bit easier.
+#[doc(hidden)]
 pub const fn fourcc(id: &[u8; 4]) -> u32 {
     u32::from_le_bytes(*id)
 }
@@ -75,6 +82,12 @@ impl Debug for FourCC {
         write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
         write!(f, "{:?})", &self.0)?;
         Ok(())
+    }
+}
+
+impl From<&[u8; 4]> for FourCC {
+    fn from(value: &[u8; 4]) -> Self {
+        FourCC(*value)
     }
 }
 
@@ -205,8 +218,23 @@ where
         };
 
         reader.seek(SeekFrom::Current(-8))?;
-        // TODO: convert to match on each specific chunk type: fewer seeks and better error messages
-        let res = ChunkEnum::read(&mut reader).map(box_chunk);
+        let id = FourCC(chunk_id);
+        let res = match id {
+            FmtChunk::ID => FmtChunk::read(&mut reader).map(box_chunk),
+            DataChunk::ID => DataChunk::read(&mut reader).map(box_chunk),
+            ListInfoChunk::ID => {
+                let list = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
+                reader.seek(SeekFrom::Current(-12))?;
+                match list.form_type {
+                    ListInfoChunkData::LIST_TYPE => ListInfoChunk::read(&mut reader).map(box_chunk),
+                    ListAdtlChunkData::LIST_TYPE => ListAdtlChunk::read(&mut reader).map(box_chunk),
+                    _ => UnknownChunk::read(&mut reader).map(box_chunk),
+                }
+            }
+            BextChunk::ID => BextChunk::read(&mut reader).map(box_chunk),
+            Md5Chunk::ID => Md5Chunk::read(&mut reader).map(box_chunk),
+            _ => UnknownChunk::read(&mut reader).map(box_chunk),
+        };
         chunks.push(res);
 
         // setup for next iteration
@@ -911,8 +939,8 @@ impl KnownChunkID for FmtChunkData {
 
 type FmtChunk = KnownChunk<FmtChunkData>;
 
-impl FmtChunk {
-    pub fn summary(&self) -> String {
+impl Summarizable for FmtChunk {
+    fn summary(&self) -> String {
         format!(
             "{} chan, {}/{}",
             self.data.channels,
@@ -922,7 +950,7 @@ impl FmtChunk {
         )
     }
 
-    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(self.into_iter())
     }
 }
@@ -977,6 +1005,8 @@ impl<'a> Iterator for FmtChunkIterator<'a> {
     }
 }
 
+impl Chunk for FmtChunk {}
+
 /// `data` chunk parser which skips all audio data
 #[binrw]
 #[brw(little)]
@@ -989,21 +1019,27 @@ impl KnownChunkID for DataChunkData {
 
 type DataChunk = KnownChunk<DataChunkData>;
 
-impl DataChunk {
-    pub fn summary(&self) -> String {
+impl Summarizable for DataChunk {
+    fn summary(&self) -> String {
         "audio data".to_string()
     }
 }
+
+impl Chunk for DataChunk {}
 
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInfoChunkData {
-    #[brw(assert(list_type == FourCC(*b"INFO")))]
+    #[brw(assert(list_type == ListInfoChunkData::LIST_TYPE))]
     list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
     chunks: Vec<InfoChunkEnum>,
+}
+
+impl ListInfoChunkData {
+    const LIST_TYPE: FourCC = FourCC(*b"INFO");
 }
 
 impl KnownChunkID for ListInfoChunkData {
@@ -1012,8 +1048,8 @@ impl KnownChunkID for ListInfoChunkData {
 
 type ListInfoChunk = KnownChunk<ListInfoChunkData>;
 
-impl ListInfoChunk {
-    pub fn summary(&self) -> String {
+impl Summarizable for ListInfoChunk {
+    fn summary(&self) -> String {
         format!(
             "{}: {}",
             self.data.list_type,
@@ -1021,7 +1057,7 @@ impl ListInfoChunk {
         )
     }
 
-    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(
             self.data
                 .chunks
@@ -1031,37 +1067,20 @@ impl ListInfoChunk {
     }
 }
 
+impl Chunk for ListInfoChunk {}
+
 /// InfoChunkData is a genericised container for LIST INFO chunks
+///
+/// A type alias is devfined for all of the INFO types from the initial 1991
+/// WAV spec.
+///
+/// # Examples:
 ///
 /// ```
 /// # use wavrw::IcmtChunkData;
 /// let icmt = IcmtChunkData::new("comment");
 /// ```
 ///
-/// # Examples:
-///
-/// Since const generics do not support arrays, it's storing the FourCC
-/// id as a `u32`... which makes instantiation awkward. There is a helper
-/// function [fourcc] to make it a bit easier in the general case:
-///
-/// ```
-/// # use wavrw::{InfoChunkData, fourcc};
-/// # use binrw::NullString;
-/// let icmt =  InfoChunkData::<{ fourcc(b"ICMT") }> {
-///     value: NullString("comment".into()),
-/// };
-/// ```
-///
-/// and for all of the INFO types from the original 1991 WAV spec, there
-/// is an additional alias:
-///
-/// ```
-/// # use wavrw::IcmtChunkData;
-/// # use binrw::NullString;
-/// let icmt = IcmtChunkData {
-///     value: NullString("comment".into()),
-/// };
-/// ```
 #[binrw]
 #[br(little)]
 #[derive(PartialEq, Eq)]
@@ -1264,12 +1283,16 @@ impl InfoChunkEnum {
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListAdtlChunkData {
-    #[brw(assert(list_type == FourCC(*b"adtl")))]
+    #[brw(assert(list_type == ListAdtlChunkData::LIST_TYPE))]
     list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
     // chunks: Vec<AdtlChunk>,
     raw: Vec<u8>,
+}
+
+impl ListAdtlChunkData {
+    const LIST_TYPE: FourCC = FourCC(*b"adtl");
 }
 
 impl KnownChunkID for ListAdtlChunkData {
@@ -1278,11 +1301,13 @@ impl KnownChunkID for ListAdtlChunkData {
 
 type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
 
-impl ListAdtlChunk {
-    pub fn summary(&self) -> String {
+impl Summarizable for ListAdtlChunk {
+    fn summary(&self) -> String {
         format!("{} ...", self.data.list_type)
     }
 }
+
+impl Chunk for ListAdtlChunk {}
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII, but we're parsing it as utf8, since
@@ -1332,15 +1357,15 @@ impl KnownChunkID for BextChunkData {
 
 type BextChunk = KnownChunk<BextChunkData>;
 
-impl BextChunk {
-    pub fn summary(&self) -> String {
+impl Summarizable for BextChunk {
+    fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
             self.data.origination_date, self.data.origination_time, self.data.description
         )
     }
 
-    pub fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(self.into_iter())
     }
 }
@@ -1422,6 +1447,39 @@ impl<'a> Iterator for BextChunkIterator<'a> {
     }
 }
 
+impl Chunk for BextChunk {}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct UnknownChunk {
+    id: FourCC,
+    size: u32,
+    #[br(count = size )]
+    #[bw()]
+    raw: Vec<u8>,
+}
+
+impl ChunkID for UnknownChunk {
+    fn id(&self) -> FourCC {
+        self.id
+    }
+}
+
+impl SizedChunk for UnknownChunk {
+    fn size(&self) -> u32 {
+        self.size
+    }
+}
+
+impl Summarizable for UnknownChunk {
+    fn summary(&self) -> String {
+        format!("...")
+    }
+}
+
+impl Chunk for UnknownChunk {}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -1432,13 +1490,7 @@ pub enum ChunkEnum {
     Adtl(ListAdtlChunk),
     Bext(Box<BextChunk>),
     Md5(Md5Chunk),
-    Unknown {
-        id: FourCC,
-        size: u32,
-        #[br(count = size )]
-        #[bw()]
-        raw: Vec<u8>,
-    },
+    Unknown(UnknownChunk),
 }
 
 impl ChunkID for ChunkEnum {
@@ -1451,7 +1503,7 @@ impl ChunkID for ChunkEnum {
             ChunkEnum::Adtl(e) => e.id(),
             ChunkEnum::Bext(e) => e.id(),
             ChunkEnum::Md5(e) => e.id(),
-            ChunkEnum::Unknown { id, .. } => *id,
+            ChunkEnum::Unknown(e) => e.id(),
         }
     }
 }
@@ -1466,7 +1518,7 @@ impl SizedChunk for ChunkEnum {
             ChunkEnum::Adtl(e) => e.size,
             ChunkEnum::Bext(e) => e.size,
             ChunkEnum::Md5(e) => e.size,
-            ChunkEnum::Unknown { size, .. } => *size,
+            ChunkEnum::Unknown(e) => e.size,
         }
     }
 }
@@ -1481,7 +1533,7 @@ impl Summarizable for ChunkEnum {
             ChunkEnum::Adtl(e) => e.summary(),
             ChunkEnum::Bext(e) => e.summary(),
             ChunkEnum::Md5(e) => e.summary(),
-            ChunkEnum::Unknown { .. } => "...".to_owned(),
+            ChunkEnum::Unknown(e) => e.summary(),
         }
     }
 
@@ -1727,6 +1779,7 @@ mod test {
         "4C495354 38000000 494E464F 49534654 0D000000 42574620 4D657461 45646974 00004943 4D541500 00006265 78742063 68756E6B 20746573 74206669 6C6500"
             );
         let list = ListInfoChunk::read(&mut buff).unwrap();
+        assert_eq!(list.id(), FourCC(*b"LIST"));
 
         // parse via enum wrapper this time
         buff.set_position(0);
