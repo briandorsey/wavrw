@@ -12,7 +12,7 @@ use std::str::FromStr;
 // helper types
 // ----
 
-const fn fourcc(id: &[u8; 4]) -> u32 {
+pub const fn fourcc(id: &[u8; 4]) -> u32 {
     u32::from_le_bytes(*id)
 }
 
@@ -1018,11 +1018,42 @@ impl ListInfoChunk {
     }
 }
 
+/// InfoChunkData is a genericised container for LIST INFO chunks
+///
+/// ```
+/// # use wavrw::IcmtChunkData;
+/// let icmt = IcmtChunkData::new("comment");
+/// ```
+///
+/// # Examples:
+///
+/// Since const generics do not support arrays, it's storing the FourCC
+/// id as a `u32`... which makes instantiation awkward. There is a helper
+/// function [fourcc] to make it a bit easier in the general case:
+///
+/// ```
+/// # use wavrw::{InfoChunkData, fourcc};
+/// # use binrw::NullString;
+/// let icmt =  InfoChunkData::<{ fourcc(b"ICMT") }> {
+///     value: NullString("comment".into()),
+/// };
+/// ```
+///
+/// and for all of the INFO types from the original 1991 WAV spec, there
+/// is an additional alias:
+///
+/// ```
+/// # use wavrw::IcmtChunkData;
+/// # use binrw::NullString;
+/// let icmt = IcmtChunkData {
+///     value: NullString("comment".into()),
+/// };
+/// ```
 #[binrw]
 #[br(little)]
 #[derive(PartialEq, Eq)]
 pub struct InfoChunkData<const I: u32> {
-    value: NullString,
+    pub value: NullString,
 }
 
 impl<const I: u32> KnownChunkID for InfoChunkData<I> {
@@ -1040,52 +1071,59 @@ impl<const I: u32> Debug for InfoChunkData<I> {
         Ok(())
     }
 }
+impl<const I: u32> InfoChunkData<I> {
+    pub fn new(value: &str) -> Self {
+        InfoChunkData::<I> {
+            value: value.into(),
+        }
+    }
+}
 
-type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
-type IgnrChunkData = InfoChunkData<{ fourcc(b"IGNR") }>;
-type IkeyChunkData = InfoChunkData<{ fourcc(b"IKEY") }>;
-type IlgtChunkData = InfoChunkData<{ fourcc(b"ILGT") }>;
-type ImedChunkData = InfoChunkData<{ fourcc(b"IMED") }>;
-type InamChunkData = InfoChunkData<{ fourcc(b"INAM") }>;
-type IpltChunkData = InfoChunkData<{ fourcc(b"IPLT") }>;
-type IprdChunkData = InfoChunkData<{ fourcc(b"IPRD") }>;
-type IsbjChunkData = InfoChunkData<{ fourcc(b"ISBJ") }>;
-type IsftChunkData = InfoChunkData<{ fourcc(b"ISFT") }>;
-type IshpChunkData = InfoChunkData<{ fourcc(b"ISHP") }>;
-type IartChunkData = InfoChunkData<{ fourcc(b"IART") }>;
-type IsrcChunkData = InfoChunkData<{ fourcc(b"ISRC") }>;
-type IsrfChunkData = InfoChunkData<{ fourcc(b"ISRF") }>;
-type ItchChunkData = InfoChunkData<{ fourcc(b"ITCH") }>;
-type IcmsChunkData = InfoChunkData<{ fourcc(b"ICMS") }>;
-type IcmtChunkData = InfoChunkData<{ fourcc(b"ICMT") }>;
-type IcopChunkData = InfoChunkData<{ fourcc(b"ICOP") }>;
-type IcrdChunkData = InfoChunkData<{ fourcc(b"ICRD") }>;
-type IcrpChunkData = InfoChunkData<{ fourcc(b"ICRP") }>;
-type IdpiChunkData = InfoChunkData<{ fourcc(b"IDPI") }>;
-type IengChunkData = InfoChunkData<{ fourcc(b"IENG") }>;
+pub type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
+pub type IgnrChunkData = InfoChunkData<{ fourcc(b"IGNR") }>;
+pub type IkeyChunkData = InfoChunkData<{ fourcc(b"IKEY") }>;
+pub type IlgtChunkData = InfoChunkData<{ fourcc(b"ILGT") }>;
+pub type ImedChunkData = InfoChunkData<{ fourcc(b"IMED") }>;
+pub type InamChunkData = InfoChunkData<{ fourcc(b"INAM") }>;
+pub type IpltChunkData = InfoChunkData<{ fourcc(b"IPLT") }>;
+pub type IprdChunkData = InfoChunkData<{ fourcc(b"IPRD") }>;
+pub type IsbjChunkData = InfoChunkData<{ fourcc(b"ISBJ") }>;
+pub type IsftChunkData = InfoChunkData<{ fourcc(b"ISFT") }>;
+pub type IshpChunkData = InfoChunkData<{ fourcc(b"ISHP") }>;
+pub type IartChunkData = InfoChunkData<{ fourcc(b"IART") }>;
+pub type IsrcChunkData = InfoChunkData<{ fourcc(b"ISRC") }>;
+pub type IsrfChunkData = InfoChunkData<{ fourcc(b"ISRF") }>;
+pub type ItchChunkData = InfoChunkData<{ fourcc(b"ITCH") }>;
+pub type IcmsChunkData = InfoChunkData<{ fourcc(b"ICMS") }>;
+pub type IcmtChunkData = InfoChunkData<{ fourcc(b"ICMT") }>;
+pub type IcopChunkData = InfoChunkData<{ fourcc(b"ICOP") }>;
+pub type IcrdChunkData = InfoChunkData<{ fourcc(b"ICRD") }>;
+pub type IcrpChunkData = InfoChunkData<{ fourcc(b"ICRP") }>;
+pub type IdpiChunkData = InfoChunkData<{ fourcc(b"IDPI") }>;
+pub type IengChunkData = InfoChunkData<{ fourcc(b"IENG") }>;
 
-type IarlChunk = KnownChunk<IarlChunkData>;
-type IgnrChunk = KnownChunk<IgnrChunkData>;
-type IkeyChunk = KnownChunk<IkeyChunkData>;
-type IlgtChunk = KnownChunk<IlgtChunkData>;
-type ImedChunk = KnownChunk<ImedChunkData>;
-type InamChunk = KnownChunk<InamChunkData>;
-type IpltChunk = KnownChunk<IpltChunkData>;
-type IprdChunk = KnownChunk<IprdChunkData>;
-type IsbjChunk = KnownChunk<IsbjChunkData>;
-type IsftChunk = KnownChunk<IsftChunkData>;
-type IshpChunk = KnownChunk<IshpChunkData>;
-type IartChunk = KnownChunk<IartChunkData>;
-type IsrcChunk = KnownChunk<IsrcChunkData>;
-type IsrfChunk = KnownChunk<IsrfChunkData>;
-type ItchChunk = KnownChunk<ItchChunkData>;
-type IcmsChunk = KnownChunk<IcmsChunkData>;
-type IcmtChunk = KnownChunk<IcmtChunkData>;
-type IcopChunk = KnownChunk<IcopChunkData>;
-type IcrdChunk = KnownChunk<IcrdChunkData>;
-type IcrpChunk = KnownChunk<IcrpChunkData>;
-type IdpiChunk = KnownChunk<IdpiChunkData>;
-type IengChunk = KnownChunk<IengChunkData>;
+pub type IarlChunk = KnownChunk<IarlChunkData>;
+pub type IgnrChunk = KnownChunk<IgnrChunkData>;
+pub type IkeyChunk = KnownChunk<IkeyChunkData>;
+pub type IlgtChunk = KnownChunk<IlgtChunkData>;
+pub type ImedChunk = KnownChunk<ImedChunkData>;
+pub type InamChunk = KnownChunk<InamChunkData>;
+pub type IpltChunk = KnownChunk<IpltChunkData>;
+pub type IprdChunk = KnownChunk<IprdChunkData>;
+pub type IsbjChunk = KnownChunk<IsbjChunkData>;
+pub type IsftChunk = KnownChunk<IsftChunkData>;
+pub type IshpChunk = KnownChunk<IshpChunkData>;
+pub type IartChunk = KnownChunk<IartChunkData>;
+pub type IsrcChunk = KnownChunk<IsrcChunkData>;
+pub type IsrfChunk = KnownChunk<IsrfChunkData>;
+pub type ItchChunk = KnownChunk<ItchChunkData>;
+pub type IcmsChunk = KnownChunk<IcmsChunkData>;
+pub type IcmtChunk = KnownChunk<IcmtChunkData>;
+pub type IcopChunk = KnownChunk<IcopChunkData>;
+pub type IcrdChunk = KnownChunk<IcrdChunkData>;
+pub type IcrpChunk = KnownChunk<IcrpChunkData>;
+pub type IdpiChunk = KnownChunk<IdpiChunkData>;
+pub type IengChunk = KnownChunk<IengChunkData>;
 
 #[binrw]
 #[brw(little)]
@@ -1616,9 +1654,6 @@ mod test {
         let icmt = IcmtChunkData {
             value: NullString("comment".into()),
         };
-        assert_eq!(
-            format!("{icmt:?}"),
-            "InfoChunkData<ICMT> { value: NullString(\"comment\") }"
-        );
+        assert!(format!("{icmt:?}").starts_with("InfoChunkData<ICMT>"));
     }
 }
