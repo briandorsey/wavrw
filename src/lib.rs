@@ -24,11 +24,12 @@ pub trait ChunkID {
     fn id(&self) -> FourCC;
 }
 
-pub trait ChunkT: ChunkID {
+pub trait SizedChunk: ChunkID {
     /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
+}
 
-    // TODO: these two actually belong on the inner data structs, right?
+pub trait Summarizable {
     /// Returns a short text summary of the contents of the chunk.
     fn summary(&self) -> String;
 
@@ -38,6 +39,8 @@ pub trait ChunkT: ChunkID {
         Box::new(std::iter::empty())
     }
 }
+
+pub trait Chunk: SizedChunk + Summarizable {}
 
 impl<T> ChunkID for T
 where
@@ -51,7 +54,7 @@ where
 // Helper for cleaner Result.map() calls when boxing inner chunk.
 // Reduces code repetition, but mostly helps the compiler with type
 // inference.
-fn box_chunk<T: ChunkT + 'static>(t: T) -> Box<dyn ChunkT> {
+fn box_chunk<T: Chunk + 'static>(t: T) -> Box<dyn Chunk> {
     Box::new(t)
 }
 
@@ -170,7 +173,7 @@ impl<const N: usize> BinRead for FixedStr<N> {
 
 /// `metadata_chunks` parses a WAV file chunk by chunk, continuing
 ///  even if some chunks have parsing errors.
-pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn ChunkT>>>, std::io::Error>
+pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn Chunk>>>, std::io::Error>
 where
     R: Read + Seek,
 {
@@ -189,7 +192,7 @@ where
 
     let mut buff: [u8; 4] = [0; 4];
     let mut offset = reader.stream_position()?;
-    let mut chunks: Vec<BinResult<Box<dyn ChunkT>>> = Vec::new();
+    let mut chunks: Vec<BinResult<Box<dyn Chunk>>> = Vec::new();
 
     loop {
         let chunk_id = {
@@ -272,13 +275,22 @@ where
     const ID: FourCC = T::ID;
 }
 
-impl<T> ChunkT for KnownChunk<T>
+impl<T> SizedChunk for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID + ChunkT,
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 {
     fn size(&self) -> u32 {
-        self.data.size() + self.extra_bytes.len() as u32
+        self.size + self.extra_bytes.len() as u32
     }
+}
+
+impl<T> Summarizable for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable,
+{
     fn summary(&self) -> String {
         self.data.summary()
     }
@@ -299,16 +311,21 @@ impl KnownChunkID for Md5ChunkData {
     const ID: FourCC = FourCC(*b"MD5 ");
 }
 
-impl ChunkT for Md5ChunkData {
+impl SizedChunk for Md5ChunkData {
     fn size(&self) -> u32 {
         16
     }
+}
+
+impl Summarizable for Md5ChunkData {
     fn summary(&self) -> String {
         format!("0x{:X}", self.md5)
     }
 }
 
 type Md5Chunk = KnownChunk<Md5ChunkData>;
+
+impl Chunk for Md5Chunk {}
 
 #[binrw]
 #[brw(little)]
@@ -1067,6 +1084,13 @@ impl<const I: u32> Debug for InfoChunkData<I> {
         Ok(())
     }
 }
+
+impl<const I: u32> Summarizable for InfoChunkData<I> {
+    fn summary(&self) -> String {
+        self.value.to_string()
+    }
+}
+
 impl<const I: u32> InfoChunkData<I> {
     pub fn new(value: &str) -> Self {
         InfoChunkData::<I> {
@@ -1120,6 +1144,29 @@ pub type IcrdChunk = KnownChunk<IcrdChunkData>;
 pub type IcrpChunk = KnownChunk<IcrpChunkData>;
 pub type IdpiChunk = KnownChunk<IdpiChunkData>;
 pub type IengChunk = KnownChunk<IengChunkData>;
+
+impl Chunk for IarlChunk {}
+impl Chunk for IgnrChunk {}
+impl Chunk for IkeyChunk {}
+impl Chunk for IlgtChunk {}
+impl Chunk for ImedChunk {}
+impl Chunk for InamChunk {}
+impl Chunk for IpltChunk {}
+impl Chunk for IprdChunk {}
+impl Chunk for IsbjChunk {}
+impl Chunk for IsftChunk {}
+impl Chunk for IshpChunk {}
+impl Chunk for IartChunk {}
+impl Chunk for IsrcChunk {}
+impl Chunk for IsrfChunk {}
+impl Chunk for ItchChunk {}
+impl Chunk for IcmsChunk {}
+impl Chunk for IcmtChunk {}
+impl Chunk for IcopChunk {}
+impl Chunk for IcrdChunk {}
+impl Chunk for IcrpChunk {}
+impl Chunk for IdpiChunk {}
+impl Chunk for IengChunk {}
 
 #[binrw]
 #[brw(little)]
@@ -1409,7 +1456,7 @@ impl ChunkID for ChunkEnum {
     }
 }
 
-impl ChunkT for ChunkEnum {
+impl SizedChunk for ChunkEnum {
     /// Returns the logical (used) size in bytes of the contained chunk.
     fn size(&self) -> u32 {
         match self {
@@ -1422,7 +1469,9 @@ impl ChunkT for ChunkEnum {
             ChunkEnum::Unknown { size, .. } => *size,
         }
     }
+}
 
+impl Summarizable for ChunkEnum {
     /// Returns a short text summary of the contents of the contained chunk.
     fn summary(&self) -> String {
         match self {
@@ -1447,6 +1496,8 @@ impl ChunkT for ChunkEnum {
         }
     }
 }
+
+impl Chunk for ChunkEnum {}
 
 #[cfg(test)]
 mod test {
@@ -1649,5 +1700,38 @@ mod test {
             value: NullString("comment".into()),
         };
         assert!(format!("{icmt:?}").starts_with("InfoChunkData<ICMT>"));
+    }
+
+    #[test]
+    fn icmtchunk_as_trait() {
+        let icmt = IcmtChunk {
+            size: 8,
+            data: IcmtChunkData::new("comment".into()),
+            extra_bytes: vec![],
+        };
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(icmt);
+    }
+
+    #[test]
+    fn knownchunk_as_trait() {
+        let md5 = Md5Chunk {
+            size: 16,
+            data: Md5ChunkData { md5: 0 },
+            extra_bytes: vec![],
+        };
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(md5);
+    }
+
+    #[test]
+    fn chunkenum_as_trait() {
+        let md5 = ChunkEnum::Md5(Md5Chunk {
+            size: 16,
+            data: Md5ChunkData { md5: 0 },
+            extra_bytes: vec![],
+        });
+        // ensure trait bounds are satisfied
+        let mut _trt: Box<dyn Chunk> = Box::new(md5);
     }
 }
