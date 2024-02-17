@@ -21,12 +21,9 @@ pub trait KnownChunkID {
 }
 
 pub trait ChunkID {
-    // TODO: remove &self once no longer using enum
     fn id(&self) -> FourCC;
 }
 
-// TODO: naming convention for traits which overlap with types?
-// TODO: better name for this trait, maybe after splitting?
 pub trait ChunkT: ChunkID {
     /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
@@ -890,7 +887,6 @@ pub struct FmtChunkData {
     bits_per_sample: u16,
 }
 // TODO: properly handle different fmt chunk additions from later specs
-// TODO: if ever extra data (based on cbSize), include as RAW section. Display as hex and preserve when writing
 
 impl KnownChunkID for FmtChunkData {
     const ID: FourCC = FourCC(*b"fmt ");
@@ -1258,13 +1254,11 @@ pub struct BextChunkData {
     origination_date: FixedStr<10>, // OriginationDate
     /// hh:mm:ss
     origination_time: FixedStr<8>, // OriginationTime
-    // TODO: validate endianness, spec has DWORD high then DWORD low
     /// First sample count since midnight
     time_reference: u64, // TimeReference
     /// Version of the BWF; unsigned binary number
     version: u16, // Version
-    /// SMPTE UMID
-    // TODO: write UMID parser, based on: SMPTE 330M
+    /// SMPTE UMID, raw unparsed data
     umid: [u8; 64], // UMID
     /// Integrated Loudness Value of the file in LUFS (multiplied by 100)
     loudness_value: i16, // LoudnessValue
