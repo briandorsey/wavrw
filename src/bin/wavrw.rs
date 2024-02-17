@@ -50,8 +50,13 @@ fn main() -> Result<()> {
                                 chunk.summary()
                             );
                             if *detailed {
+                                let mut had_items = false;
                                 for (key, value) in chunk.items() {
+                                    had_items = true;
                                     println!("             |{key:>23} : {value}");
+                                }
+                                if had_items {
+                                    println!("             --------------------------------------");
                                 }
                             }
                             // remove offset calculations once handled by metadata_chunks()
