@@ -40,7 +40,7 @@ pub trait Summarizable {
     }
 }
 
-pub trait Chunk: SizedChunk + Summarizable {}
+pub trait Chunk: SizedChunk + Summarizable + Debug {}
 
 impl<T> ChunkID for T
 where
@@ -205,7 +205,9 @@ where
         };
 
         reader.seek(SeekFrom::Current(-8))?;
+        // TODO: convert to match on each specific chunk type: fewer seeks and better error messages
         let res = ChunkEnum::read(&mut reader).map(box_chunk);
+        chunks.push(res);
 
         // setup for next iteration
         offset += chunk_size as u64 + 8;
@@ -221,8 +223,6 @@ where
             );
             reader.seek(SeekFrom::Start(offset))?;
         }
-
-        chunks.push(res);
 
         if offset >= riff.size as u64 {
             break;
@@ -264,7 +264,7 @@ pub struct KnownChunk<
     end_pos: PosValue<()>,
 
     // calculate how much was read, and read any extra bytes that remain in the chunk
-    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    #[br(align_after = 2, count = size as u64 - (end_pos.pos - begin_pos.pos))]
     extra_bytes: Vec<u8>,
 }
 
@@ -1692,6 +1692,49 @@ mod test {
         buff.set_position(0);
         let after = InfoChunkEnum::read(&mut buff).unwrap();
         assert_eq!(after, icmt);
+    }
+
+    #[test]
+    fn infochunk_small_valid() {
+        // buff contains ICMT chunk with an odd length
+        // handling the WORD padding incorrectly can break parsing
+        let mut buff =
+            hex_to_cursor("49434D54 15000000 62657874 20636875 6E6B2074 65737420 66696C65 00");
+        // parse via explicit chunk type
+        let icmt = IcmtChunk::read(&mut buff).unwrap();
+        dbg!(&icmt);
+        assert_eq!(icmt.id(), FourCC(*b"ICMT"));
+        assert_eq!(icmt.data.value, "bext chunk test file".into());
+
+        // parse via enum wrapper this time
+        buff.set_position(0);
+        let en = InfoChunkEnum::read(&mut buff).unwrap();
+        dbg!(&en);
+        assert_eq!(en.id(), FourCC(*b"ICMT"));
+        let InfoChunkEnum::Icmt(icmt) = en else {
+            unreachable!("should have been ICMT")
+        };
+        assert_eq!(icmt.data.value, "bext chunk test file".into());
+    }
+
+    #[test]
+    fn listinfochunk_small_valid() {
+        // buff contains INFO chunk with two odd length'd inner chunks
+        // handling the WORD padding incorrectly can break parsing
+        // if infochunk_small_valid() passes, but this fails, error is
+        // likely in the ListInfoChunk wrapping
+        let mut buff = hex_to_cursor(
+        "4C495354 38000000 494E464F 49534654 0D000000 42574620 4D657461 45646974 00004943 4D541500 00006265 78742063 68756E6B 20746573 74206669 6C6500"
+            );
+        let list = ListInfoChunk::read(&mut buff).unwrap();
+
+        // parse via enum wrapper this time
+        buff.set_position(0);
+        let chunk = ChunkEnum::read(&mut buff).map(box_chunk).unwrap();
+        assert_eq!(chunk.id(), FourCC(*b"LIST"));
+
+        // let list = ListInfoChunk::read(&mut buff).unwrap();
+        // assert_eq!(
     }
 
     #[test]
