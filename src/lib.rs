@@ -1020,13 +1020,25 @@ impl ListInfoChunk {
 
 #[binrw]
 #[br(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct InfoChunkData<const I: u32> {
     value: NullString,
 }
 
 impl<const I: u32> KnownChunkID for InfoChunkData<I> {
     const ID: FourCC = FourCC(I.to_le_bytes());
+}
+
+impl<const I: u32> Debug for InfoChunkData<I> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "InfoChunkData<{}> {{ value: {:?} }}",
+            String::from_utf8_lossy(I.to_le_bytes().as_slice()),
+            self.value,
+        )?;
+        Ok(())
+    }
 }
 
 type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
@@ -1597,5 +1609,16 @@ mod test {
         buff.set_position(0);
         let after = InfoChunkEnum::read(&mut buff).unwrap();
         assert_eq!(after, icmt);
+    }
+
+    #[test]
+    fn infochunk_debug_string() {
+        let icmt = IcmtChunkData {
+            value: NullString("comment".into()),
+        };
+        assert_eq!(
+            format!("{icmt:?}"),
+            "InfoChunkData<ICMT> { value: NullString(\"comment\") }"
+        );
     }
 }
