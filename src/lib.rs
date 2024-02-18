@@ -1456,8 +1456,8 @@ impl Chunk for BextChunk {}
 pub struct UnknownChunk {
     id: FourCC,
     size: u32,
-    #[br(count = size )]
-    #[bw()]
+    #[br(align_after = 2, count = size )]
+    #[bw(align_after = 2)]
     raw: Vec<u8>,
 }
 
