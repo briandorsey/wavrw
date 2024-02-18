@@ -36,9 +36,17 @@ pub trait SizedChunk: ChunkID {
     fn size(&self) -> u32;
 }
 
-pub trait Summarizable {
+pub trait Summarizable: ChunkID {
     /// Returns a short text summary of the contents of the chunk.
     fn summary(&self) -> String;
+
+    /// User friendly name of the chunk, usually the chunk id
+    ///
+    /// An ascii friendly chunk name, with whitespace removed. Chunks with
+    /// subtypes use their subtype as the name. Ex: LIST-INFO is INFO
+    fn name(&self) -> String {
+        self.id().to_string().trim().to_string()
+    }
 
     /// Returns an iterator over a sequence of contents of the contained
     /// chunk as strings (field, value).
@@ -1058,6 +1066,10 @@ impl Summarizable for ListInfoChunk {
         )
     }
 
+    fn name(&self) -> String {
+        self.data.list_type.to_string().trim().to_string()
+    }
+
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(
             self.data
@@ -1305,6 +1317,10 @@ type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
 impl Summarizable for ListAdtlChunk {
     fn summary(&self) -> String {
         format!("{} ...", self.data.list_type)
+    }
+
+    fn name(&self) -> String {
+        self.data.list_type.to_string().trim().to_string()
     }
 }
 
