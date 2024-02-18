@@ -20,7 +20,7 @@ struct Args {
 enum Commands {
     /// Summarize WAV file structure and metadata
     View(ViewConfig),
-    /// List chunks contained in each file
+    /// List chunks contained in files, one per line
     Chunks(ChunksConfig),
 }
 

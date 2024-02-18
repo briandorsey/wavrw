@@ -15,8 +15,9 @@ WAV file metadata read/write utility
 Usage: wavrw <COMMAND>
 
 Commands:
-  view  Summarize WAV file structure and metadata
-  help  Print this message or the help of the given subcommand(s)
+  view    Summarize WAV file structure and metadata
+  chunks  List chunks contained in files, one per line
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
