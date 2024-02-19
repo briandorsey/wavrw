@@ -67,7 +67,7 @@ command = [
     "cargo", "run",
     "--color", "always",
     # put launch parameters for your program behind a `--` separator
-    "--", "view", "test_wavs/1khz_sine_48k_mono_region_marker-metadata.wav",
+    "--", "view", "test_wavs/example_a.wav",
 ]
 need_stdout = true
 allow_warnings = true
@@ -78,7 +78,7 @@ command = [
     "cargo", "run",
     "--color", "always",
     # put launch parameters for your program behind a `--` separator
-    "--", "view", "--detailed", "test_wavs/1khz_sine_48k_mono_region_marker-metadata.wav",
+    "--", "view", "--detailed", "test_wavs/example_a.wav",
 ]
 need_stdout = true
 allow_warnings = true

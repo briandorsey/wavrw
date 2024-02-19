@@ -7,10 +7,12 @@ use binrw::NullString;
 use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
 use itertools::Itertools;
 use std::cmp::min;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::BufReader;
 use std::io::{Read, Seek};
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 // helper types
 // ----
@@ -239,6 +241,7 @@ where
                     _ => UnknownChunk::read(&mut reader).map(box_chunk),
                 }
             }
+            CsetChunk::ID => CsetChunk::read(&mut reader).map(box_chunk),
             BextChunk::ID => BextChunk::read(&mut reader).map(box_chunk),
             Md5Chunk::ID => Md5Chunk::read(&mut reader).map(box_chunk),
             _ => UnknownChunk::read(&mut reader).map(box_chunk),
@@ -927,7 +930,6 @@ impl Display for FormatTag {
     }
 }
 
-// based on http://soundfile.sapp.org/doc/WaveFormat/
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -1326,6 +1328,224 @@ impl Summarizable for ListAdtlChunk {
 
 impl Chunk for ListAdtlChunk {}
 
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct CsetChunkData {
+    code_page: u16,
+    country_code: CsetCountryCode,
+    language: u16,
+    dialect: u16,
+}
+
+impl KnownChunkID for CsetChunkData {
+    const ID: FourCC = FourCC(*b"CSET");
+}
+
+/// CsetChunk (CSET) stores character set information. Defined in RIFF1991.
+///
+/// NOTE: Implemented from the spec only, because I couldn't find any files actually
+/// containing this chunk.
+type CsetChunk = KnownChunk<CsetChunkData>;
+
+impl Summarizable for CsetChunk {
+    fn summary(&self) -> String {
+        let (language, dialect) = cset_ld_map()
+            .get(&(self.data.language, self.data.dialect))
+            .unwrap_or(&("Unknown", "Unknown"));
+        format!(
+            "code_page: ({}), {}, {language}({}), {dialect}({})",
+            self.data.code_page, self.data.country_code, self.data.language, self.data.dialect,
+        )
+    }
+
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
+}
+
+impl Chunk for CsetChunk {}
+
+// Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
+
+impl<'a> IntoIterator for &'a CsetChunk {
+    type Item = (String, String);
+    type IntoIter = CsetChunkIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        CsetChunkIterator {
+            fmt: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct CsetChunkIterator<'a> {
+    fmt: &'a CsetChunk,
+    index: usize,
+}
+
+impl<'a> Iterator for CsetChunkIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("code_page".to_string(), self.fmt.data.code_page.to_string())),
+            2 => Some((
+                "country_code".to_string(),
+                self.fmt.data.country_code.to_string(),
+            )),
+            3 => Some(("language".to_string(), self.fmt.data.language.to_string())),
+            4 => Some(("dialect".to_string(), self.fmt.data.dialect.to_string())),
+            _ => None,
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
+    static MAP: OnceLock<HashMap<(u16, u16), (&'static str, &'static str)>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        HashMap::from([
+            ((0, 0), ("None", "")),
+            ((1, 1), ("Arabic", "")),
+            ((2, 1), ("Bulgarian", "")),
+            ((3, 1), ("Catalan", "")),
+            ((4, 1), ("Chinese", "Traditional")),
+            ((4, 2), ("Chinese", "Simplified")),
+            ((5, 1), ("Czech", "")),
+            ((6, 1), ("Danish", "")),
+            ((7, 1), ("German", "")),
+            ((7, 2), ("German", "Swiss")),
+            ((8, 1), ("Greek", "")),
+            ((9, 1), ("English", "US")),
+            ((9, 2), ("English", "UK")),
+            ((10, 1), ("Spanish", "")),
+            ((10, 2), ("Spanish", "Mexican")),
+            ((11, 1), ("Finnish", "")),
+            ((12, 1), ("French", "")),
+            ((12, 2), ("French", "Belgian")),
+            ((12, 3), ("French", "Canadian")),
+            ((12, 4), ("French", "Swiss")),
+            ((13, 1), ("Hebrew", "")),
+        ])
+    })
+}
+
+#[allow(dead_code)]
+#[binrw]
+#[brw(little, repr = u16)]
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RiffCountryCode {
+    USA = 0x1,
+    Canada = 0x2,
+    LatinAmerica = 0x3,
+    Greece = 0x30,
+    Netherlands = 0x31,
+    Belgium = 0x32,
+    France = 0x33,
+    Spain = 0x34,
+    Italy = 0x39,
+    Switzerland = 0x41,
+    Austria = 0x43,
+    UnitedKingdom = 0x44,
+    Denmark = 0x45,
+    Sweden = 0x46,
+    Norway = 0x47,
+    WestGermany = 0x49,
+    Mexico = 0x52,
+    Brazil = 0x55,
+    Australia = 0x61,
+    NewZealand = 0x64,
+    Japan = 0x81,
+    Korea = 0x82,
+    PeoplesRepublicOfChina = 0x86,
+    Taiwan = 0x88,
+    Turkey = 0x90,
+    Portugal = 0x351,
+    Luxembourg = 0x352,
+    Iceland = 0x354,
+    Finland = 0x358,
+}
+
+impl Display for RiffCountryCode {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        use RiffCountryCode::*;
+        let output = match self {
+            USA => "USA",
+            Canada => "Canada",
+            LatinAmerica => "Latin America",
+            Greece => "Greece",
+            Netherlands => "Netherlands",
+            Belgium => "Belgium",
+            France => "France",
+            Spain => "Spain",
+            Italy => "Italy",
+            Switzerland => "Switzerland",
+            Austria => "Austria",
+            UnitedKingdom => "United Kingdom",
+            Denmark => "Denmark",
+            Sweden => "Sweden",
+            Norway => "Norway",
+            WestGermany => "West Germany",
+            Mexico => "Mexico",
+            Brazil => "Brazil",
+            Australia => "Australia",
+            NewZealand => "New Zealand",
+            Japan => "Japan",
+            Korea => "Korea",
+            PeoplesRepublicOfChina => "People’s Republic of China",
+            Taiwan => "Taiwan",
+            Turkey => "Turkey",
+            Portugal => "Portugal",
+            Luxembourg => "Luxembourg",
+            Iceland => "Iceland",
+            Finland => "Finland",
+        };
+        write!(f, "{}({})", output, *self as u16)?;
+        Ok(())
+    }
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnknownCountryCode {
+    country_code: u16,
+}
+
+impl Display for UnknownCountryCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown (0x{:x})", self.country_code)?;
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[binrw]
+#[brw(little)]
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CsetCountryCode {
+    Known(RiffCountryCode),
+    Unknown(UnknownCountryCode),
+}
+
+impl Display for CsetCountryCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CsetCountryCode::Known(c) => c.to_string(),
+                CsetCountryCode::Unknown(c) => c.to_string(),
+            }
+        )?;
+        Ok(())
+    }
+}
+
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII, but we're parsing it as utf8, since
 // that is a superset of ASCII and many WAV files contain utf8 strings here
@@ -1505,6 +1725,7 @@ pub enum ChunkEnum {
     Data(DataChunk),
     Info(ListInfoChunk),
     Adtl(ListAdtlChunk),
+    Cset(CsetChunk),
     Bext(Box<BextChunk>),
     Md5(Md5Chunk),
     Unknown(UnknownChunk),
@@ -1518,6 +1739,7 @@ impl ChunkID for ChunkEnum {
             ChunkEnum::Data(e) => e.id(),
             ChunkEnum::Info(e) => e.id(),
             ChunkEnum::Adtl(e) => e.id(),
+            ChunkEnum::Cset(e) => e.id(),
             ChunkEnum::Bext(e) => e.id(),
             ChunkEnum::Md5(e) => e.id(),
             ChunkEnum::Unknown(e) => e.id(),
@@ -1533,6 +1755,7 @@ impl SizedChunk for ChunkEnum {
             ChunkEnum::Data(e) => e.size,
             ChunkEnum::Info(e) => e.size,
             ChunkEnum::Adtl(e) => e.size,
+            ChunkEnum::Cset(e) => e.size,
             ChunkEnum::Bext(e) => e.size,
             ChunkEnum::Md5(e) => e.size,
             ChunkEnum::Unknown(e) => e.size,
@@ -1548,6 +1771,7 @@ impl Summarizable for ChunkEnum {
             ChunkEnum::Data(e) => e.summary(),
             ChunkEnum::Info(e) => e.summary(),
             ChunkEnum::Adtl(e) => e.summary(),
+            ChunkEnum::Cset(e) => e.summary(),
             ChunkEnum::Bext(e) => e.summary(),
             ChunkEnum::Md5(e) => e.summary(),
             ChunkEnum::Unknown(e) => e.summary(),
@@ -1846,5 +2070,64 @@ mod test {
         });
         // ensure trait bounds are satisfied
         let mut _trt: Box<dyn Chunk> = Box::new(md5);
+    }
+
+    #[test]
+    fn riffcountrycode() {
+        let country = RiffCountryCode::Canada;
+        assert_eq!(country as u16, 2);
+
+        let mut buff = hex_to_cursor("0200");
+        let canada: RiffCountryCode = RiffCountryCode::read(&mut buff).unwrap();
+        assert_eq!(canada, RiffCountryCode::Canada);
+    }
+
+    #[test]
+    fn unknowncountrycode() {
+        let country = UnknownCountryCode {
+            country_code: 0xFFFF,
+        };
+        assert_eq!(country.country_code, 0xFFFF);
+
+        let mut buff = hex_to_cursor("FFFF");
+        let unknown = UnknownCountryCode::read(&mut buff).unwrap();
+        assert_eq!(
+            unknown,
+            UnknownCountryCode {
+                country_code: 0xFFFF
+            }
+        );
+    }
+
+    #[test]
+    fn cset_roundtrip() {
+        let cset = CsetChunk {
+            size: 8,
+            data: CsetChunkData {
+                code_page: 1,
+                country_code: CsetCountryCode::Known(RiffCountryCode::Canada),
+                language: 12,
+                dialect: 3,
+            },
+            extra_bytes: vec![],
+        };
+        println!("{cset:?}");
+        let mut buff = std::io::Cursor::new(Vec::<u8>::new());
+        cset.write(&mut buff).unwrap();
+        println!("{:?}", hexdump(buff.get_ref()));
+        buff.set_position(0);
+        let after = CsetChunk::read(&mut buff).unwrap();
+        assert_eq!(after, cset);
+        assert_eq!(after.data.code_page, 1);
+        assert_eq!(
+            after.data.country_code,
+            CsetCountryCode::Known(RiffCountryCode::Canada)
+        );
+        assert_eq!(after.data.language, 12);
+        assert_eq!(after.data.dialect, 3);
+        assert_eq!(
+            after.summary(),
+            "code_page: (1), Canada(2), French(12), Canadian(3)"
+        );
     }
 }
