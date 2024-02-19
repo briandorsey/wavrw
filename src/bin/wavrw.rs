@@ -26,10 +26,12 @@ struct WavrwArgs {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(long, short, global = true, action=ArgAction::Help)]
+    #[arg(long, short, global = true, action=ArgAction::Help,
+        help = "Print help")]
     help: (),
 
-    #[arg(long, short='V', action=ArgAction::Version)]
+    #[arg(long, short='V', action=ArgAction::Version,
+        help = "Print version")]
     version: (),
 }
 
