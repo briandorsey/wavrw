@@ -1,11 +1,5 @@
 //! `wavrw` provides tools for reading (and someday writing) wave audio  file
 //! chunks with a focus on metadata.
-
-use binrw::io::TakeSeekExt;
-use binrw::Endian;
-use binrw::NullString;
-use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
-use itertools::Itertools;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -13,6 +7,13 @@ use std::io::BufReader;
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use std::sync::OnceLock;
+
+use binrw::io::TakeSeekExt;
+use binrw::Endian;
+use binrw::NullString;
+use binrw::{binrw, helpers, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
+use itertools::Itertools;
+use tracing::{instrument, trace_span, warn};
 
 // helper types
 // ----
@@ -196,9 +197,10 @@ impl<const N: usize> BinRead for FixedStr<N> {
 
 /// `metadata_chunks` parses a WAV file chunk by chunk, continuing
 ///  even if some chunks have parsing errors.
+#[instrument]
 pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn Chunk>>>, std::io::Error>
 where
-    R: Read + Seek,
+    R: Read + Seek + Debug,
 {
     let mut reader = BufReader::new(reader);
 
@@ -218,6 +220,7 @@ where
     let mut chunks: Vec<BinResult<Box<dyn Chunk>>> = Vec::new();
 
     loop {
+        let _span_ = trace_span!("metadata_chunks_loop").entered();
         let chunk_id = {
             reader.read_exact(&mut buff)?;
             buff
@@ -256,10 +259,7 @@ where
         };
         if offset != reader.stream_position()? {
             // TODO: inject error into chunk vec and remove print
-            println!(
-                "WARNING: {}: parsed less data than chunk size",
-                FourCC(chunk_id)
-            );
+            warn!("{}: parsed less data than chunk size", FourCC(chunk_id));
             reader.seek(SeekFrom::Start(offset))?;
         }
 

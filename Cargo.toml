@@ -3,16 +3,19 @@ name = "wavrw"
 version = "0.1.0"
 edition = "2021"
 description = "WAV file metadata read/write utility"
+authors = ["Brian Dorsey"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.68"
 binrw = "0.13.3"
-clap = { version = "4.1.1", features = ["derive"] }
+clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
 hex = "0.4.3"
 hexdump = "0.1.1"
 itertools = "0.12.0"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }

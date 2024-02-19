@@ -1,6 +1,7 @@
-use anyhow::Result;
-use clap::{Parser, Subcommand};
-use itertools::Itertools;
+//! wavrw Command Line Interface
+
+#![deny(missing_docs)]
+
 use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
@@ -9,11 +10,27 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::path::PathBuf;
 
+use anyhow::Result;
+use clap::{crate_version, ArgAction, Parser, Subcommand};
+use itertools::Itertools;
+use tracing::{debug, Level};
+use tracing_subscriber::FmtSubscriber;
+
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
+#[command(author, about, long_about = None,
+    disable_help_flag = true,
+    disable_version_flag = true,
+    next_help_heading="Global Options",  
+    version=crate_version!())]
+struct WavrwArgs {
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(long, short, global = true, action=ArgAction::Help)]
+    help: (),
+
+    #[arg(long, short='V', action=ArgAction::Version)]
+    version: (),
 }
 
 #[derive(Subcommand, Debug)]
@@ -30,6 +47,7 @@ struct ViewConfig {
     /// One or more paths to WAV files
     wav_path: Vec<OsString>,
 
+    /// show detailed info for each chunk
     #[arg(long, short)]
     detailed: bool,
 }
@@ -101,7 +119,7 @@ fn chunks(config: &ChunksConfig) -> Result<()> {
 }
 
 fn walk_paths(base_path: &PathBuf, config: &ChunksConfig) -> Result<()> {
-    eprintln!("directory: {base_path:?}");
+    debug!("directory: {base_path:?}");
 
     let mut paths = fs::read_dir(base_path)?
         .map(|res| res.map(|e| e.path()))
@@ -147,10 +165,16 @@ fn chunks_for_path(path: &PathBuf) -> Result<String> {
 }
 
 fn main() -> Result<()> {
-    let mut args = Args::parse();
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    let mut args = WavrwArgs::parse();
 
     match &mut args.command {
         Commands::View(config) => view(config),
+
         Commands::Chunks(config) => {
             // TODO: figure out how to do this in CLAP
             for ext in &mut config.ext {
@@ -164,5 +188,5 @@ fn main() -> Result<()> {
 #[test]
 fn verify_args() {
     use clap::CommandFactory;
-    Args::command().debug_assert()
+    WavrwArgs::command().debug_assert()
 }
