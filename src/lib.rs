@@ -236,6 +236,7 @@ where
         let res = match id {
             FmtChunk::ID => FmtChunk::read(&mut reader).map(box_chunk),
             DataChunk::ID => DataChunk::read(&mut reader).map(box_chunk),
+            FactChunk::ID => FactChunk::read(&mut reader).map(box_chunk),
             ListInfoChunk::ID => {
                 let list = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
                 reader.seek(SeekFrom::Current(-12))?;
@@ -1042,6 +1043,33 @@ impl Summarizable for DataChunk {
 impl Chunk for DataChunk {}
 
 #[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct FactChunkData {
+    samples: u32,
+}
+
+impl KnownChunkID for FactChunkData {
+    const ID: FourCC = FourCC(*b"fact");
+}
+
+impl SizedChunk for FactChunkData {
+    fn size(&self) -> u32 {
+        4
+    }
+}
+
+impl Summarizable for FactChunkData {
+    fn summary(&self) -> String {
+        format!("{} samples", self.samples)
+    }
+}
+
+type FactChunk = KnownChunk<FactChunkData>;
+
+impl Chunk for FactChunk {}
+
+#[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInfoChunkData {
@@ -1729,6 +1757,7 @@ impl Chunk for UnknownChunk {}
 pub enum ChunkEnum {
     Fmt(FmtChunk),
     Data(DataChunk),
+    Fact(FactChunk),
     Info(ListInfoChunk),
     Adtl(ListAdtlChunk),
     Cset(CsetChunk),
@@ -1743,6 +1772,7 @@ impl ChunkID for ChunkEnum {
         match self {
             ChunkEnum::Fmt(e) => e.id(),
             ChunkEnum::Data(e) => e.id(),
+            ChunkEnum::Fact(e) => e.id(),
             ChunkEnum::Info(e) => e.id(),
             ChunkEnum::Adtl(e) => e.id(),
             ChunkEnum::Cset(e) => e.id(),
@@ -1759,6 +1789,7 @@ impl SizedChunk for ChunkEnum {
         match self {
             ChunkEnum::Fmt(e) => e.size,
             ChunkEnum::Data(e) => e.size,
+            ChunkEnum::Fact(e) => e.size,
             ChunkEnum::Info(e) => e.size,
             ChunkEnum::Adtl(e) => e.size,
             ChunkEnum::Cset(e) => e.size,
@@ -1775,6 +1806,7 @@ impl Summarizable for ChunkEnum {
         match self {
             ChunkEnum::Fmt(e) => e.summary(),
             ChunkEnum::Data(e) => e.summary(),
+            ChunkEnum::Fact(e) => e.summary(),
             ChunkEnum::Info(e) => e.summary(),
             ChunkEnum::Adtl(e) => e.summary(),
             ChunkEnum::Cset(e) => e.summary(),
@@ -2136,5 +2168,27 @@ mod test {
             after.summary(),
             "code_page: (1), Canada(2), French(12), Canadian(3)"
         );
+    }
+
+    #[test]
+    fn factchunk_small_valid() {
+        // buff contains ICMT chunk with an odd length
+        // handling the WORD padding incorrectly can break parsing
+        let mut buff = hex_to_cursor("66616374 04000000 E0010000");
+        // parse via explicit chunk type
+        let fact = FactChunk::read(&mut buff).unwrap();
+        dbg!(&fact);
+        assert_eq!(fact.id(), FourCC(*b"fact"));
+        assert_eq!(fact.data.samples, 480);
+
+        // parse via enum wrapper this time
+        buff.set_position(0);
+        let en = ChunkEnum::read(&mut buff).unwrap();
+        dbg!(&en);
+        assert_eq!(en.id(), FourCC(*b"fact"));
+        let ChunkEnum::Fact(fact) = en else {
+            unreachable!("should have been fact")
+        };
+        assert_eq!(fact.data.samples, 480);
     }
 }
