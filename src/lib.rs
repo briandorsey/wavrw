@@ -1,5 +1,6 @@
 //! `wavrw` provides tools for reading (and someday writing) wave audio  file
 //! chunks with a focus on metadata.
+
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -82,14 +83,14 @@ fn box_chunk<T: Chunk + 'static>(t: T) -> Box<dyn Chunk> {
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", String::from_utf8_lossy(&self.0),)?;
         Ok(())
     }
 }
 
 impl Debug for FourCC {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
         write!(f, "{:?})", &self.0)?;
         Ok(())
@@ -119,12 +120,12 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 struct FixedStrErr;
 
 #[derive(BinWrite, PartialEq, Eq)]
-/// FixedStr holds Null terminated fixed length strings (from BEXT for example)
+/// `FixedStr` holds Null terminated fixed length strings (from BEXT for example)
 ///
-/// FixedStr is intended to be used via binrw's [BinRead] trait and its
+/// `FixedStr` is intended to be used via binrw's [`BinRead`] trait and its
 /// Null parsing is implmented there. Do not directly create the struct
 /// or that logic will be bypassed. If there is a future need, we should
-/// implement a ::new() constructor which in turn calls the [FixedStr::read_options()]
+/// implement a constructor which in turn calls the [`FixedStr::read_options()`]
 /// implementation.
 struct FixedStr<const N: usize>([u8; N]);
 
@@ -137,7 +138,7 @@ impl<const N: usize> Debug for FixedStr<N> {
 }
 
 impl<const N: usize> Display for FixedStr<N> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "{}",
@@ -652,8 +653,9 @@ pub enum FormatTag {
     Development = 0xFFFF,
 }
 
+#[allow(clippy::enum_glob_use)]
 impl Display for FormatTag {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         use FormatTag::*;
         let output = match self {
             Unknown => "WAVE_FORMAT_UNKNOWN",
@@ -980,6 +982,7 @@ impl<'a> IntoIterator for &'a FmtChunk {
     }
 }
 
+#[derive(Debug)]
 pub struct FmtChunkIterator<'a> {
     fmt: &'a FmtChunk,
     index: usize,
@@ -1108,7 +1111,7 @@ impl<const I: u32> KnownChunkID for InfoChunkData<I> {
 }
 
 impl<const I: u32> Debug for InfoChunkData<I> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "InfoChunkData<{}> {{ value: {:?} }}",
@@ -1342,7 +1345,7 @@ impl KnownChunkID for CsetChunkData {
     const ID: FourCC = FourCC(*b"CSET");
 }
 
-/// CsetChunk (CSET) stores character set information. Defined in RIFF1991.
+/// `CsetChunk` (CSET) stores character set information. Defined in RIFF1991.
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
@@ -1380,6 +1383,7 @@ impl<'a> IntoIterator for &'a CsetChunk {
     }
 }
 
+#[derive(Debug)]
 pub struct CsetChunkIterator<'a> {
     fmt: &'a CsetChunk,
     index: usize,
@@ -1469,8 +1473,9 @@ pub enum RiffCountryCode {
     Finland = 0x358,
 }
 
+#[allow(clippy::enum_glob_use)]
 impl Display for RiffCountryCode {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         use RiffCountryCode::*;
         let output = match self {
             USA => "USA",
@@ -1619,6 +1624,7 @@ impl<'a> IntoIterator for &'a BextChunk {
     }
 }
 
+#[derive(Debug)]
 pub struct BextChunkIterator<'a> {
     bext: &'a BextChunk,
     index: usize,
@@ -1677,7 +1683,7 @@ impl<'a> Iterator for BextChunkIterator<'a> {
             )),
             14 => Some((
                 "coding_history".to_string(),
-                self.bext.data.coding_history.to_string(),
+                self.bext.data.coding_history.clone(),
             )),
             _ => None,
         }
@@ -1711,7 +1717,7 @@ impl SizedChunk for UnknownChunk {
 
 impl Summarizable for UnknownChunk {
     fn summary(&self) -> String {
-        format!("...")
+        "...".to_string()
     }
 }
 
@@ -1732,7 +1738,7 @@ pub enum ChunkEnum {
 }
 
 impl ChunkID for ChunkEnum {
-    /// Returns the [FourCC] (chunk id) for the contained chunk.
+    /// Returns the `FourCC` (chunk id) for the contained chunk.
     fn id(&self) -> FourCC {
         match self {
             ChunkEnum::Fmt(e) => e.id(),
@@ -1792,6 +1798,7 @@ impl Summarizable for ChunkEnum {
 
 impl Chunk for ChunkEnum {}
 
+#[allow(clippy::dbg_macro)]
 #[cfg(test)]
 mod test {
     use binrw::BinRead; // don't understand why this is needed in this scope
@@ -2043,7 +2050,7 @@ mod test {
     fn icmtchunk_as_trait() {
         let icmt = IcmtChunk {
             size: 8,
-            data: IcmtChunkData::new("comment".into()),
+            data: IcmtChunkData::new("comment"),
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied

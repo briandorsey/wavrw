@@ -7,7 +7,7 @@ fn hex_benchmark(c: &mut Criterion) {
     c.bench_function("hex_fmt", |b| b.iter(|| hex_fmt(black_box(input_int))));
 
     c.bench_function("hex_encode", |b| {
-        b.iter(|| hex_encode(black_box(input_int)))
+        b.iter(|| hex_encode(black_box(input_int)));
     });
 
     c.bench_function("hex_iter", |b| b.iter(|| hex_iter(black_box(input_int))));

@@ -154,7 +154,7 @@ fn chunks_for_path(path: &PathBuf) -> Result<String> {
     for res in wavrw::metadata_chunks(file)? {
         match res {
             Ok(chunk) => {
-                chunks.push(chunk.name().to_string());
+                chunks.push(chunk.name());
             }
             Err(err) => {
                 println!("ERROR: {err}");
@@ -190,5 +190,5 @@ fn main() -> Result<()> {
 #[test]
 fn verify_args() {
     use clap::CommandFactory;
-    WavrwArgs::command().debug_assert()
+    WavrwArgs::command().debug_assert();
 }
