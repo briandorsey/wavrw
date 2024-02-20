@@ -340,6 +340,15 @@ where
     }
 }
 
+impl<T> Chunk for KnownChunk<T> where
+    T: for<'a> BinRead<Args<'a> = ()>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable
+        + Debug
+{
+}
+
 // based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
@@ -365,8 +374,6 @@ impl Summarizable for Md5ChunkData {
 }
 
 type Md5Chunk = KnownChunk<Md5ChunkData>;
-
-impl Chunk for Md5Chunk {}
 
 #[binrw]
 #[brw(little)]
@@ -950,16 +957,14 @@ impl KnownChunkID for FmtChunkData {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
-type FmtChunk = KnownChunk<FmtChunkData>;
-
-impl Summarizable for FmtChunk {
+impl Summarizable for FmtChunkData {
     fn summary(&self) -> String {
         format!(
             "{}, {} chan, {}/{}",
-            self.data.format_tag.to_string().replace("WAVE_FORMAT_", ""),
-            self.data.channels,
-            self.data.bits_per_sample,
-            self.data.samples_per_sec,
+            self.format_tag.to_string().replace("WAVE_FORMAT_", ""),
+            self.channels,
+            self.bits_per_sample,
+            self.samples_per_sec,
             // TODO: format_tag
         )
     }
@@ -971,56 +976,50 @@ impl Summarizable for FmtChunk {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a FmtChunk {
+impl<'a> IntoIterator for &'a FmtChunkData {
     type Item = (String, String);
-    type IntoIter = FmtChunkIterator<'a>;
+    type IntoIter = FmtChunkDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FmtChunkIterator {
-            fmt: self,
+        FmtChunkDataIterator {
+            data: self,
             index: 0,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct FmtChunkIterator<'a> {
-    fmt: &'a FmtChunk,
+pub struct FmtChunkDataIterator<'a> {
+    data: &'a FmtChunkData,
     index: usize,
 }
 
-impl<'a> Iterator for FmtChunkIterator<'a> {
+impl<'a> Iterator for FmtChunkDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some((
-                "format_tag".to_string(),
-                self.fmt.data.format_tag.to_string(),
-            )),
-            2 => Some(("channels".to_string(), self.fmt.data.channels.to_string())),
+            1 => Some(("format_tag".to_string(), self.data.format_tag.to_string())),
+            2 => Some(("channels".to_string(), self.data.channels.to_string())),
             3 => Some((
                 "samples_per_sec".to_string(),
-                self.fmt.data.samples_per_sec.to_string(),
+                self.data.samples_per_sec.to_string(),
             )),
             4 => Some((
                 "avg_bytes_per_sec".to_string(),
-                self.fmt.data.avg_bytes_per_sec.to_string(),
+                self.data.avg_bytes_per_sec.to_string(),
             )),
-            5 => Some((
-                "block_align".to_string(),
-                self.fmt.data.block_align.to_string(),
-            )),
+            5 => Some(("block_align".to_string(), self.data.block_align.to_string())),
             6 => Some((
                 "bits_per_sample".to_string(),
-                self.fmt.data.bits_per_sample.to_string(),
+                self.data.bits_per_sample.to_string(),
             )),
             _ => None,
         }
     }
 }
 
-impl Chunk for FmtChunk {}
+type FmtChunk = KnownChunk<FmtChunkData>;
 
 /// `data` chunk parser which skips all audio data
 #[binrw]
@@ -1032,15 +1031,13 @@ impl KnownChunkID for DataChunkData {
     const ID: FourCC = FourCC(*b"data");
 }
 
-type DataChunk = KnownChunk<DataChunkData>;
-
-impl Summarizable for DataChunk {
+impl Summarizable for DataChunkData {
     fn summary(&self) -> String {
         "audio data".to_string()
     }
 }
 
-impl Chunk for DataChunk {}
+type DataChunk = KnownChunk<DataChunkData>;
 
 #[binrw]
 #[brw(little)]
@@ -1067,8 +1064,6 @@ impl Summarizable for FactChunkData {
 
 type FactChunk = KnownChunk<FactChunkData>;
 
-impl Chunk for FactChunk {}
-
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
@@ -1088,32 +1083,25 @@ impl KnownChunkID for ListInfoChunkData {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-type ListInfoChunk = KnownChunk<ListInfoChunkData>;
-
-impl Summarizable for ListInfoChunk {
+impl Summarizable for ListInfoChunkData {
     fn summary(&self) -> String {
         format!(
             "{}: {}",
-            self.data.list_type,
-            self.data.chunks.iter().map(|c| c.id()).join(", ")
+            self.list_type,
+            self.chunks.iter().map(|c| c.id()).join(", ")
         )
     }
 
     fn name(&self) -> String {
-        self.data.list_type.to_string().trim().to_string()
+        self.list_type.to_string().trim().to_string()
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        Box::new(
-            self.data
-                .chunks
-                .iter()
-                .map(|c| (c.id().to_string(), c.value())),
-        )
+        Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
     }
 }
 
-impl Chunk for ListInfoChunk {}
+type ListInfoChunk = KnownChunk<ListInfoChunkData>;
 
 /// InfoChunkData is a genericised container for LIST INFO chunks
 ///
@@ -1209,29 +1197,6 @@ pub type IcrdChunk = KnownChunk<IcrdChunkData>;
 pub type IcrpChunk = KnownChunk<IcrpChunkData>;
 pub type IdpiChunk = KnownChunk<IdpiChunkData>;
 pub type IengChunk = KnownChunk<IengChunkData>;
-
-impl Chunk for IarlChunk {}
-impl Chunk for IgnrChunk {}
-impl Chunk for IkeyChunk {}
-impl Chunk for IlgtChunk {}
-impl Chunk for ImedChunk {}
-impl Chunk for InamChunk {}
-impl Chunk for IpltChunk {}
-impl Chunk for IprdChunk {}
-impl Chunk for IsbjChunk {}
-impl Chunk for IsftChunk {}
-impl Chunk for IshpChunk {}
-impl Chunk for IartChunk {}
-impl Chunk for IsrcChunk {}
-impl Chunk for IsrfChunk {}
-impl Chunk for ItchChunk {}
-impl Chunk for IcmsChunk {}
-impl Chunk for IcmtChunk {}
-impl Chunk for IcopChunk {}
-impl Chunk for IcrdChunk {}
-impl Chunk for IcrpChunk {}
-impl Chunk for IdpiChunk {}
-impl Chunk for IengChunk {}
 
 #[binrw]
 #[brw(little)]
@@ -1345,19 +1310,17 @@ impl KnownChunkID for ListAdtlChunkData {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
-
-impl Summarizable for ListAdtlChunk {
+impl Summarizable for ListAdtlChunkData {
     fn summary(&self) -> String {
-        format!("{} ...", self.data.list_type)
+        format!("{} ...", self.list_type)
     }
 
     fn name(&self) -> String {
-        self.data.list_type.to_string().trim().to_string()
+        self.list_type.to_string().trim().to_string()
     }
 }
 
-impl Chunk for ListAdtlChunk {}
+type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
 
 #[binrw]
 #[brw(little)]
@@ -1373,20 +1336,14 @@ impl KnownChunkID for CsetChunkData {
     const ID: FourCC = FourCC(*b"CSET");
 }
 
-/// `CsetChunk` (CSET) stores character set information. Defined in RIFF1991.
-///
-/// NOTE: Implemented from the spec only, because I couldn't find any files actually
-/// containing this chunk.
-type CsetChunk = KnownChunk<CsetChunkData>;
-
-impl Summarizable for CsetChunk {
+impl Summarizable for CsetChunkData {
     fn summary(&self) -> String {
         let (language, dialect) = cset_ld_map()
-            .get(&(self.data.language, self.data.dialect))
+            .get(&(self.language, self.dialect))
             .unwrap_or(&("Unknown", "Unknown"));
         format!(
             "code_page: ({}), {}, {language}({}), {dialect}({})",
-            self.data.code_page, self.data.country_code, self.data.language, self.data.dialect,
+            self.code_page, self.country_code, self.language, self.dialect,
         )
     }
 
@@ -1395,44 +1352,48 @@ impl Summarizable for CsetChunk {
     }
 }
 
-impl Chunk for CsetChunk {}
-
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a CsetChunk {
+impl<'a> IntoIterator for &'a CsetChunkData {
     type Item = (String, String);
-    type IntoIter = CsetChunkIterator<'a>;
+    type IntoIter = CsetChunkDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        CsetChunkIterator {
-            fmt: self,
+        CsetChunkDataIterator {
+            data: self,
             index: 0,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct CsetChunkIterator<'a> {
-    fmt: &'a CsetChunk,
+pub struct CsetChunkDataIterator<'a> {
+    data: &'a CsetChunkData,
     index: usize,
 }
 
-impl<'a> Iterator for CsetChunkIterator<'a> {
+impl<'a> Iterator for CsetChunkDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("code_page".to_string(), self.fmt.data.code_page.to_string())),
+            1 => Some(("code_page".to_string(), self.data.code_page.to_string())),
             2 => Some((
                 "country_code".to_string(),
-                self.fmt.data.country_code.to_string(),
+                self.data.country_code.to_string(),
             )),
-            3 => Some(("language".to_string(), self.fmt.data.language.to_string())),
-            4 => Some(("dialect".to_string(), self.fmt.data.dialect.to_string())),
+            3 => Some(("language".to_string(), self.data.language.to_string())),
+            4 => Some(("dialect".to_string(), self.data.dialect.to_string())),
             _ => None,
         }
     }
 }
+
+/// `CsetChunk` (CSET) stores character set information. Defined in RIFF1991.
+///
+/// NOTE: Implemented from the spec only, because I couldn't find any files actually
+/// containing this chunk.
+type CsetChunk = KnownChunk<CsetChunkData>;
 
 #[allow(clippy::type_complexity)]
 fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
@@ -1627,11 +1588,11 @@ impl KnownChunkID for BextChunkData {
 
 type BextChunk = KnownChunk<BextChunkData>;
 
-impl Summarizable for BextChunk {
+impl Summarizable for BextChunkData {
     fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
-            self.data.origination_date, self.data.origination_time, self.data.description
+            self.origination_date, self.origination_time, self.description
         )
     }
 
@@ -1640,85 +1601,77 @@ impl Summarizable for BextChunk {
     }
 }
 
-impl<'a> IntoIterator for &'a BextChunk {
+impl<'a> IntoIterator for &'a BextChunkData {
     type Item = (String, String);
-    type IntoIter = BextChunkIterator<'a>;
+    type IntoIter = BextChunkDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        BextChunkIterator {
-            bext: self,
+        BextChunkDataIterator {
+            data: self,
             index: 0,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct BextChunkIterator<'a> {
-    bext: &'a BextChunk,
+pub struct BextChunkDataIterator<'a> {
+    data: &'a BextChunkData,
     index: usize,
 }
 
-impl<'a> Iterator for BextChunkIterator<'a> {
+impl<'a> Iterator for BextChunkDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some((
-                "description".to_string(),
-                self.bext.data.description.to_string(),
-            )),
-            2 => Some((
-                "originator".to_string(),
-                self.bext.data.originator.to_string(),
-            )),
+            1 => Some(("description".to_string(), self.data.description.to_string())),
+            2 => Some(("originator".to_string(), self.data.originator.to_string())),
             3 => Some((
                 "originator_reference".to_string(),
-                self.bext.data.originator_reference.to_string(),
+                self.data.originator_reference.to_string(),
             )),
             4 => Some((
                 "origination_date".to_string(),
-                self.bext.data.origination_date.to_string(),
+                self.data.origination_date.to_string(),
             )),
             5 => Some((
                 "origination_time".to_string(),
-                self.bext.data.origination_time.to_string(),
+                self.data.origination_time.to_string(),
             )),
             6 => Some((
                 "time_reference".to_string(),
-                self.bext.data.time_reference.to_string(),
+                self.data.time_reference.to_string(),
             )),
-            7 => Some(("version".to_string(), self.bext.data.version.to_string())),
-            8 => Some(("umid".to_string(), hex::encode(self.bext.data.umid))),
+            7 => Some(("version".to_string(), self.data.version.to_string())),
+            8 => Some(("umid".to_string(), hex::encode(self.data.umid))),
             9 => Some((
                 "loudness_value".to_string(),
-                self.bext.data.loudness_value.to_string(),
+                self.data.loudness_value.to_string(),
             )),
             10 => Some((
                 "loudness_range".to_string(),
-                self.bext.data.loudness_range.to_string(),
+                self.data.loudness_range.to_string(),
             )),
             11 => Some((
                 "max_true_peak_level".to_string(),
-                self.bext.data.max_true_peak_level.to_string(),
+                self.data.max_true_peak_level.to_string(),
             )),
             12 => Some((
                 "max_momentary_loudness".to_string(),
-                self.bext.data.max_momentary_loudness.to_string(),
+                self.data.max_momentary_loudness.to_string(),
             )),
             13 => Some((
                 "max_short_term_loudness".to_string(),
-                self.bext.data.max_short_term_loudness.to_string(),
+                self.data.max_short_term_loudness.to_string(),
             )),
             14 => Some((
                 "coding_history".to_string(),
-                self.bext.data.coding_history.clone(),
+                self.data.coding_history.clone(),
             )),
             _ => None,
         }
     }
 }
-
-impl Chunk for BextChunk {}
 
 #[binrw]
 #[brw(little)]
@@ -1815,12 +1768,11 @@ impl Summarizable for ChunkEnum {
             ChunkEnum::Unknown(e) => e.summary(),
         }
     }
-
     /// Returns an iterator over a sequence of contents of the contained
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
-            ChunkEnum::Fmt(e) => Box::new(e.into_iter()),
+            ChunkEnum::Fmt(e) => Box::new(e.items()),
             ChunkEnum::Info(e) => Box::new(e.items()),
             ChunkEnum::Bext(e) => Box::new(e.items()),
             _ => Box::new(std::iter::empty()),
