@@ -161,7 +161,7 @@ fn chunks_for_path(path: &PathBuf) -> Result<String> {
             }
         }
     }
-    output.push_str(&chunks.iter().map(|c| c.trim()).join(", "));
+    output.push_str(&chunks.iter().join(", "));
 
     Ok(output)
 }
