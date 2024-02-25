@@ -11,18 +11,18 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct CsetChunkData {
+pub struct CsetData {
     code_page: u16,
     country_code: CsetCountryCode,
     language: u16,
     dialect: u16,
 }
 
-impl KnownChunkID for CsetChunkData {
+impl KnownChunkID for CsetData {
     const ID: FourCC = FourCC(*b"CSET");
 }
 
-impl Summarizable for CsetChunkData {
+impl Summarizable for CsetData {
     fn summary(&self) -> String {
         let (language, dialect) = cset_ld_map()
             .get(&(self.language, self.dialect))
@@ -40,12 +40,12 @@ impl Summarizable for CsetChunkData {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a CsetChunkData {
+impl<'a> IntoIterator for &'a CsetData {
     type Item = (String, String);
-    type IntoIter = CsetChunkDataIterator<'a>;
+    type IntoIter = CsetDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        CsetChunkDataIterator {
+        CsetDataIterator {
             data: self,
             index: 0,
         }
@@ -53,12 +53,12 @@ impl<'a> IntoIterator for &'a CsetChunkData {
 }
 
 #[derive(Debug)]
-pub struct CsetChunkDataIterator<'a> {
-    data: &'a CsetChunkData,
+pub struct CsetDataIterator<'a> {
+    data: &'a CsetData,
     index: usize,
 }
 
-impl<'a> Iterator for CsetChunkDataIterator<'a> {
+impl<'a> Iterator for CsetDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -91,11 +91,11 @@ impl<'a> Iterator for CsetChunkDataIterator<'a> {
     }
 }
 
-/// `CsetChunk` (CSET) stores character set information. Defined in RIFF1991.
+/// `Cset` (CSET) stores character set information. Defined in RIFF1991.
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type CsetChunk = KnownChunk<CsetChunkData>;
+pub type Cset = KnownChunk<CsetData>;
 
 #[allow(clippy::type_complexity)]
 fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
@@ -280,9 +280,9 @@ mod test {
 
     #[test]
     fn cset_roundtrip() {
-        let cset = CsetChunk {
+        let cset = Cset {
             size: 8,
-            data: CsetChunkData {
+            data: CsetData {
                 code_page: 1,
                 country_code: CsetCountryCode::Known(RiffCountryCode::Canada),
                 language: 12,
@@ -295,7 +295,7 @@ mod test {
         cset.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = CsetChunk::read(&mut buff).unwrap();
+        let after = Cset::read(&mut buff).unwrap();
         assert_eq!(after, cset);
         assert_eq!(after.data.code_page, 1);
         assert_eq!(

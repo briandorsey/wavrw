@@ -5,7 +5,7 @@ use crate::FourCC;
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct RiffChunk {
+pub struct Riff {
     pub id: FourCC,
     pub size: u32,
     pub form_type: FourCC,
@@ -25,10 +25,10 @@ mod test {
         let header = "524946465E09000057415645";
         let mut data = hex_to_cursor(header);
         println!("{header:?}");
-        let wavfile = RiffChunk::read(&mut data).unwrap();
+        let wavfile = Riff::read(&mut data).unwrap();
         assert_eq!(
             wavfile,
-            RiffChunk {
+            Riff {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),

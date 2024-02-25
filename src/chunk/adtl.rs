@@ -7,24 +7,24 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListAdtlChunkData {
-    #[brw(assert(list_type == ListAdtlChunkData::LIST_TYPE))]
+pub struct ListAdtlData {
+    #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
     pub list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
-    // chunks: Vec<AdtlChunk>,
+    // chunks: Vec<ListAdtl>,
     raw: Vec<u8>,
 }
 
-impl ListAdtlChunkData {
+impl ListAdtlData {
     pub const LIST_TYPE: FourCC = FourCC(*b"adtl");
 }
 
-impl KnownChunkID for ListAdtlChunkData {
+impl KnownChunkID for ListAdtlData {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-impl Summarizable for ListAdtlChunkData {
+impl Summarizable for ListAdtlData {
     fn summary(&self) -> String {
         format!("{} ...", self.list_type)
     }
@@ -34,4 +34,4 @@ impl Summarizable for ListAdtlChunkData {
     }
 }
 
-pub type ListAdtlChunk = KnownChunk<ListAdtlChunkData>;
+pub type ListAdtl = KnownChunk<ListAdtlData>;

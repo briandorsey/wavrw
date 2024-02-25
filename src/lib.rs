@@ -14,15 +14,15 @@ use tracing::{instrument, trace_span, warn};
 
 pub mod chunk;
 pub mod testing;
-use crate::chunk::adtl::{ListAdtlChunk, ListAdtlChunkData};
-use crate::chunk::bext::BextChunk;
-use crate::chunk::cset::CsetChunk;
-use crate::chunk::data::DataChunk;
-use crate::chunk::fact::FactChunk;
-use crate::chunk::fmt::FmtChunk;
-use crate::chunk::info::{ListInfoChunk, ListInfoChunkData};
-use crate::chunk::md5::Md5Chunk;
-use crate::chunk::riff::RiffChunk;
+use crate::chunk::adtl::{ListAdtl, ListAdtlData};
+use crate::chunk::bext::Bext;
+use crate::chunk::cset::Cset;
+use crate::chunk::data::Data;
+use crate::chunk::fact::Fact;
+use crate::chunk::fmt::Fmt;
+use crate::chunk::info::{ListInfo, ListInfoData};
+use crate::chunk::md5::Md5;
+use crate::chunk::riff::Riff;
 
 // helper types
 // ----
@@ -216,7 +216,7 @@ where
 
     // TODO: research errors and figure out an error plan for wavrw
     // remove wrapping Result, and map IO and BinErrors to wavrw errors
-    let riff = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
+    let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
     // TODO: convert assert into returned wav error type
     assert_eq!(
         riff.form_type,
@@ -243,21 +243,21 @@ where
         reader.seek(SeekFrom::Current(-8))?;
         let id = FourCC(chunk_id);
         let res = match id {
-            FmtChunk::ID => FmtChunk::read(&mut reader).map(box_chunk),
-            DataChunk::ID => DataChunk::read(&mut reader).map(box_chunk),
-            FactChunk::ID => FactChunk::read(&mut reader).map(box_chunk),
-            ListInfoChunk::ID => {
-                let list = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
+            Fmt::ID => Fmt::read(&mut reader).map(box_chunk),
+            Data::ID => Data::read(&mut reader).map(box_chunk),
+            Fact::ID => Fact::read(&mut reader).map(box_chunk),
+            ListInfo::ID => {
+                let list = Riff::read(&mut reader).map_err(std::io::Error::other)?;
                 reader.seek(SeekFrom::Current(-12))?;
                 match list.form_type {
-                    ListInfoChunkData::LIST_TYPE => ListInfoChunk::read(&mut reader).map(box_chunk),
-                    ListAdtlChunkData::LIST_TYPE => ListAdtlChunk::read(&mut reader).map(box_chunk),
+                    ListInfoData::LIST_TYPE => ListInfo::read(&mut reader).map(box_chunk),
+                    ListAdtlData::LIST_TYPE => ListAdtl::read(&mut reader).map(box_chunk),
                     _ => UnknownChunk::read(&mut reader).map(box_chunk),
                 }
             }
-            CsetChunk::ID => CsetChunk::read(&mut reader).map(box_chunk),
-            BextChunk::ID => BextChunk::read(&mut reader).map(box_chunk),
-            Md5Chunk::ID => Md5Chunk::read(&mut reader).map(box_chunk),
+            Cset::ID => Cset::read(&mut reader).map(box_chunk),
+            Bext::ID => Bext::read(&mut reader).map(box_chunk),
+            Md5::ID => Md5::read(&mut reader).map(box_chunk),
             _ => UnknownChunk::read(&mut reader).map(box_chunk),
         };
         chunks.push(res);
@@ -392,14 +392,14 @@ impl Chunk for UnknownChunk {}
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChunkEnum {
-    Fmt(FmtChunk),
-    Data(DataChunk),
-    Fact(FactChunk),
-    Info(ListInfoChunk),
-    Adtl(ListAdtlChunk),
-    Cset(CsetChunk),
-    Bext(Box<BextChunk>),
-    Md5(Md5Chunk),
+    Fmt(Fmt),
+    Data(Data),
+    Fact(Fact),
+    Info(ListInfo),
+    Adtl(ListAdtl),
+    Cset(Cset),
+    Bext(Box<Bext>),
+    Md5(Md5),
     Unknown(UnknownChunk),
 }
 
@@ -511,9 +511,9 @@ mod test {
 
     #[test]
     fn knownchunk_as_trait() {
-        let md5 = Md5Chunk {
+        let md5 = Md5 {
             size: 16,
-            data: chunk::md5::Md5ChunkData { md5: 0 },
+            data: chunk::md5::Md5Data { md5: 0 },
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
@@ -522,9 +522,9 @@ mod test {
 
     #[test]
     fn chunkenum_as_trait() {
-        let md5 = ChunkEnum::Md5(Md5Chunk {
+        let md5 = ChunkEnum::Md5(Md5 {
             size: 16,
-            data: chunk::md5::Md5ChunkData { md5: 0 },
+            data: chunk::md5::Md5Data { md5: 0 },
             extra_bytes: vec![],
         });
         // ensure trait bounds are satisfied

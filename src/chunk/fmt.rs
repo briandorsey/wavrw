@@ -562,7 +562,7 @@ impl Display for FormatTag {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct FmtChunkData {
+pub struct FmtData {
     pub format_tag: FormatTag,
     pub channels: u16,
     pub samples_per_sec: u32,
@@ -572,11 +572,11 @@ pub struct FmtChunkData {
 }
 // TODO: properly handle different fmt chunk additions from later specs
 
-impl KnownChunkID for FmtChunkData {
+impl KnownChunkID for FmtData {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
-impl Summarizable for FmtChunkData {
+impl Summarizable for FmtData {
     fn summary(&self) -> String {
         format!(
             "{}, {} chan, {}/{}",
@@ -595,12 +595,12 @@ impl Summarizable for FmtChunkData {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a FmtChunkData {
+impl<'a> IntoIterator for &'a FmtData {
     type Item = (String, String);
-    type IntoIter = FmtChunkDataIterator<'a>;
+    type IntoIter = FmtDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FmtChunkDataIterator {
+        FmtDataIterator {
             data: self,
             index: 0,
         }
@@ -608,12 +608,12 @@ impl<'a> IntoIterator for &'a FmtChunkData {
 }
 
 #[derive(Debug)]
-pub struct FmtChunkDataIterator<'a> {
-    data: &'a FmtChunkData,
+pub struct FmtDataIterator<'a> {
+    data: &'a FmtData,
     index: usize,
 }
 
-impl<'a> Iterator for FmtChunkDataIterator<'a> {
+impl<'a> Iterator for FmtDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -638,7 +638,7 @@ impl<'a> Iterator for FmtChunkDataIterator<'a> {
     }
 }
 
-pub type FmtChunk = KnownChunk<FmtChunkData>;
+pub type Fmt = KnownChunk<FmtData>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -651,9 +651,9 @@ mod test {
     #[test]
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
-        let expected = FmtChunk {
+        let expected = Fmt {
             size: 16,
-            data: FmtChunkData {
+            data: FmtData {
                 format_tag: FormatTag::Pcm,
                 channels: 1,
                 samples_per_sec: 48000,
@@ -663,7 +663,7 @@ mod test {
             },
             extra_bytes: vec![],
         };
-        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
+        let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
         // hexdump(remaining_input);
     }

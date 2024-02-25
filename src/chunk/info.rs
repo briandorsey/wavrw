@@ -8,23 +8,23 @@ use crate::{fourcc, ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[br(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListInfoChunkData {
-    #[brw(assert(list_type == ListInfoChunkData::LIST_TYPE))]
+pub struct ListInfoData {
+    #[brw(assert(list_type == ListInfoData::LIST_TYPE))]
     pub list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
-    pub chunks: Vec<InfoChunkEnum>,
+    pub chunks: Vec<InfoEnum>,
 }
 
-impl ListInfoChunkData {
+impl ListInfoData {
     pub const LIST_TYPE: FourCC = FourCC(*b"INFO");
 }
 
-impl KnownChunkID for ListInfoChunkData {
+impl KnownChunkID for ListInfoData {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-impl Summarizable for ListInfoChunkData {
+impl Summarizable for ListInfoData {
     fn summary(&self) -> String {
         format!(
             "{}: {}",
@@ -42,9 +42,9 @@ impl Summarizable for ListInfoChunkData {
     }
 }
 
-pub type ListInfoChunk = KnownChunk<ListInfoChunkData>;
+pub type ListInfo = KnownChunk<ListInfoData>;
 
-/// InfoChunkData is a genericised container for LIST INFO chunks
+/// InfoData is a genericised container for LIST INFO chunks
 ///
 /// A type alias is devfined for all of the INFO types from the initial 1991
 /// WAV spec.
@@ -52,26 +52,26 @@ pub type ListInfoChunk = KnownChunk<ListInfoChunkData>;
 /// # Examples:
 ///
 /// ```
-/// # use wavrw::chunk::info::IcmtChunkData;
-/// let icmt = IcmtChunkData::new("comment");
+/// # use wavrw::chunk::info::IcmtData;
+/// let icmt = IcmtData::new("comment");
 /// ```
 ///
 #[binrw]
 #[br(little)]
 #[derive(PartialEq, Eq)]
-pub struct InfoChunkData<const I: u32> {
+pub struct InfoData<const I: u32> {
     pub value: NullString,
 }
 
-impl<const I: u32> KnownChunkID for InfoChunkData<I> {
+impl<const I: u32> KnownChunkID for InfoData<I> {
     const ID: FourCC = FourCC(I.to_le_bytes());
 }
 
-impl<const I: u32> Debug for InfoChunkData<I> {
+impl<const I: u32> Debug for InfoData<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
-            "InfoChunkData<{}> {{ value: {:?} }}",
+            "InfoData<{}> {{ value: {:?} }}",
             String::from_utf8_lossy(I.to_le_bytes().as_slice()),
             self.value,
         )?;
@@ -79,92 +79,92 @@ impl<const I: u32> Debug for InfoChunkData<I> {
     }
 }
 
-impl<const I: u32> Summarizable for InfoChunkData<I> {
+impl<const I: u32> Summarizable for InfoData<I> {
     fn summary(&self) -> String {
         self.value.to_string()
     }
 }
 
-impl<const I: u32> InfoChunkData<I> {
+impl<const I: u32> InfoData<I> {
     pub fn new(value: &str) -> Self {
-        InfoChunkData::<I> {
+        InfoData::<I> {
             value: value.into(),
         }
     }
 }
 
-pub type IarlChunkData = InfoChunkData<{ fourcc(b"IARL") }>;
-pub type IgnrChunkData = InfoChunkData<{ fourcc(b"IGNR") }>;
-pub type IkeyChunkData = InfoChunkData<{ fourcc(b"IKEY") }>;
-pub type IlgtChunkData = InfoChunkData<{ fourcc(b"ILGT") }>;
-pub type ImedChunkData = InfoChunkData<{ fourcc(b"IMED") }>;
-pub type InamChunkData = InfoChunkData<{ fourcc(b"INAM") }>;
-pub type IpltChunkData = InfoChunkData<{ fourcc(b"IPLT") }>;
-pub type IprdChunkData = InfoChunkData<{ fourcc(b"IPRD") }>;
-pub type IsbjChunkData = InfoChunkData<{ fourcc(b"ISBJ") }>;
-pub type IsftChunkData = InfoChunkData<{ fourcc(b"ISFT") }>;
-pub type IshpChunkData = InfoChunkData<{ fourcc(b"ISHP") }>;
-pub type IartChunkData = InfoChunkData<{ fourcc(b"IART") }>;
-pub type IsrcChunkData = InfoChunkData<{ fourcc(b"ISRC") }>;
-pub type IsrfChunkData = InfoChunkData<{ fourcc(b"ISRF") }>;
-pub type ItchChunkData = InfoChunkData<{ fourcc(b"ITCH") }>;
-pub type IcmsChunkData = InfoChunkData<{ fourcc(b"ICMS") }>;
-pub type IcmtChunkData = InfoChunkData<{ fourcc(b"ICMT") }>;
-pub type IcopChunkData = InfoChunkData<{ fourcc(b"ICOP") }>;
-pub type IcrdChunkData = InfoChunkData<{ fourcc(b"ICRD") }>;
-pub type IcrpChunkData = InfoChunkData<{ fourcc(b"ICRP") }>;
-pub type IdpiChunkData = InfoChunkData<{ fourcc(b"IDPI") }>;
-pub type IengChunkData = InfoChunkData<{ fourcc(b"IENG") }>;
+pub type IarlData = InfoData<{ fourcc(b"IARL") }>;
+pub type IgnrData = InfoData<{ fourcc(b"IGNR") }>;
+pub type IkeyData = InfoData<{ fourcc(b"IKEY") }>;
+pub type IlgtData = InfoData<{ fourcc(b"ILGT") }>;
+pub type ImedData = InfoData<{ fourcc(b"IMED") }>;
+pub type InamData = InfoData<{ fourcc(b"INAM") }>;
+pub type IpltData = InfoData<{ fourcc(b"IPLT") }>;
+pub type IprdData = InfoData<{ fourcc(b"IPRD") }>;
+pub type IsbjData = InfoData<{ fourcc(b"ISBJ") }>;
+pub type IsftData = InfoData<{ fourcc(b"ISFT") }>;
+pub type IshpData = InfoData<{ fourcc(b"ISHP") }>;
+pub type IartData = InfoData<{ fourcc(b"IART") }>;
+pub type IsrcData = InfoData<{ fourcc(b"ISRC") }>;
+pub type IsrfData = InfoData<{ fourcc(b"ISRF") }>;
+pub type ItchData = InfoData<{ fourcc(b"ITCH") }>;
+pub type IcmsData = InfoData<{ fourcc(b"ICMS") }>;
+pub type IcmtData = InfoData<{ fourcc(b"ICMT") }>;
+pub type IcopData = InfoData<{ fourcc(b"ICOP") }>;
+pub type IcrdData = InfoData<{ fourcc(b"ICRD") }>;
+pub type IcrpData = InfoData<{ fourcc(b"ICRP") }>;
+pub type IdpiData = InfoData<{ fourcc(b"IDPI") }>;
+pub type IengData = InfoData<{ fourcc(b"IENG") }>;
 
-pub type IarlChunk = KnownChunk<IarlChunkData>;
-pub type IgnrChunk = KnownChunk<IgnrChunkData>;
-pub type IkeyChunk = KnownChunk<IkeyChunkData>;
-pub type IlgtChunk = KnownChunk<IlgtChunkData>;
-pub type ImedChunk = KnownChunk<ImedChunkData>;
-pub type InamChunk = KnownChunk<InamChunkData>;
-pub type IpltChunk = KnownChunk<IpltChunkData>;
-pub type IprdChunk = KnownChunk<IprdChunkData>;
-pub type IsbjChunk = KnownChunk<IsbjChunkData>;
-pub type IsftChunk = KnownChunk<IsftChunkData>;
-pub type IshpChunk = KnownChunk<IshpChunkData>;
-pub type IartChunk = KnownChunk<IartChunkData>;
-pub type IsrcChunk = KnownChunk<IsrcChunkData>;
-pub type IsrfChunk = KnownChunk<IsrfChunkData>;
-pub type ItchChunk = KnownChunk<ItchChunkData>;
-pub type IcmsChunk = KnownChunk<IcmsChunkData>;
-pub type IcmtChunk = KnownChunk<IcmtChunkData>;
-pub type IcopChunk = KnownChunk<IcopChunkData>;
-pub type IcrdChunk = KnownChunk<IcrdChunkData>;
-pub type IcrpChunk = KnownChunk<IcrpChunkData>;
-pub type IdpiChunk = KnownChunk<IdpiChunkData>;
-pub type IengChunk = KnownChunk<IengChunkData>;
+pub type Iarl = KnownChunk<IarlData>;
+pub type Ignr = KnownChunk<IgnrData>;
+pub type Ikey = KnownChunk<IkeyData>;
+pub type Ilgt = KnownChunk<IlgtData>;
+pub type Imed = KnownChunk<ImedData>;
+pub type Inam = KnownChunk<InamData>;
+pub type Iplt = KnownChunk<IpltData>;
+pub type Iprd = KnownChunk<IprdData>;
+pub type Isbj = KnownChunk<IsbjData>;
+pub type Isft = KnownChunk<IsftData>;
+pub type Ishp = KnownChunk<IshpData>;
+pub type Iart = KnownChunk<IartData>;
+pub type Isrc = KnownChunk<IsrcData>;
+pub type Isrf = KnownChunk<IsrfData>;
+pub type Itch = KnownChunk<ItchData>;
+pub type Icms = KnownChunk<IcmsData>;
+pub type Icmt = KnownChunk<IcmtData>;
+pub type Icop = KnownChunk<IcopData>;
+pub type Icrd = KnownChunk<IcrdData>;
+pub type Icrp = KnownChunk<IcrpData>;
+pub type Idpi = KnownChunk<IdpiData>;
+pub type Ieng = KnownChunk<IengData>;
 
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub enum InfoChunkEnum {
-    Iarl(IarlChunk),
-    Ignr(IgnrChunk),
-    Ikey(IkeyChunk),
-    Ilgt(IlgtChunk),
-    Imed(ImedChunk),
-    Inam(InamChunk),
-    Iplt(IpltChunk),
-    Iprd(IprdChunk),
-    Isbj(IsbjChunk),
-    Isft(IsftChunk),
-    Ishp(IshpChunk),
-    Iart(IartChunk),
-    Isrc(IsrcChunk),
-    Isrf(IsrfChunk),
-    Itch(ItchChunk),
-    Icms(IcmsChunk),
-    Icmt(IcmtChunk),
-    Icop(IcopChunk),
-    Icrd(IcrdChunk),
-    Icrp(IcrpChunk),
-    Idpi(IdpiChunk),
-    Ieng(IengChunk),
+pub enum InfoEnum {
+    Iarl(Iarl),
+    Ignr(Ignr),
+    Ikey(Ikey),
+    Ilgt(Ilgt),
+    Imed(Imed),
+    Inam(Inam),
+    Iplt(Iplt),
+    Iprd(Iprd),
+    Isbj(Isbj),
+    Isft(Isft),
+    Ishp(Ishp),
+    Iart(Iart),
+    Isrc(Isrc),
+    Isrf(Isrf),
+    Itch(Itch),
+    Icms(Icms),
+    Icmt(Icmt),
+    Icop(Icop),
+    Icrd(Icrd),
+    Icrp(Icrp),
+    Idpi(Idpi),
+    Ieng(Ieng),
     Unknown {
         id: FourCC,
         size: u32,
@@ -173,60 +173,60 @@ pub enum InfoChunkEnum {
     },
 }
 
-impl InfoChunkEnum {
+impl InfoEnum {
     pub fn id(&self) -> FourCC {
         match self {
-            InfoChunkEnum::Iarl(e) => e.id(),
-            InfoChunkEnum::Ignr(e) => e.id(),
-            InfoChunkEnum::Ikey(e) => e.id(),
-            InfoChunkEnum::Ilgt(e) => e.id(),
-            InfoChunkEnum::Imed(e) => e.id(),
-            InfoChunkEnum::Inam(e) => e.id(),
-            InfoChunkEnum::Iplt(e) => e.id(),
-            InfoChunkEnum::Iprd(e) => e.id(),
-            InfoChunkEnum::Isbj(e) => e.id(),
-            InfoChunkEnum::Isft(e) => e.id(),
-            InfoChunkEnum::Ishp(e) => e.id(),
-            InfoChunkEnum::Iart(e) => e.id(),
-            InfoChunkEnum::Isrc(e) => e.id(),
-            InfoChunkEnum::Isrf(e) => e.id(),
-            InfoChunkEnum::Itch(e) => e.id(),
-            InfoChunkEnum::Icms(e) => e.id(),
-            InfoChunkEnum::Icmt(e) => e.id(),
-            InfoChunkEnum::Icop(e) => e.id(),
-            InfoChunkEnum::Icrd(e) => e.id(),
-            InfoChunkEnum::Icrp(e) => e.id(),
-            InfoChunkEnum::Idpi(e) => e.id(),
-            InfoChunkEnum::Ieng(e) => e.id(),
-            InfoChunkEnum::Unknown { id, .. } => *id,
+            InfoEnum::Iarl(e) => e.id(),
+            InfoEnum::Ignr(e) => e.id(),
+            InfoEnum::Ikey(e) => e.id(),
+            InfoEnum::Ilgt(e) => e.id(),
+            InfoEnum::Imed(e) => e.id(),
+            InfoEnum::Inam(e) => e.id(),
+            InfoEnum::Iplt(e) => e.id(),
+            InfoEnum::Iprd(e) => e.id(),
+            InfoEnum::Isbj(e) => e.id(),
+            InfoEnum::Isft(e) => e.id(),
+            InfoEnum::Ishp(e) => e.id(),
+            InfoEnum::Iart(e) => e.id(),
+            InfoEnum::Isrc(e) => e.id(),
+            InfoEnum::Isrf(e) => e.id(),
+            InfoEnum::Itch(e) => e.id(),
+            InfoEnum::Icms(e) => e.id(),
+            InfoEnum::Icmt(e) => e.id(),
+            InfoEnum::Icop(e) => e.id(),
+            InfoEnum::Icrd(e) => e.id(),
+            InfoEnum::Icrp(e) => e.id(),
+            InfoEnum::Idpi(e) => e.id(),
+            InfoEnum::Ieng(e) => e.id(),
+            InfoEnum::Unknown { id, .. } => *id,
         }
     }
 
     pub fn value(&self) -> String {
         match self {
-            InfoChunkEnum::Iarl(e) => e.data.value.to_string(),
-            InfoChunkEnum::Ignr(e) => e.data.value.to_string(),
-            InfoChunkEnum::Ikey(e) => e.data.value.to_string(),
-            InfoChunkEnum::Ilgt(e) => e.data.value.to_string(),
-            InfoChunkEnum::Imed(e) => e.data.value.to_string(),
-            InfoChunkEnum::Inam(e) => e.data.value.to_string(),
-            InfoChunkEnum::Iplt(e) => e.data.value.to_string(),
-            InfoChunkEnum::Iprd(e) => e.data.value.to_string(),
-            InfoChunkEnum::Isbj(e) => e.data.value.to_string(),
-            InfoChunkEnum::Isft(e) => e.data.value.to_string(),
-            InfoChunkEnum::Ishp(e) => e.data.value.to_string(),
-            InfoChunkEnum::Iart(e) => e.data.value.to_string(),
-            InfoChunkEnum::Isrc(e) => e.data.value.to_string(),
-            InfoChunkEnum::Isrf(e) => e.data.value.to_string(),
-            InfoChunkEnum::Itch(e) => e.data.value.to_string(),
-            InfoChunkEnum::Icms(e) => e.data.value.to_string(),
-            InfoChunkEnum::Icmt(e) => e.data.value.to_string(),
-            InfoChunkEnum::Icop(e) => e.data.value.to_string(),
-            InfoChunkEnum::Icrd(e) => e.data.value.to_string(),
-            InfoChunkEnum::Icrp(e) => e.data.value.to_string(),
-            InfoChunkEnum::Idpi(e) => e.data.value.to_string(),
-            InfoChunkEnum::Ieng(e) => e.data.value.to_string(),
-            InfoChunkEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
+            InfoEnum::Iarl(e) => e.data.value.to_string(),
+            InfoEnum::Ignr(e) => e.data.value.to_string(),
+            InfoEnum::Ikey(e) => e.data.value.to_string(),
+            InfoEnum::Ilgt(e) => e.data.value.to_string(),
+            InfoEnum::Imed(e) => e.data.value.to_string(),
+            InfoEnum::Inam(e) => e.data.value.to_string(),
+            InfoEnum::Iplt(e) => e.data.value.to_string(),
+            InfoEnum::Iprd(e) => e.data.value.to_string(),
+            InfoEnum::Isbj(e) => e.data.value.to_string(),
+            InfoEnum::Isft(e) => e.data.value.to_string(),
+            InfoEnum::Ishp(e) => e.data.value.to_string(),
+            InfoEnum::Iart(e) => e.data.value.to_string(),
+            InfoEnum::Isrc(e) => e.data.value.to_string(),
+            InfoEnum::Isrf(e) => e.data.value.to_string(),
+            InfoEnum::Itch(e) => e.data.value.to_string(),
+            InfoEnum::Icms(e) => e.data.value.to_string(),
+            InfoEnum::Icmt(e) => e.data.value.to_string(),
+            InfoEnum::Icop(e) => e.data.value.to_string(),
+            InfoEnum::Icrd(e) => e.data.value.to_string(),
+            InfoEnum::Icrp(e) => e.data.value.to_string(),
+            InfoEnum::Idpi(e) => e.data.value.to_string(),
+            InfoEnum::Ieng(e) => e.data.value.to_string(),
+            InfoEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
         }
     }
 }
@@ -242,9 +242,9 @@ mod test {
 
     #[test]
     fn infochunk_roundtrip() {
-        let icmt = InfoChunkEnum::Icmt(IcmtChunk {
+        let icmt = InfoEnum::Icmt(Icmt {
             size: 8,
-            data: IcmtChunkData {
+            data: IcmtData {
                 value: NullString("comment".into()),
             },
             extra_bytes: vec![],
@@ -254,7 +254,7 @@ mod test {
         icmt.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = InfoChunkEnum::read(&mut buff).unwrap();
+        let after = InfoEnum::read(&mut buff).unwrap();
         assert_eq!(after, icmt);
     }
 
@@ -265,17 +265,17 @@ mod test {
         let mut buff =
             hex_to_cursor("49434D54 15000000 62657874 20636875 6E6B2074 65737420 66696C65 00");
         // parse via explicit chunk type
-        let icmt = IcmtChunk::read(&mut buff).unwrap();
+        let icmt = Icmt::read(&mut buff).unwrap();
         dbg!(&icmt);
         assert_eq!(icmt.id(), FourCC(*b"ICMT"));
         assert_eq!(icmt.data.value, "bext chunk test file".into());
 
         // parse via enum wrapper this time
         buff.set_position(0);
-        let en = InfoChunkEnum::read(&mut buff).unwrap();
+        let en = InfoEnum::read(&mut buff).unwrap();
         dbg!(&en);
         assert_eq!(en.id(), FourCC(*b"ICMT"));
-        let InfoChunkEnum::Icmt(icmt) = en else {
+        let InfoEnum::Icmt(icmt) = en else {
             unreachable!("should have been ICMT")
         };
         assert_eq!(icmt.data.value, "bext chunk test file".into());
@@ -286,11 +286,11 @@ mod test {
         // buff contains INFO chunk with two odd length'd inner chunks
         // handling the WORD padding incorrectly can break parsing
         // if infochunk_small_valid() passes, but this fails, error is
-        // likely in the ListInfoChunk wrapping
+        // likely in the ListInfo wrapping
         let mut buff = hex_to_cursor(
         "4C495354 38000000 494E464F 49534654 0D000000 42574620 4D657461 45646974 00004943 4D541500 00006265 78742063 68756E6B 20746573 74206669 6C6500"
             );
-        let list = ListInfoChunk::read(&mut buff).unwrap();
+        let list = ListInfo::read(&mut buff).unwrap();
         assert_eq!(list.id(), FourCC(*b"LIST"));
 
         // parse via enum wrapper this time
@@ -298,23 +298,23 @@ mod test {
         let chunk = ChunkEnum::read(&mut buff).map(box_chunk).unwrap();
         assert_eq!(chunk.id(), FourCC(*b"LIST"));
 
-        // let list = ListInfoChunk::read(&mut buff).unwrap();
+        // let list = ListInfo::read(&mut buff).unwrap();
         // assert_eq!(
     }
 
     #[test]
     fn infochunk_debug_string() {
-        let icmt = IcmtChunkData {
+        let icmt = IcmtData {
             value: NullString("comment".into()),
         };
-        assert!(format!("{icmt:?}").starts_with("InfoChunkData<ICMT>"));
+        assert!(format!("{icmt:?}").starts_with("InfoData<ICMT>"));
     }
 
     #[test]
     fn icmtchunk_as_trait() {
-        let icmt = IcmtChunk {
+        let icmt = Icmt {
             size: 8,
-            data: IcmtChunkData::new("comment"),
+            data: IcmtData::new("comment"),
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied

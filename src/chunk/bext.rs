@@ -10,7 +10,7 @@ use crate::{FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct BextChunkData {
+pub struct BextData {
     /// Description of the sound sequence
     pub description: FixedStr<256>, // Description
     /// Name of the originator
@@ -46,13 +46,13 @@ pub struct BextChunkData {
     pub coding_history: String, // CodingHistory
 }
 
-impl KnownChunkID for BextChunkData {
+impl KnownChunkID for BextData {
     const ID: FourCC = FourCC(*b"bext");
 }
 
-pub type BextChunk = KnownChunk<BextChunkData>;
+pub type Bext = KnownChunk<BextData>;
 
-impl Summarizable for BextChunkData {
+impl Summarizable for BextData {
     fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
@@ -65,12 +65,12 @@ impl Summarizable for BextChunkData {
     }
 }
 
-impl<'a> IntoIterator for &'a BextChunkData {
+impl<'a> IntoIterator for &'a BextData {
     type Item = (String, String);
-    type IntoIter = BextChunkDataIterator<'a>;
+    type IntoIter = BextDataIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        BextChunkDataIterator {
+        BextDataIterator {
             data: self,
             index: 0,
         }
@@ -78,12 +78,12 @@ impl<'a> IntoIterator for &'a BextChunkData {
 }
 
 #[derive(Debug)]
-pub struct BextChunkDataIterator<'a> {
-    data: &'a BextChunkData,
+pub struct BextDataIterator<'a> {
+    data: &'a BextData,
     index: usize,
 }
 
-impl<'a> Iterator for BextChunkDataIterator<'a> {
+impl<'a> Iterator for BextDataIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -175,7 +175,7 @@ mod test {
             00000000 00000000 00000000 00000000 00000000 00000000 0000436F 
             64696E67 48697374 6F7279"#,
         );
-        let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
+        let bext = Bext::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
             bext.data.description,

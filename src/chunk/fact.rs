@@ -5,27 +5,27 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct FactChunkData {
+pub struct FactData {
     pub samples: u32,
 }
 
-impl KnownChunkID for FactChunkData {
+impl KnownChunkID for FactData {
     const ID: FourCC = FourCC(*b"fact");
 }
 
-impl SizedChunk for FactChunkData {
+impl SizedChunk for FactData {
     fn size(&self) -> u32 {
         4
     }
 }
 
-impl Summarizable for FactChunkData {
+impl Summarizable for FactData {
     fn summary(&self) -> String {
         format!("{} samples", self.samples)
     }
 }
 
-pub type FactChunk = KnownChunk<FactChunkData>;
+pub type Fact = KnownChunk<FactData>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -41,7 +41,7 @@ mod test {
         // handling the WORD padding incorrectly can break parsing
         let mut buff = hex_to_cursor("66616374 04000000 E0010000");
         // parse via explicit chunk type
-        let fact = FactChunk::read(&mut buff).unwrap();
+        let fact = Fact::read(&mut buff).unwrap();
         dbg!(&fact);
         assert_eq!(fact.id(), FourCC(*b"fact"));
         assert_eq!(fact.data.samples, 480);

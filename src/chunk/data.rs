@@ -6,16 +6,16 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-pub struct DataChunkData {}
+pub struct DataData {}
 
-impl KnownChunkID for DataChunkData {
+impl KnownChunkID for DataData {
     const ID: FourCC = FourCC(*b"data");
 }
 
-impl Summarizable for DataChunkData {
+impl Summarizable for DataData {
     fn summary(&self) -> String {
         "audio data".to_string()
     }
 }
 
-pub type DataChunk = KnownChunk<DataChunkData>;
+pub type Data = KnownChunk<DataData>;
