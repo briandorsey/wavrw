@@ -68,8 +68,24 @@ impl<'a> Iterator for CsetChunkDataIterator<'a> {
                 "country_code".to_string(),
                 self.data.country_code.to_string(),
             )),
-            3 => Some(("language".to_string(), self.data.language.to_string())),
-            4 => Some(("dialect".to_string(), self.data.dialect.to_string())),
+            3 => {
+                let (language, _) = cset_ld_map()
+                    .get(&(self.data.language, self.data.dialect))
+                    .unwrap_or(&("Unknown", "Unknown"));
+                Some((
+                    "language".to_string(),
+                    format!("{language}({})", self.data.language.to_string()),
+                ))
+            }
+            4 => {
+                let (_, dialect) = cset_ld_map()
+                    .get(&(self.data.language, self.data.dialect))
+                    .unwrap_or(&("Unknown", "Unknown"));
+                Some((
+                    "dialect".to_string(),
+                    format!("{dialect}({})", self.data.dialect.to_string()),
+                ))
+            }
             _ => None,
         }
     }
