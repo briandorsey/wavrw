@@ -47,7 +47,8 @@ pub trait Summarizable: ChunkID {
     /// User friendly name of the chunk, usually the chunk id
     ///
     /// An ascii friendly chunk name, with whitespace removed. Chunks with
-    /// subtypes use their subtype as the name. Ex: LIST-INFO is INFO
+    /// sub types (forms, in RIFF terms) use their sub type as the name.
+    /// Ex: `ListInfoChunk` is "INFO".    
     fn name(&self) -> String {
         self.id().to_string().trim().to_string()
     }

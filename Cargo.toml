@@ -25,10 +25,12 @@ unsafe_code = "forbid"
 
 missing_debug_implementations = "deny"
 
-missing_crate_level_docs = "warn"
 future_incompatible = "warn"
 nonstandard_style = "warn"
 rust_2018_idioms = "warn"
+
+[lints.rustdoc]
+missing_crate_level_docs = "warn"
 
 [lints.clippy]
 unwrap_used = "warn"
