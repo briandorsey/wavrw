@@ -14,15 +14,15 @@ use tracing::{instrument, trace_span, warn};
 
 pub mod chunk;
 pub mod testing;
-use crate::chunk::adtl::{ListAdtl, ListAdtlData};
-use crate::chunk::bext::Bext;
-use crate::chunk::cset::Cset;
-use crate::chunk::data::Data;
-use crate::chunk::fact::Fact;
-use crate::chunk::fmt::Fmt;
-use crate::chunk::info::{ListInfo, ListInfoData};
-use crate::chunk::md5::Md5;
-use crate::chunk::riff::Riff;
+use crate::chunk::Bext;
+use crate::chunk::Cset;
+use crate::chunk::Data;
+use crate::chunk::Fact;
+use crate::chunk::Fmt;
+use crate::chunk::Md5;
+use crate::chunk::Riff;
+use crate::chunk::{ListAdtl, ListAdtlData};
+use crate::chunk::{ListInfo, ListInfoData};
 
 // helper types
 // ----
@@ -513,7 +513,7 @@ mod test {
     fn knownchunk_as_trait() {
         let md5 = Md5 {
             size: 16,
-            data: chunk::md5::Md5Data { md5: 0 },
+            data: chunk::Md5Data { md5: 0 },
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
@@ -524,7 +524,7 @@ mod test {
     fn chunkenum_as_trait() {
         let md5 = ChunkEnum::Md5(Md5 {
             size: 16,
-            data: chunk::md5::Md5Data { md5: 0 },
+            data: chunk::Md5Data { md5: 0 },
             extra_bytes: vec![],
         });
         // ensure trait bounds are satisfied
