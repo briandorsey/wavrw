@@ -159,14 +159,22 @@ fn chunks_for_path(path: &PathBuf) -> Result<String> {
     let mut chunks: Vec<String> = vec![];
 
     let file = File::open(path)?;
-    for res in wavrw::metadata_chunks(file)? {
-        match res {
-            Ok(chunk) => {
-                chunks.push(chunk.name());
+    let parse_res = wavrw::metadata_chunks(file);
+    match parse_res {
+        Ok(it) => {
+            for chunk_res in it {
+                match chunk_res {
+                    Ok(chunk) => {
+                        chunks.push(chunk.name());
+                    }
+                    Err(err) => {
+                        println!("ERROR: {err}");
+                    }
+                }
             }
-            Err(err) => {
-                println!("ERROR: {err}");
-            }
+        }
+        Err(err) => {
+            println!("ERROR: {err}");
         }
     }
     output.push_str(&chunks.iter().join(", "));
