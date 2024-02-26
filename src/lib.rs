@@ -21,6 +21,7 @@ use crate::chunk::Data;
 use crate::chunk::Fact;
 use crate::chunk::Fmt;
 use crate::chunk::Md5;
+use crate::chunk::Plst;
 use crate::chunk::Riff;
 use crate::chunk::{ListAdtl, ListAdtlData};
 use crate::chunk::{ListInfo, ListInfoData};
@@ -263,6 +264,7 @@ where
             }
             Cue::ID => Cue::read(&mut reader).map(box_chunk),
             Cset::ID => Cset::read(&mut reader).map(box_chunk),
+            Plst::ID => Plst::read(&mut reader).map(box_chunk),
             Bext::ID => Bext::read(&mut reader).map(box_chunk),
             Md5::ID => Md5::read(&mut reader).map(box_chunk),
             _ => UnknownChunk::read(&mut reader).map(box_chunk),

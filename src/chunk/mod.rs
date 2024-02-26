@@ -7,6 +7,7 @@ mod fact;
 mod fmt;
 mod info;
 mod md5;
+mod plst;
 mod riff;
 
 pub use adtl::{ListAdtl, ListAdtlData};
@@ -18,6 +19,7 @@ pub use fact::{Fact, FactData};
 pub use fmt::{Fmt, FmtData, FormatTag};
 pub use info::{ListInfo, ListInfoData};
 pub use md5::{Md5, Md5Data};
+pub use plst::{Plst, PlstData, PlstSegment};
 pub use riff::Riff;
 
 pub use info::{
