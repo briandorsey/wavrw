@@ -33,13 +33,6 @@ impl CuePoint {
             self.sample_offset,
         )
     }
-
-    //     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-    //         let mut items: Vec<(String, String)> = Vec::new();
-    //         items.push(("name".to_string(), format!("{}", self.name)));
-    //         items.push(("position".to_string(), format!("{}", self.position)));
-    //         Box::new(items.into_iter())
-    //     }
 }
 
 #[binrw]
@@ -81,35 +74,6 @@ impl Summarizable for CueData {
 
     fn name(&self) -> String {
         self.id().to_string().trim().to_string()
-    }
-}
-
-impl<'a> IntoIterator for &'a CueData {
-    type Item = (String, String);
-    type IntoIter = CueDataIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        CueDataIterator {
-            data: self,
-            index: 0,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CueDataIterator<'a> {
-    data: &'a CueData,
-    index: usize,
-}
-
-impl<'a> Iterator for CueDataIterator<'a> {
-    type Item = (String, String);
-    fn next(&mut self) -> Option<(String, String)> {
-        self.index += 1;
-        match self.index {
-            1 => Some(("cue_points".to_string(), self.data.cue_points.to_string())),
-            _ => None,
-        }
     }
 }
 
