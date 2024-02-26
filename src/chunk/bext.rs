@@ -226,12 +226,4 @@ mod test {
         assert_eq!(bext.data.reserved.len(), 180, "reserved");
         assert_eq!(bext.data.coding_history, "CodingHistory", "coding_history");
     }
-
-    #[test]
-    fn decode_spaces() {
-        let a = &decode("666D7420 10000000 01000100 80BB0000 80320200 03001800".replace(' ', ""))
-            .unwrap();
-        let b = &decode("666D7420100000000100010080BB00008032020003001800").unwrap();
-        assert_eq!(a, b);
-    }
 }

@@ -1,6 +1,7 @@
 mod adtl;
 mod bext;
 mod cset;
+mod cue;
 mod data;
 mod fact;
 mod fmt;
@@ -11,6 +12,7 @@ mod riff;
 pub use adtl::{ListAdtl, ListAdtlData};
 pub use bext::{Bext, BextData};
 pub use cset::{Cset, CsetCountryCode, CsetData};
+pub use cue::{Cue, CueData, CuePoint};
 pub use data::{Data, DataData};
 pub use fact::{Fact, FactData};
 pub use fmt::{Fmt, FmtData, FormatTag};

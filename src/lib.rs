@@ -16,6 +16,7 @@ pub mod chunk;
 pub mod testing;
 use crate::chunk::Bext;
 use crate::chunk::Cset;
+use crate::chunk::Cue;
 use crate::chunk::Data;
 use crate::chunk::Fact;
 use crate::chunk::Fmt;
@@ -65,6 +66,11 @@ pub trait Summarizable: ChunkID {
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(std::iter::empty())
+    }
+
+    /// Alternative header for use above `items`
+    fn item_summary_header(&self) -> String {
+        self.summary()
     }
 }
 
@@ -255,6 +261,7 @@ where
                     _ => UnknownChunk::read(&mut reader).map(box_chunk),
                 }
             }
+            Cue::ID => Cue::read(&mut reader).map(box_chunk),
             Cset::ID => Cset::read(&mut reader).map(box_chunk),
             Bext::ID => Bext::read(&mut reader).map(box_chunk),
             Md5::ID => Md5::read(&mut reader).map(box_chunk),
@@ -345,6 +352,10 @@ where
     }
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         self.data.items()
+    }
+
+    fn item_summary_header(&self) -> String {
+        self.data.item_summary_header()
     }
 }
 
@@ -470,8 +481,18 @@ impl Chunk for ChunkEnum {}
 #[cfg(test)]
 mod test {
 
+    use hex::decode;
+
     use super::*;
     use crate::testing::hex_to_cursor;
+
+    #[test]
+    fn decode_spaces() {
+        let a = &decode("666D7420 10000000 01000100 80BB0000 80320200 03001800".replace(' ', ""))
+            .unwrap();
+        let b = &decode("666D7420100000000100010080BB00008032020003001800").unwrap();
+        assert_eq!(a, b);
+    }
 
     #[test]
     fn fixed_string() {

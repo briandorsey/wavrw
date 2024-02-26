@@ -65,15 +65,14 @@ fn view(config: &ViewConfig) -> Result<()> {
         for res in wavrw::metadata_chunks(file)? {
             match res {
                 Ok(chunk) => {
-                    println!(
-                        "{:12} {:8} {:>10} {}",
-                        offset,
-                        chunk.id(),
-                        chunk.size(),
-                        // TODO: truncate summary & add ... when long
-                        chunk.summary()
-                    );
                     if config.detailed {
+                        println!(
+                            "{:12} {:8} {:>10} {}",
+                            offset,
+                            chunk.id(),
+                            chunk.size(),
+                            chunk.item_summary_header()
+                        );
                         let mut had_items = false;
                         for (key, value) in chunk.items() {
                             had_items = true;
@@ -82,6 +81,15 @@ fn view(config: &ViewConfig) -> Result<()> {
                         if had_items {
                             println!("             --------------------------------------");
                         }
+                    } else {
+                        println!(
+                            "{:12} {:8} {:>10} {}",
+                            offset,
+                            chunk.id(),
+                            chunk.size(),
+                            // TODO: truncate summary & add ... when long
+                            chunk.summary()
+                        );
                     }
                     // remove offset calculations once handled by metadata_chunks()
                     offset += chunk.size() + 8;
