@@ -338,7 +338,7 @@ where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 {
     fn size(&self) -> u32 {
-        self.size + self.extra_bytes.len() as u32
+        self.size
     }
 }
 
