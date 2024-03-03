@@ -63,6 +63,10 @@ impl Summarizable for BextData {
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(self.into_iter())
     }
+
+    fn item_summary_header(&self) -> String {
+        String::new()
+    }
 }
 
 impl<'a> IntoIterator for &'a BextData {
