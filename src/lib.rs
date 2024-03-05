@@ -293,12 +293,14 @@ where
 // parsing structs
 // ----
 
+type KCArgs = (u32,);
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 /// `KnownChunk` is a wrapper around chunk data, handling ID and size.
 pub struct KnownChunk<
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+    T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
     #[br(temp, assert(id == T::ID))]
     #[bw(calc = T::ID)]
@@ -311,7 +313,7 @@ pub struct KnownChunk<
     #[bw(ignore)]
     begin_pos: PosValue<()>,
     // ensure that we don't read outside the bounds for this chunk
-    #[br(map_stream = |r| r.take_seek(size as u64))]
+    #[br(map_stream = |r| r.take_seek(size as u64), args(size))]
     data: T,
 
     // assert for better error message if too many bytes processed
@@ -328,14 +330,14 @@ pub struct KnownChunk<
 
 impl<T> KnownChunkID for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+    T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 {
     const ID: FourCC = T::ID;
 }
 
 impl<T> SizedChunk for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+    T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 {
     fn size(&self) -> u32 {
         self.size
@@ -344,7 +346,7 @@ where
 
 impl<T> Summarizable for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()>
+    T: for<'a> BinRead<Args<'a> = KCArgs>
         + for<'a> BinWrite<Args<'a> = ()>
         + KnownChunkID
         + Summarizable,
@@ -362,7 +364,7 @@ where
 }
 
 impl<T> Chunk for KnownChunk<T> where
-    T: for<'a> BinRead<Args<'a> = ()>
+    T: for<'a> BinRead<Args<'a> = KCArgs>
         + for<'a> BinWrite<Args<'a> = ()>
         + KnownChunkID
         + Summarizable

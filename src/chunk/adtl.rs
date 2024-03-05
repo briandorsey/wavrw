@@ -6,6 +6,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[br(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListAdtlData {
     #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]

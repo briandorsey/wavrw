@@ -37,6 +37,7 @@ impl CuePoint {
 
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CueData {
     /// Count of cue points. The number of times the cue-point struct repeats within this chunk.

@@ -4,6 +4,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct FactData {
     pub samples: u32,

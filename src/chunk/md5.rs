@@ -5,6 +5,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 // based on https://mediaarea.net/BWFMetaEdit/md5
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Md5Data {
     pub md5: u128,

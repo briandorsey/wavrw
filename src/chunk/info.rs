@@ -7,6 +7,7 @@ use crate::{fourcc, ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[br(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInfoData {
     #[brw(assert(list_type == ListInfoData::LIST_TYPE))]
@@ -58,6 +59,7 @@ pub type ListInfo = KnownChunk<ListInfoData>;
 ///
 #[binrw]
 #[br(little)]
+#[br(import(_size: u32))]
 #[derive(PartialEq, Eq)]
 pub struct InfoData<const I: u32> {
     pub value: NullString,

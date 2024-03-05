@@ -21,6 +21,7 @@ impl PlstSegment {
 
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlstData {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.

@@ -9,6 +9,7 @@ use crate::{FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 // that is a superset of ASCII and many WAV files contain utf8 strings here
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct BextData {
     /// Description of the sound sequence

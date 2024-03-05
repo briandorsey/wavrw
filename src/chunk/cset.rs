@@ -10,6 +10,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[brw(little)]
+#[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CsetData {
     code_page: u16,
