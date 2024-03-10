@@ -178,18 +178,18 @@ fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
     let mut out = String::new();
 
     let mut offset: u32 = 12;
-    println!("      offset id         size summary");
+    println!("      offset id              size summary");
 
     for res in wavrw::metadata_chunks(file)? {
         match res {
             Ok(chunk) => {
                 writeln!(
                     out,
-                    "{:12} {:8} {:10} {}",
+                    "{:12} {:9} {:10} {}",
                     offset,
-                    chunk.id(),
+                    chunk.name(),
                     chunk.size(),
-                    trim(&chunk.summary(), config.width.saturating_sub(30))
+                    trim(&chunk.summary(), config.width.saturating_sub(29))
                 )?;
 
                 // remove offset calculations once handled by metadata_chunks()
@@ -211,16 +211,16 @@ fn view_detailed(file: File) -> Result<String> {
     let mut out = String::new();
 
     let mut offset: u32 = 12;
-    println!("      offset id         size summary");
+    println!("      offset id              size summary");
 
     for res in wavrw::metadata_chunks(file)? {
         match res {
             Ok(chunk) => {
                 writeln!(
                     out,
-                    "{:12} {:8} {:10} {}",
+                    "{:12} {:9} {:10} {}",
                     offset,
-                    chunk.id(),
+                    chunk.name(),
                     chunk.size(),
                     chunk.item_summary_header()
                 )?;

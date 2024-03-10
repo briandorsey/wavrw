@@ -27,11 +27,7 @@ impl KnownChunkID for ListInfoData {
 
 impl Summarizable for ListInfoData {
     fn summary(&self) -> String {
-        format!(
-            "{}: {}",
-            self.list_type,
-            self.chunks.iter().map(|c| c.id()).join(", ")
-        )
+        format!("{}", self.chunks.iter().map(|c| c.id()).join(", "))
     }
 
     fn name(&self) -> String {
@@ -40,6 +36,10 @@ impl Summarizable for ListInfoData {
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(self.chunks.iter().map(|c| (c.id().to_string(), c.value())))
+    }
+
+    fn item_summary_header(&self) -> String {
+        "chunk: text".to_string()
     }
 }
 

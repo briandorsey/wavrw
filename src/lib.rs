@@ -98,7 +98,7 @@ fn box_chunk<T: Chunk + 'static>(t: T) -> Box<dyn Chunk> {
 
 #[binrw]
 #[brw(big)]
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
