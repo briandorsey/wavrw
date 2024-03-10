@@ -367,6 +367,10 @@ where
     fn item_summary_header(&self) -> String {
         self.data.item_summary_header()
     }
+
+    fn name(&self) -> String {
+        self.data.name()
+    }
 }
 
 impl<T> Chunk for KnownChunk<T> where
