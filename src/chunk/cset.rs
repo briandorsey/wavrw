@@ -75,7 +75,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
                     .unwrap_or(&("Unknown", "Unknown"));
                 Some((
                     "language".to_string(),
-                    format!("{language}({})", self.data.language.to_string()),
+                    format!("{language}({})", self.data.language),
                 ))
             }
             4 => {
@@ -84,7 +84,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
                     .unwrap_or(&("Unknown", "Unknown"));
                 Some((
                     "dialect".to_string(),
-                    format!("{dialect}({})", self.data.dialect.to_string()),
+                    format!("{dialect}({})", self.data.dialect),
                 ))
             }
             _ => None,
@@ -134,7 +134,7 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RiffCountryCode {
-    USA = 0x1,
+    UnitedStates = 0x1,
     Canada = 0x2,
     LatinAmerica = 0x3,
     Greece = 0x30,
@@ -170,7 +170,7 @@ impl Display for RiffCountryCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         use RiffCountryCode::*;
         let output = match self {
-            USA => "USA",
+            UnitedStates => "USA",
             Canada => "Canada",
             LatinAmerica => "Latin America",
             Greece => "Greece",

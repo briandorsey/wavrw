@@ -96,7 +96,7 @@ struct ChunksConfig {
     recurse: bool,
 }
 
-fn trim(text: String, width: u16) -> String {
+fn trim(text: &str, width: u16) -> String {
     let text = text.replace('\r', "");
     let mut text = text.replace('\n', "");
     let padded_width: usize = width.saturating_sub(4).into();
@@ -114,7 +114,7 @@ fn trim(text: String, width: u16) -> String {
         text.truncate(upto);
         text.push_str(" ...");
     }
-    text.into()
+    text
 }
 
 fn view(config: &ViewConfig) -> Result<()> {
@@ -133,13 +133,13 @@ fn view(config: &ViewConfig) -> Result<()> {
 
         match config.format {
             Format::Line => {
-                println!("{}", view_line(file)?)
+                println!("{}", view_line(file)?);
             }
             Format::Summary => {
-                println!("{}", view_summary(file, config)?)
+                println!("{}", view_summary(file, config)?);
             }
             Format::Detailed => {
-                println!("{}", view_detailed(file)?)
+                println!("{}", view_detailed(file)?);
             }
         }
     }
@@ -189,7 +189,7 @@ fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
                     offset,
                     chunk.id(),
                     chunk.size(),
-                    trim(chunk.summary(), config.width.saturating_sub(30))
+                    trim(&chunk.summary(), config.width.saturating_sub(30))
                 )?;
 
                 // remove offset calculations once handled by metadata_chunks()

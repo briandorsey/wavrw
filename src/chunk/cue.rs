@@ -26,11 +26,7 @@ impl CuePoint {
     fn summary(&self) -> String {
         format!(
             "{:7}, {}, {:7}, {:7}, {:7}",
-            self.position,
-            self.chunk_id.to_string(),
-            self.chunk_start,
-            self.block_start,
-            self.sample_offset,
+            self.position, self.chunk_id, self.chunk_start, self.block_start, self.sample_offset,
         )
     }
 }
