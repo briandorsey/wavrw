@@ -35,7 +35,7 @@ impl Summarizable for ListInfoData {
     }
 
     fn name(&self) -> String {
-        self.list_type.to_string().trim().to_string()
+        format!("{}-{}", self.id(), self.list_type)
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {

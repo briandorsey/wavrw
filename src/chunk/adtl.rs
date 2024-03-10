@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use binrw::{binrw, helpers};
 
-use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[br(little)]
@@ -31,7 +31,7 @@ impl Summarizable for ListAdtlData {
     }
 
     fn name(&self) -> String {
-        self.list_type.to_string().trim().to_string()
+        format!("{}-{}", self.id(), self.list_type)
     }
 }
 
