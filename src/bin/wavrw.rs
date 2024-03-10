@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{crate_version, ArgAction, Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
-use tracing::{debug, Level};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -119,6 +119,15 @@ fn trim(text: String, width: u16) -> String {
 
 fn view(config: &ViewConfig) -> Result<()> {
     for path in &config.wav_path {
+        let path = PathBuf::from(path);
+        if path.is_dir() {
+            println!(
+                "{} is a directory, skipping. Consider using 'list' command for directories.",
+                path.display()
+            );
+            continue;
+        }
+
         println!("{}", path.to_string_lossy());
         let file = File::open(path)?;
 
