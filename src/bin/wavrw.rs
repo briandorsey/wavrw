@@ -3,15 +3,14 @@
 #![deny(missing_docs)]
 
 use std::ffi::OsString;
+use std::fmt::Write;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::Seek;
-use std::io::SeekFrom;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{crate_version, ArgAction, Parser, Subcommand};
+use clap::{crate_version, ArgAction, Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -39,9 +38,18 @@ struct WavrwArgs {
 enum Commands {
     /// Summarize WAV file structure and metadata
     View(ViewConfig),
-    /// List chunks contained in files, one per line
-    Chunks(ChunksConfig),
+    /// List directories of files, show single line summary of chunks
+    List(ChunksConfig),
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+enum Format {
+    Line,
+    Summary,
+    Detailed,
+}
+
+const WIDTH_DEFAULT: u16 = 80;
 
 #[derive(Parser, Debug)]
 #[command(long_about = None)]
@@ -49,17 +57,43 @@ struct ViewConfig {
     /// One or more paths to WAV files
     wav_path: Vec<OsString>,
 
-    /// show detailed info for each chunk
-    #[arg(long, short)]
-    detailed: bool,
+    /// output format
+    #[arg(long, short, value_enum, default_value_t = Format::Summary)]
+    format: Format,
 
     #[arg(
         long,
-        short = 'w',
-        default_value_t = 80,
+       short = 'w',
+        default_value_t = WIDTH_DEFAULT,
         help = "trim output to <WIDTH> columns"
     )]
     width: u16,
+}
+
+impl Default for ViewConfig {
+    fn default() -> Self {
+        ViewConfig {
+            wav_path: vec![],
+            format: Format::Summary,
+            width: WIDTH_DEFAULT,
+        }
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command(long_about = None)]
+struct ChunksConfig {
+    /// directory to list
+    #[arg(default_value = ".")]
+    path: OsString,
+
+    /// case insensitive file extensions to include
+    #[arg(long, short, default_value_os = "wav")]
+    ext: Vec<OsString>,
+
+    /// recurse through subdirectories as well
+    #[arg(long, short, default_value_t = false)]
+    recurse: bool,
 }
 
 fn trim(text: String, width: u16) -> String {
@@ -86,108 +120,28 @@ fn trim(text: String, width: u16) -> String {
 fn view(config: &ViewConfig) -> Result<()> {
     for path in &config.wav_path {
         println!("{}", path.to_string_lossy());
-        let mut file = File::open(path)?;
-        file.seek(SeekFrom::Start(0))?;
-        let mut offset: u32 = 12;
-        println!("      offset id         size summary");
+        let file = File::open(path)?;
 
-        for res in wavrw::metadata_chunks(file)? {
-            match res {
-                Ok(chunk) => {
-                    if config.detailed {
-                        println!(
-                            "{:12} {:8} {:10} {}",
-                            offset,
-                            chunk.id(),
-                            chunk.size(),
-                            chunk.item_summary_header()
-                        );
-                        let mut had_items = false;
-                        for (key, value) in chunk.items() {
-                            had_items = true;
-                            println!("             |{key:>23} : {value}");
-                        }
-                        if had_items {
-                            println!("             --------------------------------------");
-                        }
-                    } else {
-                        println!(
-                            "{:12} {:8} {:10} {}",
-                            offset,
-                            chunk.id(),
-                            chunk.size(),
-                            // trim to config.width minus width of previous text
-                            trim(chunk.summary(), config.width.saturating_sub(30))
-                        );
-                    }
-                    // remove offset calculations once handled by metadata_chunks()
-                    offset += chunk.size() + 8;
-                    // RIFF offsets must be on word boundaries (divisible by 2)
-                    if offset % 2 == 1 {
-                        offset += 1;
-                    };
-                }
-                Err(err) => {
-                    println!("ERROR: {err}");
-                }
+        match config.format {
+            Format::Line => {
+                println!("{}", view_line(file)?)
+            }
+            Format::Summary => {
+                println!("{}", view_summary(file, config)?)
+            }
+            Format::Detailed => {
+                println!("{}", view_detailed(file)?)
             }
         }
     }
     Ok(())
 }
 
-#[derive(Parser, Debug)]
-#[command(long_about = None)]
-struct ChunksConfig {
-    /// directory to list
-    #[arg(default_value = ".")]
-    path: OsString,
-
-    /// case insensitive file extensions to include
-    #[arg(long, short, default_value_os = "wav")]
-    ext: Vec<OsString>,
-
-    /// recurse through subdirectories as well
-    #[arg(long, short, default_value_t = false)]
-    recurse: bool,
-}
-
-fn chunks(config: &ChunksConfig) -> Result<()> {
-    walk_paths(&config.path.clone().into(), config)?;
-    Ok(())
-}
-
-fn walk_paths(base_path: &PathBuf, config: &ChunksConfig) -> Result<()> {
-    debug!("directory: {base_path:?}");
-
-    let mut paths = fs::read_dir(base_path)?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-    paths.sort_unstable();
-    for path in paths {
-        if path.is_dir() & config.recurse {
-            walk_paths(&path, config)?;
-        } else if let Some(ext) = path.extension() {
-            let ext = ext.to_ascii_lowercase();
-            if !config.ext.contains(&ext) {
-                continue;
-            }
-            // eprintln!("--------> {path:?}");
-            println!(
-                "{}: {}",
-                &path.strip_prefix(base_path)?.display(),
-                chunks_for_path(&path)?
-            );
-        }
-    }
-    Ok(())
-}
-
-fn chunks_for_path(path: &PathBuf) -> Result<String> {
-    let mut output = String::new();
+fn view_line(file: File) -> Result<String> {
+    let mut out = String::new();
+    out.push_str("    ");
     let mut chunks: Vec<String> = vec![];
 
-    let file = File::open(path)?;
     let parse_res = wavrw::metadata_chunks(file);
     match parse_res {
         Ok(it) => {
@@ -206,9 +160,112 @@ fn chunks_for_path(path: &PathBuf) -> Result<String> {
             println!("ERROR: {err}");
         }
     }
-    output.push_str(&chunks.iter().join(", "));
+    out.push_str(&chunks.iter().join(", "));
 
-    Ok(output)
+    Ok(out)
+}
+
+fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
+    let mut out = String::new();
+
+    let mut offset: u32 = 12;
+    println!("      offset id         size summary");
+
+    for res in wavrw::metadata_chunks(file)? {
+        match res {
+            Ok(chunk) => {
+                writeln!(
+                    out,
+                    "{:12} {:8} {:10} {}",
+                    offset,
+                    chunk.id(),
+                    chunk.size(),
+                    trim(chunk.summary(), config.width.saturating_sub(30))
+                )?;
+
+                // remove offset calculations once handled by metadata_chunks()
+                offset += chunk.size() + 8;
+                // RIFF offsets must be on word boundaries (divisible by 2)
+                if offset % 2 == 1 {
+                    offset += 1;
+                };
+            }
+            Err(err) => {
+                println!("ERROR: {err}");
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn view_detailed(file: File) -> Result<String> {
+    let mut out = String::new();
+
+    let mut offset: u32 = 12;
+    println!("      offset id         size summary");
+
+    for res in wavrw::metadata_chunks(file)? {
+        match res {
+            Ok(chunk) => {
+                writeln!(
+                    out,
+                    "{:12} {:8} {:10} {}",
+                    offset,
+                    chunk.id(),
+                    chunk.size(),
+                    chunk.item_summary_header()
+                )?;
+                let mut had_items = false;
+                for (key, value) in chunk.items() {
+                    had_items = true;
+                    writeln!(out, "             |{key:>23} : {value}")?;
+                }
+                if had_items {
+                    writeln!(out, "             --------------------------------------")?;
+                }
+
+                // remove offset calculations once handled by metadata_chunks()
+                offset += chunk.size() + 8;
+                // RIFF offsets must be on word boundaries (divisible by 2)
+                if offset % 2 == 1 {
+                    offset += 1;
+                };
+            }
+            Err(err) => {
+                println!("ERROR: {err}");
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn chunks(config: &ChunksConfig) -> Result<()> {
+    walk_paths(&config.path.clone().into(), config)?;
+    Ok(())
+}
+
+fn walk_paths(base_path: &PathBuf, config: &ChunksConfig) -> Result<()> {
+    let mut paths = fs::read_dir(base_path)?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, io::Error>>()?;
+    paths.sort_unstable();
+    for path in paths {
+        if path.is_dir() & config.recurse {
+            walk_paths(&path, config)?;
+        } else if let Some(ext) = path.extension() {
+            let ext = ext.to_ascii_lowercase();
+            if !config.ext.contains(&ext) {
+                continue;
+            }
+
+            view(&ViewConfig {
+                wav_path: vec![path.into()],
+                format: Format::Line,
+                ..Default::default()
+            })?;
+        }
+    }
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -222,7 +279,7 @@ fn main() -> Result<()> {
     match &mut args.command {
         Commands::View(config) => view(config),
 
-        Commands::Chunks(config) => {
+        Commands::List(config) => {
             // TODO: figure out how to do this in CLAP
             for ext in &mut config.ext {
                 ext.make_ascii_lowercase();
