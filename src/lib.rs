@@ -122,6 +122,12 @@ impl From<&[u8; 4]> for FourCC {
     }
 }
 
+impl<'a> PartialEq<&'a [u8; 4]> for FourCC {
+    fn eq(&self, other: &&'a [u8; 4]) -> bool {
+        self == FourCC(**other)
+    }
+}
+
 // needed for assert in br() attribute
 impl<'a> PartialEq<&'a FourCC> for FourCC {
     fn eq(&self, other: &&'a FourCC) -> bool {

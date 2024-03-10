@@ -128,7 +128,7 @@ fn view(config: &ViewConfig) -> Result<()> {
             continue;
         }
 
-        println!("{}", path.to_string_lossy());
+        print!("{}: ", path.to_string_lossy());
         let file = File::open(path)?;
 
         match config.format {
@@ -148,16 +148,18 @@ fn view(config: &ViewConfig) -> Result<()> {
 
 fn view_line(file: File) -> Result<String> {
     let mut out = String::new();
-    out.push_str("    ");
-    let mut chunks: Vec<String> = vec![];
+    let mut chunk_strings: Vec<String> = vec![];
 
     let parse_res = wavrw::metadata_chunks(file);
     match parse_res {
         Ok(it) => {
             for chunk_res in it {
                 match chunk_res {
+                    Ok(chunk) if chunk.id() == b"LIST" => {
+                        chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
+                    }
                     Ok(chunk) => {
-                        chunks.push(chunk.name());
+                        chunk_strings.push(chunk.name());
                     }
                     Err(err) => {
                         println!("ERROR: {err}");
@@ -165,21 +167,21 @@ fn view_line(file: File) -> Result<String> {
                 }
             }
         }
+
         Err(err) => {
             println!("ERROR: {err}");
         }
     }
-    out.push_str(&chunks.iter().join(", "));
+    out.push_str(&chunk_strings.iter().join(", "));
 
     Ok(out)
 }
 
 fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
-    let mut out = String::new();
+    let mut out = "\n".to_string();
+    writeln!(out, "      offset id              size summary")?;
 
     let mut offset: u32 = 12;
-    println!("      offset id              size summary");
-
     for res in wavrw::metadata_chunks(file)? {
         match res {
             Ok(chunk) => {
@@ -208,11 +210,10 @@ fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
 }
 
 fn view_detailed(file: File) -> Result<String> {
-    let mut out = String::new();
+    let mut out = "\n".to_string();
+    writeln!(out, "      offset id              size summary")?;
 
     let mut offset: u32 = 12;
-    println!("      offset id              size summary");
-
     for res in wavrw::metadata_chunks(file)? {
         match res {
             Ok(chunk) => {
