@@ -52,6 +52,35 @@ struct ViewConfig {
     /// show detailed info for each chunk
     #[arg(long, short)]
     detailed: bool,
+
+    #[arg(
+        long,
+        short = 'w',
+        default_value_t = 80,
+        help = "trim output to <WIDTH> columns"
+    )]
+    width: u16,
+}
+
+fn trim(text: String, width: u16) -> String {
+    let text = text.replace('\r', "");
+    let mut text = text.replace('\n', "");
+    let padded_width: usize = width.saturating_sub(4).into();
+
+    // truncate based on unicode chars
+    if text.chars().count() > padded_width {
+        // .truncate takes byte offsets and panics if not on a char boundary,
+        // so we need to find the offset by iterating over chars
+        let upto = text
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(padded_width)
+            .unwrap_or(text.len());
+
+        text.truncate(upto);
+        text.push_str(" ...");
+    }
+    text.into()
 }
 
 fn view(config: &ViewConfig) -> Result<()> {
@@ -67,7 +96,7 @@ fn view(config: &ViewConfig) -> Result<()> {
                 Ok(chunk) => {
                     if config.detailed {
                         println!(
-                            "{:12} {:8} {:>10} {}",
+                            "{:12} {:8} {:10} {}",
                             offset,
                             chunk.id(),
                             chunk.size(),
@@ -83,12 +112,12 @@ fn view(config: &ViewConfig) -> Result<()> {
                         }
                     } else {
                         println!(
-                            "{:12} {:8} {:>10} {}",
+                            "{:12} {:8} {:10} {}",
                             offset,
                             chunk.id(),
                             chunk.size(),
-                            // TODO: truncate summary & add ... when long
-                            chunk.summary()
+                            // trim to config.width minus width of previous text
+                            trim(chunk.summary(), config.width.saturating_sub(30))
                         );
                     }
                     // remove offset calculations once handled by metadata_chunks()
