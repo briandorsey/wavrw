@@ -28,17 +28,14 @@ impl KnownChunkID for ListAdtlData {
 
 impl Summarizable for ListAdtlData {
     fn summary(&self) -> String {
-        format!(
-            "{}",
-            self.chunks
-                .iter()
-                .into_grouping_map_by(|c| c.id())
-                .fold(0, |acc, _key, _value| acc + 1)
-                .iter()
-                .map(|(g, c)| format!("{}({})", g, c))
-                .sorted_unstable()
-                .join(", ")
-        )
+        self.chunks
+            .iter()
+            .into_grouping_map_by(|c| c.id())
+            .fold(0, |acc, _key, _value| acc + 1)
+            .iter()
+            .map(|(g, c)| format!("{}({})", g, c))
+            .sorted_unstable()
+            .join(", ")
     }
 
     fn name(&self) -> String {
@@ -76,11 +73,11 @@ impl KnownChunkID for LablData {
 
 impl Summarizable for LablData {
     fn summary(&self) -> String {
-        format!("{:>3}, {}", self.name, self.text.to_string())
+        format!("{:>3}, {}", self.name, self.text)
     }
 }
 
-/// The `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
+/// The `labl` chunk contains a label, or title, to associate with a [`CuePoint`][super::CuePoint].
 pub type Labl = KnownChunk<LablData>;
 
 #[binrw]
@@ -101,11 +98,11 @@ impl KnownChunkID for NoteData {
 
 impl Summarizable for NoteData {
     fn summary(&self) -> String {
-        format!("{:>3}, {}", self.name, self.text.to_string())
+        format!("{:>3}, {}", self.name, self.text)
     }
 }
 
-/// The `note` chunk contains comment text for a [CuePoint][super::CuePoint].
+/// The `note` chunk contains comment text for a [`CuePoint`][super::CuePoint].
 pub type Note = KnownChunk<NoteData>;
 
 #[binrw]
@@ -149,7 +146,7 @@ impl Summarizable for LtxtData {
             "{:>3}, len:{}, purpose:{}, {}",
             self.name,
             self.sample_length,
-            FourCC(self.purpose.to_le_bytes()).to_string(),
+            FourCC(self.purpose.to_le_bytes()),
             String::from_utf8_lossy(&self.text)
         )
     }
@@ -186,7 +183,7 @@ impl Summarizable for FileData {
         format!(
             "{:>3}, media_type:{}, {} bytes",
             self.name,
-            FourCC(self.media_type.to_le_bytes()).to_string(),
+            FourCC(self.media_type.to_le_bytes()),
             self.file_data.len()
         )
     }

@@ -27,7 +27,7 @@ impl KnownChunkID for ListInfoData {
 
 impl Summarizable for ListInfoData {
     fn summary(&self) -> String {
-        format!("{}", self.chunks.iter().map(|c| c.id()).join(", "))
+        self.chunks.iter().map(|c| c.id()).join(", ")
     }
 
     fn name(&self) -> String {
