@@ -9,12 +9,13 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
+/// The associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub struct ListAdtlData {
     #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
     pub list_type: FourCC,
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
-    chunks: Vec<AdtlEnum>,
+    pub chunks: Vec<AdtlEnum>,
 }
 
 impl ListAdtlData {
@@ -56,14 +57,19 @@ impl Summarizable for ListAdtlData {
     }
 }
 
+/// The associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub type ListAdtl = KnownChunk<ListAdtlData>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(PartialEq, Eq)]
+/// The `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
 pub struct LablData {
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
+
+    /// Specifies a NULL-terminated string containing a text label.
     pub text: NullString,
 }
 
@@ -84,19 +90,107 @@ impl Summarizable for LablData {
     }
 }
 
+/// The `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
 pub type Labl = KnownChunk<LablData>;
 
-// impl LablData {
-//     pub fn new(text: &str) -> Self {
-//         LablData { text: text.into() }
-//     }
-// }
+#[binrw]
+#[br(little)]
+#[br(import(_size: u32))]
+#[derive(PartialEq, Eq)]
+/// The `note` chunk contains comment text for a [CuePoint][super::CuePoint].
+pub struct NoteData {
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    pub name: u32,
+    /// Specifies a NULL-terminated string containing comment text.
+    pub text: NullString,
+}
+
+impl KnownChunkID for NoteData {
+    const ID: FourCC = FourCC(*b"note");
+}
+
+impl Debug for NoteData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "NoteData<{}> {{ value: {:?} }}", NoteData::ID, self.text,)?;
+        Ok(())
+    }
+}
+
+impl Summarizable for NoteData {
+    fn summary(&self) -> String {
+        format!("{:>3}, {}", self.name, self.text.to_string())
+    }
+}
+
+/// The `note` chunk contains comment text for a [CuePoint][super::CuePoint].
+pub type Note = KnownChunk<NoteData>;
+
+#[binrw]
+#[br(little)]
+#[br(import(size: u32))]
+#[derive(PartialEq, Eq)]
+/// The `ltxt` chunk contains text that is associated with a data segment of specific length.
+pub struct LtxtData {
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    pub name: u32,
+
+    /// Specifies the number of samples in the segment of waveform data. 	...>sample_length
+    pub sample_length: u32,
+
+    /// Specifies the type or purpose of the text. For example, dwPurpose can specify a FOURCC code like 'scrp' for script text or 'capt' for close-caption text. 	...>purpose
+    pub purpose: u32,
+
+    /// Specifies the country code for the text. See "Country Codes" in CSET chunk, for a current list of country codes. 	...>country_code
+    pub country_code: u16,
+
+    /// Specify the language for the text. See "Language and Dialect Codes" in CSET chunk, for a current list of language and dialect codes. 	...>language
+    pub language: u16,
+
+    /// Specify the dialect codes for the text. See "Language and Dialect Codes" in CSET chunk, for a current list of language and dialect codes. 	...>dialect
+    pub dialect: u16,
+
+    ///	Specifies the code page for the text. See CSET chunk for details. 	...>code_page
+    pub code_page: u16,
+
+    #[br(align_after = 2, count = size as u64 -4 -4 -4 -2 -2 -2 -2)]
+    pub text: Vec<u8>,
+}
+
+impl KnownChunkID for LtxtData {
+    const ID: FourCC = FourCC(*b"ltxt");
+}
+
+impl Debug for LtxtData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "LtxtData<{}> {{ value: {:?} }}", LtxtData::ID, self.text,)?;
+        Ok(())
+    }
+}
+
+impl Summarizable for LtxtData {
+    fn summary(&self) -> String {
+        format!(
+            "{:>3}, len:{}, purpose:{}, {}",
+            self.name,
+            self.sample_length,
+            FourCC(self.purpose.to_le_bytes()).to_string(),
+            String::from_utf8_lossy(&self.text)
+        )
+    }
+}
+
+/// The `ltxt` chunk contains text that is associated with a data segment of specific length.
+pub type Ltxt = KnownChunk<LtxtData>;
+
+//NOTE: Implemented from the spec only, because I couldn’t find any files actually containing this chunk.
 
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum AdtlEnum {
     Labl(Labl),
+    Note(Note),
+    Ltxt(Ltxt),
     Unknown {
         id: FourCC,
         size: u32,
@@ -108,6 +202,8 @@ impl AdtlEnum {
     pub fn id(&self) -> FourCC {
         match self {
             AdtlEnum::Labl(e) => e.id(),
+            AdtlEnum::Note(e) => e.id(),
+            AdtlEnum::Ltxt(e) => e.id(),
             AdtlEnum::Unknown { id, .. } => *id,
         }
     }
@@ -115,7 +211,34 @@ impl AdtlEnum {
     pub fn summary(&self) -> String {
         match self {
             AdtlEnum::Labl(e) => e.summary(),
+            AdtlEnum::Note(e) => e.summary(),
+            AdtlEnum::Ltxt(e) => e.summary(),
             AdtlEnum::Unknown { .. } => "...".to_string(),
         }
     }
 }
+
+#[allow(clippy::dbg_macro)]
+#[cfg(test)]
+mod test {
+    use binrw::BinRead;
+
+    use super::*;
+    use crate::testing::hex_to_cursor;
+
+    #[test]
+    fn adtl_valid() {
+        let mut buff = hex_to_cursor(
+"4C495354 24010000 6164746C 6C747874 14000000 01000000 81212000 72676E20 00000000 00000000 6C61626C 10000000 01000000 316B2040 202D3130 64420000 6C747874 14000000 02000000 D5A66400 72676E20 00000000 00000000 6C61626C 0E000000 02000000 316B487A 20546573 74006C74 78741400 00000300 00006A23 05007267 6E200000 00000000 00006C61 626C0A00 00000300 00004469 72616300 6C747874 14000000 04000000 22130200 72676E20 00000000 00000000 6C61626C 0A000000 04000000 43686972 70006E6F 74650800 00000400 00004C6F 67006C74 78741400 00000500 0000CF38 3A007267 6E200000 00000000 00006C61 626C0C00 00000500 00005377 65657020 00006E6F 74651600 00000500 00003130 487A2D39 366B487A 20333020 53656300"
+            );
+
+        let adtl = ListAdtl::read(&mut buff).unwrap();
+        dbg!(&adtl);
+        assert_eq!(adtl.id(), FourCC(*b"LIST"));
+        assert_eq!(adtl.data.list_type, FourCC(*b"adtl"));
+        assert_eq!(adtl.data.chunks.len(), 12);
+        assert_eq!(adtl.data.chunks[3].id(), FourCC(*b"labl"));
+        assert_eq!(adtl.data.chunks[3].summary(), "  2, 1kHz Test");
+    }
+}
+// 300 bytes
