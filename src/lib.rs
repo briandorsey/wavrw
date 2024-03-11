@@ -233,13 +233,13 @@ where
     // TODO: research errors and figure out an error plan for wavrw
     // remove wrapping Result, and map IO and BinErrors to wavrw errors
     let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
-    // TODO: convert assert into returned wav error type
-    assert_eq!(
-        riff.form_type,
-        FourCC(*b"WAVE"),
-        "{} != WAVE",
-        riff.form_type
-    );
+    // TODO: convert this temp error into returned wavrw error type
+    if riff.form_type != FourCC(*b"WAVE") {
+        return Err(std::io::Error::other(format!(
+            "not a wave file. Expected RIFF form_type 'WAVE', found: {}",
+            riff.form_type
+        )));
+    }
 
     let mut buff: [u8; 4] = [0; 4];
     let mut offset = reader.stream_position()?;

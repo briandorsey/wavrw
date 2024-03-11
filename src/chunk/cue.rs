@@ -25,7 +25,7 @@ pub struct CuePoint {
 impl CuePoint {
     fn summary(&self) -> String {
         format!(
-            "{:7}, {}, {:7}, {:7}, {:7}",
+            "{:10}, {}, {:10}, {:10}, {:10}",
             self.position, self.chunk_id, self.chunk_start, self.block_start, self.sample_offset,
         )
     }

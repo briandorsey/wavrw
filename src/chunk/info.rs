@@ -53,7 +53,7 @@ pub type ListInfo = KnownChunk<ListInfoData>;
 /// # Examples:
 ///
 /// ```
-/// # use wavrw::chunk::IcmtData;
+/// # use wavrw::chunk::info::IcmtData;
 /// let icmt = IcmtData::new("comment");
 /// ```
 ///
