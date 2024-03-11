@@ -14,6 +14,8 @@ use tracing::{instrument, trace_span, warn};
 
 pub mod chunk;
 pub mod testing;
+use crate::chunk::adtl::{ListAdtl, ListAdtlData};
+use crate::chunk::info::{ListInfo, ListInfoData};
 use crate::chunk::Bext;
 use crate::chunk::Cset;
 use crate::chunk::Cue;
@@ -26,8 +28,6 @@ use crate::chunk::Md5;
 use crate::chunk::Pad;
 use crate::chunk::Plst;
 use crate::chunk::Riff;
-use crate::chunk::{ListAdtl, ListAdtlData};
-use crate::chunk::{ListInfo, ListInfoData};
 
 // helper types
 // ----
