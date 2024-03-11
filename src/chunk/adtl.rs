@@ -36,6 +36,7 @@ impl Summarizable for ListAdtlData {
                 .fold(0, |acc, _key, _value| acc + 1)
                 .iter()
                 .map(|(g, c)| format!("{}({})", g, c))
+                .sorted_unstable()
                 .join(", ")
         )
     }
@@ -50,10 +51,6 @@ impl Summarizable for ListAdtlData {
                 .iter()
                 .map(|c| (c.id().to_string(), c.summary())),
         )
-    }
-
-    fn item_summary_header(&self) -> String {
-        "chunk: summary".to_string()
     }
 }
 
