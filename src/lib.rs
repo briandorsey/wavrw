@@ -69,7 +69,7 @@ pub trait ChunkID {
     fn id(&self) -> FourCC;
 }
 
-pub trait SizedChunk: ChunkID {
+pub trait SizedChunk: Summarizable + Debug {
     /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
 }
@@ -99,7 +99,7 @@ pub trait Summarizable: ChunkID {
     }
 }
 
-pub trait Chunk: SizedChunk + Summarizable + Debug {}
+pub trait Chunk: Summarizable + Debug {}
 
 impl<T> ChunkID for T
 where
@@ -113,7 +113,7 @@ where
 // Helper for cleaner Result.map() calls when boxing inner chunk.
 // Reduces code repetition, but mostly helps the compiler with type
 // inference.
-fn box_chunk<T: Chunk + 'static>(t: T) -> Box<dyn Chunk> {
+fn box_chunk<T: SizedChunk + 'static>(t: T) -> Box<dyn SizedChunk> {
     Box::new(t)
 }
 
@@ -246,7 +246,7 @@ impl<const N: usize> BinRead for FixedStr<N> {
 ///
 /// It attempts to continue parsing even if some chunks have parsing errors.
 #[instrument]
-pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn Chunk>>>, std::io::Error>
+pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn SizedChunk>>>, std::io::Error>
 where
     R: Read + Seek + Debug,
 {
@@ -265,7 +265,7 @@ where
 
     let mut buff: [u8; 4] = [0; 4];
     let mut offset = reader.stream_position()?;
-    let mut chunks: Vec<BinResult<Box<dyn Chunk>>> = Vec::new();
+    let mut chunks: Vec<BinResult<Box<dyn SizedChunk>>> = Vec::new();
 
     loop {
         let _span_ = trace_span!("metadata_chunks_loop").entered();
@@ -371,7 +371,11 @@ where
 
 impl<T> SizedChunk for KnownChunk<T>
 where
-    T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
+    T: for<'a> BinRead<Args<'a> = KCArgs>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable
+        + Debug,
 {
     fn size(&self) -> u32 {
         self.size
