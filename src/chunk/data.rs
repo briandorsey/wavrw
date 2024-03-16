@@ -4,7 +4,7 @@ use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
-/// `data` chunk parser which skips all audio data
+/// `data` chunk contains audio data, this parser skips all audio data (for now).
 #[binrw]
 #[brw(little)]
 #[br(import(size: u32))]

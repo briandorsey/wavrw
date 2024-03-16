@@ -12,6 +12,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
+/// `CSET` chunk contains character set information. Defined in RIFF1991.
 pub struct CsetData {
     code_page: u16,
     country_code: CsetCountryCode,
@@ -92,7 +93,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
     }
 }
 
-/// `Cset` (CSET) stores character set information. Defined in RIFF1991.
+/// `CSET` chunk contains character set information. Defined in RIFF1991.
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.

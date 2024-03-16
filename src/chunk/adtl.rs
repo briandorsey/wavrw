@@ -9,7 +9,7 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
-/// The associated data list provides the ability to attach information like labels to sections of the waveform data stream.
+/// Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub struct ListAdtlData {
     #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
     pub list_type: FourCC,
@@ -51,14 +51,14 @@ impl Summarizable for ListAdtlData {
     }
 }
 
-/// The associated data list provides the ability to attach information like labels to sections of the waveform data stream.
+/// Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub type ListAdtl = KnownChunk<ListAdtlData>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
-/// The `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
+/// `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
 pub struct LablData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
@@ -77,14 +77,14 @@ impl Summarizable for LablData {
     }
 }
 
-/// The `labl` chunk contains a label, or title, to associate with a [`CuePoint`][super::CuePoint].
+/// `labl` chunk contains a label, or title, to associate with a [`CuePoint`][super::CuePoint].
 pub type Labl = KnownChunk<LablData>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
-/// The `note` chunk contains comment text for a [CuePoint][super::CuePoint].
+/// `note` chunk contains comment text for a [CuePoint][super::CuePoint].
 pub struct NoteData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
@@ -102,14 +102,14 @@ impl Summarizable for NoteData {
     }
 }
 
-/// The `note` chunk contains comment text for a [`CuePoint`][super::CuePoint].
+/// `note` chunk contains comment text for a [`CuePoint`][super::CuePoint].
 pub type Note = KnownChunk<NoteData>;
 
 #[binrw]
 #[br(little)]
 #[br(import(size: u32))]
 #[derive(Debug, PartialEq, Eq)]
-/// The `ltxt` chunk contains text that is associated with a data segment of specific length.
+/// `ltxt` chunk contains text that is associated with a data segment of specific length.
 pub struct LtxtData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
@@ -152,14 +152,14 @@ impl Summarizable for LtxtData {
     }
 }
 
-/// The `ltxt` chunk contains text that is associated with a data segment of specific length.
+/// `ltxt` chunk contains text that is associated with a data segment of specific length.
 pub type Ltxt = KnownChunk<LtxtData>;
 
 #[binrw]
 #[br(little)]
 #[br(import(size: u32))]
 #[derive(Debug, PartialEq, Eq)]
-/// The 'file' chunk contains information described in other file formats (for example, an 'RDIB' file or an ASCII text file).
+/// `file` chunk contains information described in other file formats (for example, an 'RDIB' file or an ASCII text file).
 ///
 /// NOTE: Implemented from the spec only, because I couldn’t find any files actually containing this chunk.
 pub struct FileData {
@@ -189,7 +189,7 @@ impl Summarizable for FileData {
     }
 }
 
-/// The 'file' chunk contains information described in other file formats (for example, an 'RDIB' file or an ASCII text file).
+/// `file` chunk contains information described in other file formats (for example, an 'RDIB' file or an ASCII text file).
 ///
 /// NOTE: Implemented from the spec only, because I couldn’t find any files actually containing this chunk.
 pub type File = KnownChunk<FileData>;

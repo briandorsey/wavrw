@@ -23,6 +23,7 @@ impl PlstSegment {
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, PartialEq, Eq)]
+/// `plst` chunk contains character set information. Defined in RIFF1991.
 pub struct PlstData {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.
     pub segment_count: u32, // dwSegments
@@ -34,7 +35,7 @@ impl KnownChunkID for PlstData {
     const ID: FourCC = FourCC(*b"plst");
 }
 
-/// `Plst` (plst) stores character set information. Defined in RIFF1991.
+/// `plst` chunk contains character set information. Defined in RIFF1991.
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.

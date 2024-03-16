@@ -1,5 +1,26 @@
-//! `wavrw` provides tools for reading (and someday writing) wave audio  file
-//! chunks with a focus on metadata.
+//! Read (and someday write) wave audio file chunks with a focus on metadata.
+//!
+//! This is the API reference documentation, it is a bit dry.
+//!
+//! ```
+//! # use std::fs::File;
+//! let file = File::open("test_wavs/example_a.wav")?;
+//! for res in wavrw::metadata_chunks(file)? {
+//!     match res {
+//!         Ok(chunk) => {
+//!             println!(
+//!                 "{:12} {:10} {}",
+//!                 chunk.name(),
+//!                 chunk.size(),
+//!                 chunk.summary()
+//!             );
+//!         }
+//!         Err(err) => {
+//!             println!("ERROR: {err}");
+//!         }
+//!     }
+//! }
+//! # Ok::<(), std::io::Error>(())
 
 use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
@@ -60,8 +81,8 @@ pub trait Summarizable: ChunkID {
     /// User friendly name of the chunk, usually the chunk id
     ///
     /// An ascii friendly chunk name, with whitespace removed. Chunks with
-    /// sub types (forms, in RIFF terms) use their sub type as the name.
-    /// Ex: `ListInfoChunk` is "INFO".    
+    /// sub types (forms, in RIFF terms) include their sub type in the name.
+    /// Ex: [`ListInfo`] is "LIST-INFO".    
     fn name(&self) -> String {
         self.id().to_string().trim().to_string()
     }
@@ -145,7 +166,7 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 pub struct FixedStrErr;
 
 #[derive(BinWrite, PartialEq, Eq)]
-/// `FixedStr` holds Null terminated fixed length strings (from BEXT for example)
+/// Null terminated fixed length strings (from INFO or BEXT for example).
 ///
 /// `FixedStr` is intended to be used via binrw's [`BinRead`] trait and its
 /// Null parsing is implmented there. Do not directly create the struct
@@ -221,8 +242,9 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
-/// `metadata_chunks` parses a WAV file chunk by chunk, continuing
-///  even if some chunks have parsing errors.
+/// Parses a WAV file chunk by chunk.
+///
+/// It attempts to continue parsing even if some chunks have parsing errors.
 #[instrument]
 pub fn metadata_chunks<R>(reader: R) -> Result<Vec<BinResult<Box<dyn Chunk>>>, std::io::Error>
 where
@@ -310,23 +332,23 @@ type KCArgs = (u32,);
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Eq)]
-/// `KnownChunk` is a wrapper around chunk data, handling ID and size.
+/// A generic wrapper around chunk data, handling ID, size and padding.
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
     #[br(temp, assert(id == T::ID))]
     #[bw(calc = T::ID)]
-    id: FourCC,
+    pub id: FourCC,
 
     // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-    size: u32,
+    pub size: u32,
 
     #[br(temp)]
     #[bw(ignore)]
     begin_pos: PosValue<()>,
     // ensure that we don't read outside the bounds for this chunk
     #[br(map_stream = |r| r.take_seek(size as u64), args(size))]
-    data: T,
+    pub data: T,
 
     // assert for better error message if too many bytes processed
     // seems like it should be impossible, but found a case where T
@@ -337,7 +359,7 @@ pub struct KnownChunk<
 
     // calculate how much was read, and read any extra bytes that remain in the chunk
     #[br(align_after = 2, count = size as u64 - (end_pos.pos - begin_pos.pos))]
-    extra_bytes: Vec<u8>,
+    pub extra_bytes: Vec<u8>,
 }
 
 impl<T> KnownChunkID for KnownChunk<T>

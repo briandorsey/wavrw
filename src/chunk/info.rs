@@ -45,13 +45,22 @@ impl Summarizable for ListInfoData {
 
 pub type ListInfo = KnownChunk<ListInfoData>;
 
-/// InfoData is a genericised container for LIST INFO chunks
+/// A genericised container for LIST INFO chunks.
 ///
-/// A type alias is devfined for all of the INFO types from the initial 1991
+/// A type alias is defined for all of the INFO types from the initial 1991
 /// WAV spec.
 ///
 /// # Examples:
+/// Parsing chunk data from a buffer:
+/// ```
+/// # use wavrw::chunk::info::Icmt;
+/// # use wavrw::testing::hex_to_cursor;
+/// # use binrw::BinRead;
+/// # let mut buff = hex_to_cursor("49434D54 15000000 62657874 20636875 6E6B2074 65737420 66696C65 00");
+/// let icmt = Icmt::read(&mut buff).unwrap();
+/// ```
 ///
+/// Creating a new chunk from scratch:
 /// ```
 /// # use wavrw::chunk::info::IcmtData;
 /// let icmt = IcmtData::new("comment");
