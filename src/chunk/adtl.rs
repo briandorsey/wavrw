@@ -8,7 +8,7 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub struct ListAdtlData {
     #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
@@ -57,14 +57,16 @@ pub type ListAdtl = KnownChunk<ListAdtlData>;
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `labl` chunk contains a label, or title, to associate with a [CuePoint][super::CuePoint].
 pub struct LablData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
 
     /// Specifies a NULL-terminated string containing a text label.
-    pub text: NullString,
+    #[br(map= |ns: NullString| ns.to_string())]
+    #[bw(map= |s: &String| NullString::from(s.clone()))]
+    pub text: String,
 }
 
 impl KnownChunkID for LablData {
@@ -83,13 +85,15 @@ pub type Labl = KnownChunk<LablData>;
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `note` chunk contains comment text for a [CuePoint][super::CuePoint].
 pub struct NoteData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
     /// Specifies a NULL-terminated string containing comment text.
-    pub text: NullString,
+    #[br(map= |ns: NullString| ns.to_string())]
+    #[bw(map= |s: &String| NullString::from(s.clone()))]
+    pub text: String,
 }
 
 impl KnownChunkID for NoteData {
@@ -108,7 +112,7 @@ pub type Note = KnownChunk<NoteData>;
 #[binrw]
 #[br(little)]
 #[br(import(size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `ltxt` chunk contains text that is associated with a data segment of specific length.
 pub struct LtxtData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
@@ -158,7 +162,7 @@ pub type Ltxt = KnownChunk<LtxtData>;
 #[binrw]
 #[br(little)]
 #[br(import(size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `file` chunk contains information described in other file formats (for example, an 'RDIB' file or an ASCII text file).
 ///
 /// NOTE: Implemented from the spec only, because I couldn’t find any files actually containing this chunk.
@@ -196,7 +200,7 @@ pub type File = KnownChunk<FileData>;
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AdtlEnum {
     Labl(Labl),
     Note(Note),

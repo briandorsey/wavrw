@@ -162,10 +162,10 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FixedStrErr;
 
-#[derive(BinWrite, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, BinWrite)]
 /// Null terminated fixed length strings (from INFO or BEXT for example).
 ///
 /// `FixedStr` is intended to be used via binrw's [`BinRead`] trait and its
@@ -331,7 +331,7 @@ type KCArgs = (u32,);
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A generic wrapper around chunk data, handling ID, size and padding.
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
@@ -412,7 +412,7 @@ impl<T> Chunk for KnownChunk<T> where
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnknownChunk {
     id: FourCC,
     size: u32,
@@ -443,16 +443,21 @@ impl Chunk for UnknownChunk {}
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChunkEnum {
     Fmt(Fmt),
     Data(Data),
     Fact(Fact),
+    Cue(Cue),
     Info(ListInfo),
     Adtl(ListAdtl),
     Cset(Cset),
+    Plst(Plst),
     Bext(Box<Bext>),
     Md5(Md5),
+    Fllr(Fllr),
+    Junk(Junk),
+    Pad(Pad),
     Unknown(UnknownChunk),
 }
 
@@ -463,11 +468,16 @@ impl ChunkID for ChunkEnum {
             ChunkEnum::Fmt(e) => e.id(),
             ChunkEnum::Data(e) => e.id(),
             ChunkEnum::Fact(e) => e.id(),
+            ChunkEnum::Cue(e) => e.id(),
             ChunkEnum::Info(e) => e.id(),
             ChunkEnum::Adtl(e) => e.id(),
             ChunkEnum::Cset(e) => e.id(),
+            ChunkEnum::Plst(e) => e.id(),
             ChunkEnum::Bext(e) => e.id(),
             ChunkEnum::Md5(e) => e.id(),
+            ChunkEnum::Fllr(e) => e.id(),
+            ChunkEnum::Junk(e) => e.id(),
+            ChunkEnum::Pad(e) => e.id(),
             ChunkEnum::Unknown(e) => e.id(),
         }
     }
@@ -480,11 +490,16 @@ impl SizedChunk for ChunkEnum {
             ChunkEnum::Fmt(e) => e.size,
             ChunkEnum::Data(e) => e.size,
             ChunkEnum::Fact(e) => e.size,
+            ChunkEnum::Cue(e) => e.size,
             ChunkEnum::Info(e) => e.size,
             ChunkEnum::Adtl(e) => e.size,
             ChunkEnum::Cset(e) => e.size,
+            ChunkEnum::Plst(e) => e.size,
             ChunkEnum::Bext(e) => e.size,
             ChunkEnum::Md5(e) => e.size,
+            ChunkEnum::Fllr(e) => e.size,
+            ChunkEnum::Junk(e) => e.size,
+            ChunkEnum::Pad(e) => e.size,
             ChunkEnum::Unknown(e) => e.size,
         }
     }
@@ -497,11 +512,16 @@ impl Summarizable for ChunkEnum {
             ChunkEnum::Fmt(e) => e.summary(),
             ChunkEnum::Data(e) => e.summary(),
             ChunkEnum::Fact(e) => e.summary(),
+            ChunkEnum::Cue(e) => e.summary(),
             ChunkEnum::Info(e) => e.summary(),
             ChunkEnum::Adtl(e) => e.summary(),
             ChunkEnum::Cset(e) => e.summary(),
+            ChunkEnum::Plst(e) => e.summary(),
             ChunkEnum::Bext(e) => e.summary(),
             ChunkEnum::Md5(e) => e.summary(),
+            ChunkEnum::Fllr(e) => e.summary(),
+            ChunkEnum::Junk(e) => e.summary(),
+            ChunkEnum::Pad(e) => e.summary(),
             ChunkEnum::Unknown(e) => e.summary(),
         }
     }
@@ -592,5 +612,20 @@ mod test {
         });
         // ensure trait bounds are satisfied
         let mut _trt: Box<dyn Chunk> = Box::new(md5);
+    }
+
+    // compile time check to ensure all chunks implement consistent traits
+    fn has_standard_traits<T>()
+    where
+        T: Debug + Clone + PartialEq + std::hash::Hash,
+    {
+    }
+
+    #[test]
+    fn consistent_traits() {
+        has_standard_traits::<Riff>();
+
+        // this Enum transitively ensures the traits of all subchunks
+        has_standard_traits::<ChunkEnum>();
     }
 }

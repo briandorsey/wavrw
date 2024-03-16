@@ -8,7 +8,7 @@ use crate::{fourcc, ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ListInfoData {
     #[brw(assert(list_type == ListInfoData::LIST_TYPE))]
     pub list_type: FourCC,
@@ -69,9 +69,11 @@ pub type ListInfo = KnownChunk<ListInfoData>;
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct InfoData<const I: u32> {
-    pub value: NullString,
+    #[br(map= |ns: NullString| ns.to_string())]
+    #[bw(map= |s: &String| NullString::from(s.clone()))]
+    pub value: String,
 }
 
 impl<const I: u32> KnownChunkID for InfoData<I> {
@@ -92,7 +94,7 @@ impl<const I: u32> Debug for InfoData<I> {
 
 impl<const I: u32> Summarizable for InfoData<I> {
     fn summary(&self) -> String {
-        self.value.to_string()
+        self.value.clone()
     }
 }
 
@@ -152,7 +154,7 @@ pub type Ieng = KnownChunk<IengData>;
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InfoEnum {
     Iarl(Iarl),
     Ignr(Ignr),
@@ -180,7 +182,9 @@ pub enum InfoEnum {
         id: FourCC,
         size: u32,
         #[brw(align_after=2, pad_size_to= size.to_owned())]
-        value: NullString,
+        #[br(map= |ns: NullString| ns.to_string())]
+        #[bw(map= |s: &String| NullString::from(s.clone()))]
+        value: String,
     },
 }
 
@@ -215,28 +219,28 @@ impl InfoEnum {
 
     pub fn value(&self) -> String {
         match self {
-            InfoEnum::Iarl(e) => e.data.value.to_string(),
-            InfoEnum::Ignr(e) => e.data.value.to_string(),
-            InfoEnum::Ikey(e) => e.data.value.to_string(),
-            InfoEnum::Ilgt(e) => e.data.value.to_string(),
-            InfoEnum::Imed(e) => e.data.value.to_string(),
-            InfoEnum::Inam(e) => e.data.value.to_string(),
-            InfoEnum::Iplt(e) => e.data.value.to_string(),
-            InfoEnum::Iprd(e) => e.data.value.to_string(),
-            InfoEnum::Isbj(e) => e.data.value.to_string(),
-            InfoEnum::Isft(e) => e.data.value.to_string(),
-            InfoEnum::Ishp(e) => e.data.value.to_string(),
-            InfoEnum::Iart(e) => e.data.value.to_string(),
-            InfoEnum::Isrc(e) => e.data.value.to_string(),
-            InfoEnum::Isrf(e) => e.data.value.to_string(),
-            InfoEnum::Itch(e) => e.data.value.to_string(),
-            InfoEnum::Icms(e) => e.data.value.to_string(),
-            InfoEnum::Icmt(e) => e.data.value.to_string(),
-            InfoEnum::Icop(e) => e.data.value.to_string(),
-            InfoEnum::Icrd(e) => e.data.value.to_string(),
-            InfoEnum::Icrp(e) => e.data.value.to_string(),
-            InfoEnum::Idpi(e) => e.data.value.to_string(),
-            InfoEnum::Ieng(e) => e.data.value.to_string(),
+            InfoEnum::Iarl(e) => e.data.value.clone(),
+            InfoEnum::Ignr(e) => e.data.value.clone(),
+            InfoEnum::Ikey(e) => e.data.value.clone(),
+            InfoEnum::Ilgt(e) => e.data.value.clone(),
+            InfoEnum::Imed(e) => e.data.value.clone(),
+            InfoEnum::Inam(e) => e.data.value.clone(),
+            InfoEnum::Iplt(e) => e.data.value.clone(),
+            InfoEnum::Iprd(e) => e.data.value.clone(),
+            InfoEnum::Isbj(e) => e.data.value.clone(),
+            InfoEnum::Isft(e) => e.data.value.clone(),
+            InfoEnum::Ishp(e) => e.data.value.clone(),
+            InfoEnum::Iart(e) => e.data.value.clone(),
+            InfoEnum::Isrc(e) => e.data.value.clone(),
+            InfoEnum::Isrf(e) => e.data.value.clone(),
+            InfoEnum::Itch(e) => e.data.value.clone(),
+            InfoEnum::Icms(e) => e.data.value.clone(),
+            InfoEnum::Icmt(e) => e.data.value.clone(),
+            InfoEnum::Icop(e) => e.data.value.clone(),
+            InfoEnum::Icrd(e) => e.data.value.clone(),
+            InfoEnum::Icrp(e) => e.data.value.clone(),
+            InfoEnum::Idpi(e) => e.data.value.clone(),
+            InfoEnum::Ieng(e) => e.data.value.clone(),
             InfoEnum::Unknown { value, .. } => format!("Unknown(\"{}\")", *value),
         }
     }
@@ -256,7 +260,7 @@ mod test {
         let icmt = InfoEnum::Icmt(Icmt {
             size: 8,
             data: IcmtData {
-                value: NullString("comment".into()),
+                value: String::from("comment"),
             },
             extra_bytes: vec![],
         });
@@ -279,7 +283,7 @@ mod test {
         let icmt = Icmt::read(&mut buff).unwrap();
         dbg!(&icmt);
         assert_eq!(icmt.id(), FourCC(*b"ICMT"));
-        assert_eq!(icmt.data.value, "bext chunk test file".into());
+        assert_eq!(icmt.data.value, "bext chunk test file".to_string());
 
         // parse via enum wrapper this time
         buff.set_position(0);
@@ -289,7 +293,7 @@ mod test {
         let InfoEnum::Icmt(icmt) = en else {
             unreachable!("should have been ICMT")
         };
-        assert_eq!(icmt.data.value, "bext chunk test file".into());
+        assert_eq!(icmt.data.value, "bext chunk test file".to_string());
     }
 
     #[test]
@@ -316,7 +320,7 @@ mod test {
     #[test]
     fn infochunk_debug_string() {
         let icmt = IcmtData {
-            value: NullString("comment".into()),
+            value: "comment".to_string(),
         };
         assert!(format!("{icmt:?}").starts_with("InfoData<ICMT>"));
     }

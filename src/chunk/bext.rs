@@ -10,7 +10,7 @@ use crate::{FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BextData {
     /// Description of the sound sequence
     pub description: FixedStr<256>, // Description

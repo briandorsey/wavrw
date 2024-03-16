@@ -6,7 +6,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Md5Data {
     pub md5: u128,
 }

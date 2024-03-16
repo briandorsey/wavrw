@@ -6,7 +6,7 @@ use crate::{fourcc, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PaddingData<const I: u32> {
     #[br(parse_with = helpers::until_eof)]
     data: Vec<u8>,

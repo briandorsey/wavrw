@@ -6,7 +6,7 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CuePoint {
     /// Specifies the cue point name. Each `CuePoint` must have a unique name field.
     pub name: u32,
@@ -34,7 +34,7 @@ impl CuePoint {
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CueData {
     /// Count of cue points. The number of times the cue-point struct repeats within this chunk.
     pub cue_points: u32, // dwCuePoints

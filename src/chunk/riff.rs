@@ -4,7 +4,7 @@ use crate::FourCC;
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Riff {
     pub id: FourCC,
     pub size: u32,

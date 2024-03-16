@@ -11,7 +11,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `CSET` chunk contains character set information. Defined in RIFF1991.
 pub struct CsetData {
     code_page: u16,
@@ -133,7 +133,7 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RiffCountryCode {
     UnitedStates = 0x1,
     Canada = 0x2,
@@ -208,7 +208,7 @@ impl Display for RiffCountryCode {
 
 #[binrw]
 #[brw(little)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct UnknownCountryCode {
     country_code: u16,
 }
@@ -224,7 +224,7 @@ impl Display for UnknownCountryCode {
 #[binrw]
 #[brw(little)]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CsetCountryCode {
     Known(RiffCountryCode),
     Unknown(UnknownCountryCode),

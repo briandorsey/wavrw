@@ -8,7 +8,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FormatTag {
     Unknown = 0x0000,
     Pcm = 0x0001,
@@ -562,7 +562,7 @@ impl Display for FormatTag {
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FmtData {
     pub format_tag: FormatTag,
     pub channels: u16,

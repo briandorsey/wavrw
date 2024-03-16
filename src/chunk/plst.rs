@@ -6,7 +6,7 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlstSegment {
     pub name: u32,
     pub length: u32,
@@ -22,7 +22,7 @@ impl PlstSegment {
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `plst` chunk contains character set information. Defined in RIFF1991.
 pub struct PlstData {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.

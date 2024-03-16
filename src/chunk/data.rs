@@ -8,7 +8,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(size: u32))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DataData {
     // For some reason SeekFrom::End(0) takes us beyond this chunk, even though
     // KnownChunk uses take_seek to limit the reader. I don't know why.
