@@ -697,7 +697,7 @@ mod test {
     // compile time check to ensure all chunks implement consistent traits
     fn has_standard_traits<T>()
     where
-        T: Debug + Display + Clone + PartialEq + Eq + std::hash::Hash,
+        T: Debug + Display + Clone + PartialEq + Eq + std::hash::Hash + Send + Sync,
     {
     }
 
