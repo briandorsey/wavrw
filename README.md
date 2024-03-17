@@ -12,7 +12,7 @@ Current status: Most chunks from the initial WAV spec [RIFF1991](https://wavref.
 
 ## Example output
 
-```sh
+```
 $ wavrw view test_wavs/example_a.wav`
 test_wavs/example_a.wav: 
       offset id              size summary
@@ -32,7 +32,7 @@ test_wavs/example_a.wav:
 
 ## Example detailed output
 
-```sh
+```
 $ wavrw view --format=detailed test_wavs/example_a.wav
 test_wavs/example_a.wav: 
       offset id              size summary
@@ -96,7 +96,7 @@ test_wavs/example_a.wav:
 
 ## Help overview
 
-```sh
+```
 WAV file metadata read/write utility
 
 Usage: wavrw <COMMAND>
