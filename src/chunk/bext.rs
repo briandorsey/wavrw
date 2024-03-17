@@ -51,6 +51,34 @@ impl KnownChunkID for BextData {
     const ID: FourCC = FourCC(*b"bext");
 }
 
+impl BextData {
+    fn new() -> BextData {
+        BextData {
+            description: FixedStr::<256>::new(),
+            originator: FixedStr::<32>::new(),
+            originator_reference: FixedStr::<32>::new(),
+            origination_date: FixedStr::<10>::new(),
+            origination_time: FixedStr::<8>::new(),
+            time_reference: 0,
+            version: 0,
+            umid: [0_u8; 64],
+            loudness_value: 0,
+            loudness_range: 0,
+            max_true_peak_level: 0,
+            max_momentary_loudness: 0,
+            max_short_term_loudness: 0,
+            reserved: [0u8; 180],
+            coding_history: String::new(),
+        }
+    }
+}
+
+impl Default for BextData {
+    fn default() -> Self {
+        BextData::new()
+    }
+}
+
 pub type Bext = KnownChunk<BextData>;
 
 impl Summarizable for BextData {

@@ -11,13 +11,13 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 /// `CSET` chunk contains character set information. Defined in RIFF1991.
 pub struct CsetData {
-    code_page: u16,
-    country_code: CsetCountryCode,
-    language: u16,
-    dialect: u16,
+    pub code_page: u16,
+    pub country_code: CsetCountryCode,
+    pub language: u16,
+    pub dialect: u16,
 }
 
 impl KnownChunkID for CsetData {
@@ -135,6 +135,7 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RiffCountryCode {
+    None = 0x0,
     UnitedStates = 0x1,
     Canada = 0x2,
     LatinAmerica = 0x3,
@@ -171,7 +172,8 @@ impl Display for RiffCountryCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         use RiffCountryCode::*;
         let output = match self {
-            UnitedStates => "USA",
+            None => "None",
+            UnitedStates => "United States of America",
             Canada => "Canada",
             LatinAmerica => "Latin America",
             Greece => "Greece",
@@ -210,7 +212,7 @@ impl Display for RiffCountryCode {
 #[brw(little)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct UnknownCountryCode {
-    country_code: u16,
+    pub country_code: u16,
 }
 
 impl Display for UnknownCountryCode {
@@ -241,6 +243,18 @@ impl Display for CsetCountryCode {
             }
         )?;
         Ok(())
+    }
+}
+
+impl CsetCountryCode {
+    pub fn new() -> CsetCountryCode {
+        CsetCountryCode::Known(RiffCountryCode::None)
+    }
+}
+
+impl Default for CsetCountryCode {
+    fn default() -> Self {
+        CsetCountryCode::new()
     }
 }
 

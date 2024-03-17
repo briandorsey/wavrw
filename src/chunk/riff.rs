@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use binrw::binrw;
 
 use crate::FourCC;
@@ -9,6 +11,22 @@ pub struct Riff {
     pub id: FourCC,
     pub size: u32,
     pub form_type: FourCC,
+}
+
+impl Display for Riff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Default for Riff {
+    fn default() -> Self {
+        Riff {
+            id: FourCC(*b"RIFF"),
+            size: 0,
+            form_type: FourCC(*b"WAVE"),
+        }
+    }
 }
 
 #[allow(clippy::dbg_macro)]

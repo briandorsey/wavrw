@@ -46,6 +46,21 @@ impl KnownChunkID for CueData {
     const ID: FourCC = FourCC(*b"cue ");
 }
 
+impl CueData {
+    fn new() -> Self {
+        CueData {
+            cue_points: 0,
+            points: Vec::new(),
+        }
+    }
+}
+
+impl Default for CueData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub type Cue = KnownChunk<CueData>;
 
 impl Summarizable for CueData {

@@ -8,8 +8,13 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlstSegment {
+    /// The cue point name. This value must match a [`CuePoint.name`][crate::chunk::cue::CuePoint] in the [`CueData`][crate::chunk::cue::CueData] chunk.
     pub name: u32,
+
+    /// The length of the section in samples.
     pub length: u32,
+
+    /// The number of times to play the section.
     pub loops: u32,
 }
 

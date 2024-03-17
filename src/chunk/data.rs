@@ -10,6 +10,8 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(import(size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DataData {
+    // Not public until we figure out design for loading data. (issue #72)
+    //
     // For some reason SeekFrom::End(0) takes us beyond this chunk, even though
     // KnownChunk uses take_seek to limit the reader. I don't know why.
     // Instead, we're passing in the chunk size and using that.

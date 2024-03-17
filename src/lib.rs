@@ -119,7 +119,7 @@ fn box_chunk<T: SizedChunk + 'static>(t: T) -> Box<dyn SizedChunk> {
 
 #[binrw]
 #[brw(big)]
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
@@ -190,6 +190,18 @@ impl<const N: usize> Display for FixedStr<N> {
             "{}",
             String::from_utf8_lossy(&self.0).trim_end_matches('\0')
         )
+    }
+}
+
+impl<const N: usize> FixedStr<N> {
+    fn new() -> FixedStr<N> {
+        FixedStr::<N>([0_u8; N])
+    }
+}
+
+impl<const N: usize> Default for FixedStr<N> {
+    fn default() -> Self {
+        FixedStr::<N>::new()
     }
 }
 
@@ -362,6 +374,18 @@ pub struct KnownChunk<
     pub extra_bytes: Vec<u8>,
 }
 
+impl<T> Display for KnownChunk<T>
+where
+    T: for<'a> BinRead<Args<'a> = KCArgs>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.name(), self.data.summary())
+    }
+}
+
 impl<T> KnownChunkID for KnownChunk<T>
 where
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
@@ -425,6 +449,12 @@ pub struct UnknownChunk {
     raw: Vec<u8>,
 }
 
+impl Display for UnknownChunk {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnknownChunk({}, {})", self.id, self.size)
+    }
+}
+
 impl ChunkID for UnknownChunk {
     fn id(&self) -> FourCC {
         self.id
@@ -463,6 +493,28 @@ pub enum ChunkEnum {
     Junk(Junk),
     Pad(Pad),
     Unknown(UnknownChunk),
+}
+
+impl Display for ChunkEnum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display_string = match self {
+            ChunkEnum::Fmt(e) => e.to_string(),
+            ChunkEnum::Data(e) => e.to_string(),
+            ChunkEnum::Fact(e) => e.to_string(),
+            ChunkEnum::Cue(e) => e.to_string(),
+            ChunkEnum::Info(e) => e.to_string(),
+            ChunkEnum::Adtl(e) => e.to_string(),
+            ChunkEnum::Cset(e) => e.to_string(),
+            ChunkEnum::Plst(e) => e.to_string(),
+            ChunkEnum::Bext(e) => e.to_string(),
+            ChunkEnum::Md5(e) => e.to_string(),
+            ChunkEnum::Fllr(e) => e.to_string(),
+            ChunkEnum::Junk(e) => e.to_string(),
+            ChunkEnum::Pad(e) => e.to_string(),
+            ChunkEnum::Unknown(e) => e.to_string(),
+        };
+        write!(f, "{}", display_string)
+    }
 }
 
 impl ChunkID for ChunkEnum {
@@ -621,7 +673,7 @@ mod test {
     // compile time check to ensure all chunks implement consistent traits
     fn has_standard_traits<T>()
     where
-        T: Debug + Clone + PartialEq + std::hash::Hash,
+        T: Debug + Display + Clone + PartialEq + Eq + std::hash::Hash,
     {
     }
 
