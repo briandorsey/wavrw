@@ -253,7 +253,7 @@ mod test {
     use hexdump::hexdump;
 
     use super::*;
-    use crate::{box_chunk, testing::hex_to_cursor, Chunk, ChunkEnum};
+    use crate::{box_chunk, testing::hex_to_cursor, ChunkEnum, SizedChunk};
 
     #[test]
     fn infochunk_roundtrip() {
@@ -333,6 +333,6 @@ mod test {
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
-        let mut _trt: Box<dyn Chunk> = Box::new(icmt);
+        let mut _trt: Box<dyn SizedChunk> = Box::new(icmt);
     }
 }
