@@ -5,7 +5,7 @@
 //! Iterate over all dyn [`SizedChunk`] chunk objects from a file:
 //! ```
 //! # use std::fs::File;
-//! let file = File::open("test_wavs/example_a.wav")?;
+//! let file = File::open("../test_wavs/example_a.wav")?;
 //! for result in wavrw::metadata_chunks(file)? {
 //!     match result {
 //!         Ok(chunk) => {

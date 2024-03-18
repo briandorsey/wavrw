@@ -67,7 +67,7 @@ command = [
     "cargo", "run",
     "--color", "always",
     # put launch parameters for your program behind a `--` separator
-    "--", "view", "test_wavs/example_a.wav",
+    "--", "view", "../test_wavs/example_a.wav",
 ]
 need_stdout = true
 allow_warnings = true
@@ -78,7 +78,7 @@ command = [
     "cargo", "run",
     "--color", "always",
     # put launch parameters for your program behind a `--` separator
-    "--", "view", "--format=detailed", "test_wavs/example_a.wav",
+    "--", "view", "--format=detailed", "../test_wavs/example_a.wav",
 ]
 need_stdout = true
 allow_warnings = true
@@ -89,16 +89,7 @@ command = [
     "cargo", "run",
     "--color", "always",
     # put launch parameters for your program behind a `--` separator
-    "--", "view", "--format=line", "test_wavs/example_a.wav",
-]
-need_stdout = true
-allow_warnings = true
-background = true
-
-[jobs.docs]
-command = [
-    "cargo", "doc",
-    "--color", "always",
+    "--", "view", "--format=line", "../test_wavs/example_a.wav",
 ]
 need_stdout = true
 allow_warnings = true
@@ -122,4 +113,3 @@ allow_warnings = true
 v = "job:run_view"
 d = "job:run_view_detailed"
 l = "job:run_view_line"
-o = "job:docs"

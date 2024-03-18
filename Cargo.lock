@@ -895,15 +895,24 @@ checksum = "af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96"
 name = "wavrw"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "binrw",
- "clap 4.5.3",
  "criterion",
  "hex",
  "hexdump",
  "itertools 0.12.1",
  "tracing",
+]
+
+[[package]]
+name = "wavrw-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.3",
+ "itertools 0.12.1",
+ "tracing",
  "tracing-subscriber",
+ "wavrw",
 ]
 
 [[package]]

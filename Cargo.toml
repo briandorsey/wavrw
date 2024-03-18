@@ -1,5 +1,9 @@
-[package]
-name = "wavrw"
+[workspace]
+members = ["wavrw", "wavrw-cli"] 
+resolver = "2"
+
+[workspace.package]
+# name = "wavrw"
 version = "0.1.0"
 edition = "2021"
 description = "WAV file metadata read/write utility"
@@ -10,23 +14,15 @@ license = "Apache-2.0"
 keywords = ["parser", "metadata", "wav"]
 categories = ["multimedia::encoding", "parser-implementations"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.68"
-binrw = "0.13.3"
-clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
-hex = "0.4.3"
-hexdump = "0.1.1"
-itertools = "0.12.0"
 tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+itertools = "0.12.0"
 
-[dev-dependencies]
-criterion = { version = "0.4", features = ["html_reports"] }
+[profile.release]
+overflow-checks = true
 
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "forbid"
 # missing_docs = "warn"
 
@@ -36,13 +32,12 @@ future_incompatible = "warn"
 nonstandard_style = "warn"
 rust_2018_idioms = "warn"
 
-[lints.rustdoc]
+[workspace.lints.rustdoc]
 missing_crate_level_docs = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 unwrap_used = "warn"
 needless_pass_by_value = "warn"
-# set in .clipy.toml: allow-unwrap-in-tests = true
 
 # recommended by: https://github.com/EmbarkStudios/rust-ecosystem/blob/main/lints.toml
 await_holding_lock = "warn"
@@ -112,13 +107,3 @@ unused_self = "warn"
 useless_transmute = "warn"
 verbose_file_reads = "warn"
 zero_sized_map_values = "warn"
-
-
-[profile.release]
-overflow-checks = true
-
-[[bench]]
-name = "my_benchmark"
-harness = false
-
-
