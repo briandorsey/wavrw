@@ -39,19 +39,28 @@ pub const fn fourcc(id: &[u8; 4]) -> u32 {
     u32::from_le_bytes(*id)
 }
 
+/// const ID stored for every chunk with a parser.
 pub trait KnownChunkID {
+    /// RIFF chunk id.
     const ID: FourCC;
 }
 
+/// Retrieve a chunk ID from a chunk (even if dynamic, ex: [`UnknownChunk`]).
 pub trait ChunkID {
+    /// Return RIFF chunk id.
     fn id(&self) -> FourCC;
 }
 
+/// A chunk with size information.
+///
+/// Parsed representation of the full chunk data as stored. Likely a [`KnownChunk<T>`]
+/// where T is the inner chunk specific data.
 pub trait SizedChunk: Summarizable + Debug {
     /// Returns the logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
 }
 
+/// Utility methods for describing any chunk.
 pub trait Summarizable: ChunkID {
     /// Returns a short text summary of the contents of the chunk.
     fn summary(&self) -> String;
@@ -77,7 +86,11 @@ pub trait Summarizable: ChunkID {
     }
 }
 
-pub trait Chunk: Summarizable + Debug {}
+/// A chunk with size information.
+///
+/// We don't actually have these yet, but expect to use them when creating chunks
+/// from scratch and later writing them to a file.
+// pub trait Chunk: Summarizable + Debug {}
 
 impl<T> ChunkID for T
 where
@@ -95,6 +108,9 @@ fn box_chunk<T: SizedChunk + 'static>(t: T) -> Box<dyn SizedChunk> {
     Box::new(t)
 }
 
+/// RIFF FOURCC type. Four bytes, often readable id of a chunk.
+///
+/// Used as chunk ids, [`ListInfoData.list_type`], etc.
 #[binrw]
 #[brw(big)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,7 +159,6 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 #[derive(Debug, Clone)]
 pub struct FixedStrErr;
 
-#[derive(Clone, PartialEq, Eq, Hash, BinWrite)]
 /// Null terminated fixed length strings (from INFO or BEXT for example).
 ///
 /// `FixedStr` is intended to be used via binrw's [`BinRead`] trait and its
@@ -151,6 +166,7 @@ pub struct FixedStrErr;
 /// or that logic will be bypassed. If there is a future need, we should
 /// implement a constructor which in turn calls the [`FixedStr::read_options()`]
 /// implementation.
+#[derive(Clone, PartialEq, Eq, Hash, BinWrite)]
 pub struct FixedStr<const N: usize>([u8; N]);
 
 // FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
@@ -232,7 +248,7 @@ impl<const N: usize> BinRead for FixedStr<N> {
 // parsing helpers
 // ----
 
-/// Parses a WAV file chunk by chunk.
+/// Parses a WAV file, returns all known chunks.
 ///
 /// It attempts to continue parsing even if some chunks have parsing errors.
 #[instrument]
@@ -319,10 +335,10 @@ where
 
 type KCArgs = (u32,);
 
+/// A generic wrapper around chunk data, handling ID, size and padding.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// A generic wrapper around chunk data, handling ID, size and padding.
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
@@ -407,14 +423,14 @@ where
     }
 }
 
-impl<T> Chunk for KnownChunk<T> where
-    T: for<'a> BinRead<Args<'a> = KCArgs>
-        + for<'a> BinWrite<Args<'a> = ()>
-        + KnownChunkID
-        + Summarizable
-        + Debug
-{
-}
+// impl<T> Chunk for KnownChunk<T> where
+//     T: for<'a> BinRead<Args<'a> = KCArgs>
+//         + for<'a> BinWrite<Args<'a> = ()>
+//         + KnownChunkID
+//         + Summarizable
+//         + Debug
+// {
+// }
 
 #[binrw]
 #[brw(little)]
@@ -451,7 +467,7 @@ impl Summarizable for UnknownChunk {
     }
 }
 
-impl Chunk for UnknownChunk {}
+// impl Chunk for UnknownChunk {}
 
 #[binrw]
 #[brw(little)]
@@ -571,7 +587,7 @@ impl Summarizable for ChunkEnum {
     }
 }
 
-impl Chunk for ChunkEnum {}
+// impl Chunk for ChunkEnum {}
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -634,7 +650,7 @@ mod test {
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
-        let mut _trt: Box<dyn Chunk> = Box::new(md5);
+        let mut _trt: Box<dyn SizedChunk> = Box::new(md5);
     }
 
     #[test]
@@ -645,7 +661,7 @@ mod test {
             extra_bytes: vec![],
         });
         // ensure trait bounds are satisfied
-        let mut _trt: Box<dyn Chunk> = Box::new(md5);
+        let mut _trt: Box<dyn SizedChunk> = Box::new(md5);
     }
 
     // compile time check to ensure all chunks implement consistent traits
