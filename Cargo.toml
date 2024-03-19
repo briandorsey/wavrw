@@ -10,7 +10,7 @@ description = "WAV file metadata read/write utility"
 authors = ["Brian Dorsey"]
 readme = "README.md"
 repository = "https://github.com/briandorsey/wavrw"
-license = "Apache-2.0"
+license = "Apache-2.0 OR MIT"
 keywords = ["parser", "metadata", "wav"]
 categories = ["multimedia::encoding", "parser-implementations"]
 
