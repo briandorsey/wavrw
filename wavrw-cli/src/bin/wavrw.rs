@@ -36,10 +36,9 @@ struct WavrwArgs {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Summarize WAV file structure and metadata
     View(ViewConfig),
-    /// List directories of files, show single line summary of chunks
-    List(ChunksConfig),
+    List(ListConfig),
+    Topic(TopicConfig),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -51,6 +50,7 @@ enum Format {
 
 const WIDTH_DEFAULT: u16 = 80;
 
+/// Summarize WAV file structure and metadata
 #[derive(Parser, Debug)]
 #[command(long_about = None)]
 struct ViewConfig {
@@ -80,9 +80,10 @@ impl Default for ViewConfig {
     }
 }
 
+/// List directories of files, show single line summary of chunks
 #[derive(Parser, Debug)]
 #[command(long_about = None)]
-struct ChunksConfig {
+struct ListConfig {
     /// directory to list
     #[arg(default_value = ".")]
     path: OsString,
@@ -94,6 +95,22 @@ struct ChunksConfig {
     /// recurse through subdirectories as well
     #[arg(long, short, default_value_t = false)]
     recurse: bool,
+}
+
+/// Print additional help and reference topics.
+#[derive(Parser, Debug)]
+#[command()]
+struct TopicConfig {
+    /// Topic to display information about
+    #[arg(value_enum)]
+    topic: Topic,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Topic {
+    ///  Licences used by wavrw and all dependencies
+    #[value(alias = "licenses")]
+    License,
 }
 
 fn trim(text: &str, width: u16) -> String {
@@ -249,12 +266,12 @@ fn view_detailed(file: File) -> Result<String> {
     Ok(out)
 }
 
-fn chunks(config: &ChunksConfig) -> Result<()> {
+fn list(config: &ListConfig) -> Result<()> {
     walk_paths(&config.path.clone().into(), config)?;
     Ok(())
 }
 
-fn walk_paths(base_path: &PathBuf, config: &ChunksConfig) -> Result<()> {
+fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
     let mut paths = fs::read_dir(base_path)?
         .map(|res| res.map(|e| e.path()))
         .collect::<Result<Vec<_>, io::Error>>()?;
@@ -278,6 +295,13 @@ fn walk_paths(base_path: &PathBuf, config: &ChunksConfig) -> Result<()> {
     Ok(())
 }
 
+fn topic(config: &mut TopicConfig) -> Result<()> {
+    match config.topic {
+        Topic::License => println!(include_str!("../../generated/licenses.txt")),
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
@@ -294,8 +318,9 @@ fn main() -> Result<()> {
             for ext in &mut config.ext {
                 ext.make_ascii_lowercase();
             }
-            chunks(config)
+            list(config)
         }
+        Commands::Topic(config) => topic(config),
     }
 }
 
