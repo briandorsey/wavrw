@@ -1,18 +1,14 @@
 #![doc = include_str!("lib.md")]
 
-use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::BufReader;
 use std::io::{Read, Seek};
-use std::str::FromStr;
 
 use binrw::io::TakeSeekExt;
-use binrw::Endian;
-use binrw::{binrw, io::SeekFrom, BinRead, BinResult, BinWrite, Error, PosValue};
+use binrw::{binrw, io::SeekFrom, BinRead, BinResult, BinWrite, PosValue};
 use tracing::{instrument, trace_span, warn};
 
 pub mod chunk;
-pub mod testing;
 use crate::chunk::adtl::{ListAdtl, ListAdtlData};
 use crate::chunk::info::{ListInfo, ListInfoData};
 use crate::chunk::Bext;
@@ -27,6 +23,8 @@ use crate::chunk::Md5;
 use crate::chunk::Pad;
 use crate::chunk::Plst;
 use crate::chunk::Riff;
+pub mod fixedstr;
+pub mod testing;
 
 // helper types
 // ----
@@ -153,95 +151,6 @@ impl<'a> PartialEq<&'a FourCC> for FourCC {
 impl<'a> PartialEq<FourCC> for &'a FourCC {
     fn eq(&self, other: &FourCC) -> bool {
         *self == other
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FixedStrErr;
-
-/// Null terminated fixed length strings (from INFO or BEXT for example).
-///
-/// `FixedStr` is intended to be used via binrw's [`BinRead`] trait and its
-/// Null parsing is implmented there. Do not directly create the struct
-/// or that logic will be bypassed. If there is a future need, we should
-/// implement a constructor which in turn calls the [`FixedStr::read_options()`]
-/// implementation.
-#[derive(Clone, PartialEq, Eq, Hash, BinWrite)]
-pub struct FixedStr<const N: usize>([u8; N]);
-
-// FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
-
-impl<const N: usize> Debug for FixedStr<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "FixedStr<{}>(\"{}\")", N, self)
-    }
-}
-
-impl<const N: usize> Display for FixedStr<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{}",
-            String::from_utf8_lossy(&self.0).trim_end_matches('\0')
-        )
-    }
-}
-
-impl<const N: usize> FixedStr<N> {
-    fn new() -> FixedStr<N> {
-        FixedStr::<N>([0_u8; N])
-    }
-}
-
-impl<const N: usize> Default for FixedStr<N> {
-    fn default() -> Self {
-        FixedStr::<N>::new()
-    }
-}
-
-impl<const N: usize> FromStr for FixedStr<N> {
-    type Err = FixedStrErr;
-
-    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-        let mut array_tmp = [0u8; N];
-        let l = min(s.len(), N);
-        array_tmp[..l].copy_from_slice(&s.as_bytes()[..l]);
-        Ok(FixedStr::<N>(array_tmp))
-    }
-}
-
-impl<const N: usize> BinRead for FixedStr<N> {
-    type Args<'a> = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        endian: Endian,
-        (): Self::Args<'_>,
-    ) -> BinResult<Self> {
-        let mut values: [u8; N] = [0; N];
-        let mut index = 0;
-
-        loop {
-            if index >= N {
-                return Ok(Self(values));
-            }
-            let val = <u8>::read_options(reader, endian, ())?;
-            if val == 0 {
-                let offset = (N - index - 1).try_into();
-                return match offset {
-                    Ok(offset) => {
-                        reader.seek(SeekFrom::Current(offset))?;
-                        Ok(Self(values))
-                    }
-                    Err(err) => Err(Error::Custom {
-                        pos: index as u64,
-                        err: Box::new(err),
-                    }),
-                };
-            }
-            values[index] = val;
-            index += 1;
-        }
     }
 }
 
@@ -593,54 +502,7 @@ impl Summarizable for ChunkEnum {
 #[cfg(test)]
 mod test {
 
-    use hex::decode;
-
     use super::*;
-    use crate::testing::hex_to_cursor;
-
-    #[test]
-    fn decode_spaces() {
-        let a = &decode("666D7420 10000000 01000100 80BB0000 80320200 03001800".replace(' ', ""))
-            .unwrap();
-        let b = &decode("666D7420100000000100010080BB00008032020003001800").unwrap();
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn fixed_string() {
-        let fs = FixedStr::<6>(*b"abc\0\0\0");
-        assert_eq!(6, fs.0.len());
-        let s = fs.to_string();
-        assert_eq!("abc".to_string(), s);
-        assert_eq!(3, s.len());
-        let new_fs = FixedStr::<6>::from_str(&s).unwrap();
-        assert_eq!(fs, new_fs);
-        assert_eq!(6, fs.0.len());
-        assert_eq!(
-            b"\0\0\0"[..],
-            new_fs.0[3..6],
-            "extra space after the string should be null bytes"
-        );
-
-        // strings longer than fixed size should get truncated
-        let long_str = "this is a longer str";
-        let fs = FixedStr::<6>::from_str(long_str).unwrap();
-        assert_eq!(fs.to_string(), "this i");
-    }
-
-    #[test]
-    fn parse_fixedstr_data_after_zero() {
-        // REAPER had (still has?) a bug where data from other BEXT fields
-        // can be left in a fixed lenth string field after the terminating
-        // zero byte. This input is an example that starts with "REAPER"
-        // but has part of a path string after the terminating zero.
-        let mut buff = hex_to_cursor(
-            "52454150 45520065 72732F62 7269616E 2F70726F 6A656374 732F7761 7672772F",
-        );
-        let fs = FixedStr::<32>::read_options(&mut buff, binrw::Endian::Big, ())
-            .expect("error parsing FixedStr");
-        assert_eq!(fs, FixedStr::<32>::from_str("REAPER").unwrap());
-    }
 
     #[test]
     fn knownchunk_as_trait() {

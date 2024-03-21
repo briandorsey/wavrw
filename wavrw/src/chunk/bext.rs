@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use binrw::{binrw, helpers};
 
-use crate::{FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{fixedstr::FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII, but we're parsing it as utf8, since
@@ -54,11 +54,11 @@ impl KnownChunkID for BextData {
 impl BextData {
     fn new() -> BextData {
         BextData {
-            description: FixedStr::<256>::new(),
-            originator: FixedStr::<32>::new(),
-            originator_reference: FixedStr::<32>::new(),
-            origination_date: FixedStr::<10>::new(),
-            origination_time: FixedStr::<8>::new(),
+            description: FixedStr::<256>::default(),
+            originator: FixedStr::<32>::default(),
+            originator_reference: FixedStr::<32>::default(),
+            origination_date: FixedStr::<10>::default(),
+            origination_time: FixedStr::<8>::default(),
             time_reference: 0,
             version: 0,
             umid: [0_u8; 64],
