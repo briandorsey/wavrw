@@ -2,9 +2,16 @@
 
 `wavrw` is a command line tool to read (and someday write) WAV files with a focus on visualizing the structure of files and parsing metadata.
 
-It's initially intended as a personal learning project with aspirations to be generally useful. It's currently in *very* early days and unlikely to be useful to anyone else. 
+It's initially intended as a learning project with aspirations to be generally useful. It's currently in *very* early days and may not be useful to anyone else. 
 
 Current status: Most chunks from the initial WAV spec [RIFF1991](https://wavref.til.cafe/spec/riff1991/) are supported. Only supports reading metadata. Doesn't yet support writing metadata. Doesn't yet read or write audio data (samples). 
+
+I intend to evntually support every WAV chunk I can find a sample of. If there's something you'd like supported, please let me know by adding [an issue](https://github.com/briandorsey/wavrw/issues). If you have them, please include a link to a specification and one or more example files.
+
+Take care,
+-Brian
+
+# Details
 
 `wavrw` answers questions about WAV files: 
   * What is *actually* in this file?
