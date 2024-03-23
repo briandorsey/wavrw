@@ -46,3 +46,17 @@ match chunk {
     _ => ()
 }
 ```
+
+
+NOTE: Many WAVE chunk specifications assume or specify ASCII strings. This
+library parses ASCII strings as UTF8 encoded strings instead. All ASCII
+characters are valid UTF8, and writing UTF8 strings appears to be common
+practice in applications which write metadata.
+
+WARNING: This library does not attempt to interpret strings according to code
+page settings specified via CSET. Setting character set information in CSET
+chunks appears to be very rare, however if a file *did* specify an extended
+codepage, text would likely be misinterpreted when decoded as UTF8. If you
+do run into this situation, please consider filing an issue and if possible,
+sharing sample files to test against so I can improve codepage handling.
+

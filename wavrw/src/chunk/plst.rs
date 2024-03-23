@@ -28,7 +28,7 @@ impl PlstSegment {
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `plst` chunk contains character set information. Defined in RIFF1991.
+/// `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
 pub struct PlstData {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.
     pub segment_count: u32, // dwSegments
@@ -40,7 +40,7 @@ impl KnownChunkID for PlstData {
     const ID: FourCC = FourCC(*b"plst");
 }
 
-/// `plst` chunk contains character set information. Defined in RIFF1991.
+/// `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.

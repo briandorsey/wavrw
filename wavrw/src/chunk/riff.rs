@@ -4,6 +4,7 @@ use binrw::binrw;
 
 use crate::FourCC;
 
+/// `RIFF` Container structure for multimedia data.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

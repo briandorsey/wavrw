@@ -7,6 +7,8 @@ use crate::{fixedstr::FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII, but we're parsing it as utf8, since
 // that is a superset of ASCII and many WAV files contain utf8 strings here
+
+/// `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -79,6 +81,7 @@ impl Default for BextData {
     }
 }
 
+/// `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
 pub type Bext = KnownChunk<BextData>;
 
 impl Summarizable for BextData {

@@ -3,7 +3,7 @@ use binrw::io::SeekFrom;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
-/// `data` chunk contains audio data, this parser skips all audio data (for now).
+/// `data` Audio samples. This parser skips all audio data (for now). [RIFF1991](https://wavref.til.cafe/spec/riff1991/)
 #[binrw]
 #[brw(little)]
 #[br(import(size: u32))]
@@ -30,4 +30,5 @@ impl Summarizable for DataData {
     }
 }
 
+/// `data` Audio samples. This parser skips all audio data (for now). [RIFF1991](https://wavref.til.cafe/spec/riff1991/)
 pub type Data = KnownChunk<DataData>;

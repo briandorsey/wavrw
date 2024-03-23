@@ -1,3 +1,5 @@
+//! `info` A `LIST` containing text chunks: IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, ICRD, ICRP, IDPI, IENG. [RIFF1991](https://wavref.til.cafe/chunk/info/)
+
 use core::fmt::{Debug, Formatter};
 
 use binrw::{binrw, helpers, NullString};

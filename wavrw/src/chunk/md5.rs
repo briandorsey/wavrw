@@ -2,7 +2,9 @@ use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 
-// based on https://mediaarea.net/BWFMetaEdit/md5
+/// `MD5 ` Checksum of audio `data` of the WAVE. [MD5_2017](https://wavref.til.cafe/chunk/md5/)
+///
+/// Specified by BWFMetaEdit:  `https://mediaarea.net/BWFMetaEdit/md5`
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -27,6 +29,7 @@ impl Summarizable for Md5Data {
     }
 }
 
+/// `MD5 ` Checksum of audio `data` of the WAVE. [MD5_2017](https://wavref.til.cafe/chunk/md5/)
 pub type Md5 = KnownChunk<Md5Data>;
 
 #[allow(clippy::dbg_macro)]

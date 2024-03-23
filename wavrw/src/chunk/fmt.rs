@@ -559,6 +559,7 @@ impl Display for FormatTag {
     }
 }
 
+/// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -639,6 +640,7 @@ impl<'a> Iterator for FmtDataIterator<'a> {
     }
 }
 
+/// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 pub type Fmt = KnownChunk<FmtData>;
 
 #[allow(clippy::dbg_macro)]

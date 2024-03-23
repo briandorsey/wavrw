@@ -10,7 +10,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-/// `CSET` chunk contains character set information. Defined in RIFF1991.
+/// `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
 pub struct CsetData {
     pub code_page: u16,
     pub country_code: CsetCountryCode,
@@ -91,7 +91,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
     }
 }
 
-/// `CSET` chunk contains character set information. Defined in RIFF1991.
+/// `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.

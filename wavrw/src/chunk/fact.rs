@@ -2,6 +2,11 @@ use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 
+/// `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
+///
+/// The `fact` chunk is required if the waveform data is contained in a `wavl`
+/// LIST chunk and for all compressed audio formats. The chunk is not required
+/// for PCM files using the “ data” chunk format.
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -26,6 +31,7 @@ impl Summarizable for FactData {
     }
 }
 
+/// `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
 pub type Fact = KnownChunk<FactData>;
 
 #[allow(clippy::dbg_macro)]

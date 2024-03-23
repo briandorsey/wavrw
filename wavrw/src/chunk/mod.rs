@@ -7,7 +7,6 @@
 //!
 //! TODO: write about architecture
 
-/// `adtl` chunk contains subchunks, with additional data about [`CuePoint`]s.
 pub mod adtl;
 mod bext;
 mod cset;
@@ -15,7 +14,6 @@ mod cue;
 mod data;
 mod fact;
 mod fmt;
-/// `info` chunk contains subchunks, containing metadata text fields.
 pub mod info;
 mod junk;
 mod md5;
