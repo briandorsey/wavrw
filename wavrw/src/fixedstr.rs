@@ -1,11 +1,11 @@
 #![doc = include_str!("fixedstr.md")]
 
-use std::cmp::min;
+use core::cmp::min;
+use core::fmt::{Debug, Display, Formatter};
+use core::str::FromStr;
 use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
-use std::io::{Read, Seek, SeekFrom};
-use std::str::FromStr;
 
+use binrw::io::{Read, Seek, SeekFrom};
 use binrw::{BinRead, BinResult, BinWrite, Endian};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +27,7 @@ impl Error for FixedStrError {
 }
 
 impl Display for FixedStrError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Truncated { limit, len } => {
                 write!(f, "truncated string of length {} at {}", len, limit)
@@ -45,7 +45,7 @@ pub struct FixedStr<const N: usize>([u8; N]);
 // FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
 
 impl<const N: usize> Debug for FixedStr<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         f.debug_tuple(&format!("FixedStr::<{}>", N))
             .field(&self.to_string())
             .finish()
@@ -53,7 +53,7 @@ impl<const N: usize> Debug for FixedStr<N> {
 }
 
 impl<const N: usize> Display for FixedStr<N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(
             f,
             "{}",

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use core::fmt::{Display, Formatter};
 
 use binrw::binrw;
 
@@ -282,7 +282,7 @@ pub enum FormatTag {
 
 #[allow(clippy::enum_glob_use)]
 impl Display for FormatTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         use FormatTag::*;
         let output = match self {
             Unknown => "WAVE_FORMAT_UNKNOWN",

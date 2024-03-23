@@ -1,10 +1,12 @@
 #![doc = include_str!("lib.md")]
 
-use std::fmt::{Debug, Display, Formatter};
-use std::io::BufReader;
-use std::io::{Read, Seek};
+extern crate alloc;
 
+use core::fmt::{Debug, Display, Formatter};
+
+use binrw::io::BufReader;
 use binrw::io::TakeSeekExt;
+use binrw::io::{Read, Seek};
 use binrw::{binrw, io::SeekFrom, BinRead, BinResult, BinWrite, PosValue};
 use tracing::{instrument, trace_span, warn};
 
@@ -75,7 +77,7 @@ pub trait Summarizable: ChunkID {
     /// Returns an iterator over a sequence of contents of the contained
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        Box::new(std::iter::empty())
+        Box::new(core::iter::empty())
     }
 
     /// Alternative header for use above `items`
@@ -115,14 +117,14 @@ fn box_chunk<T: SizedChunk + 'static>(t: T) -> Box<dyn SizedChunk> {
 pub struct FourCC(pub [u8; 4]);
 
 impl Display for FourCC {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(f, "{}", String::from_utf8_lossy(&self.0),)?;
         Ok(())
     }
 }
 
 impl Debug for FourCC {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
         write!(f, "{:?})", &self.0)?;
         Ok(())
@@ -284,7 +286,7 @@ where
         + KnownChunkID
         + Summarizable,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} {}", self.name(), self.data.summary())
     }
 }
@@ -353,7 +355,7 @@ pub struct UnknownChunk {
 }
 
 impl Display for UnknownChunk {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "UnknownChunk({}, {})", self.id, self.size)
     }
 }
@@ -399,7 +401,7 @@ pub enum ChunkEnum {
 }
 
 impl Display for ChunkEnum {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let display_string = match self {
             ChunkEnum::Fmt(e) => e.to_string(),
             ChunkEnum::Data(e) => e.to_string(),
@@ -491,7 +493,7 @@ impl Summarizable for ChunkEnum {
             ChunkEnum::Fmt(e) => Box::new(e.items()),
             ChunkEnum::Info(e) => Box::new(e.items()),
             ChunkEnum::Bext(e) => Box::new(e.items()),
-            _ => Box::new(std::iter::empty()),
+            _ => Box::new(core::iter::empty()),
         }
     }
 }
@@ -529,7 +531,7 @@ mod test {
     // compile time check to ensure all chunks implement consistent traits
     fn has_standard_traits<T>()
     where
-        T: Debug + Display + Clone + PartialEq + Eq + std::hash::Hash + Send + Sync,
+        T: Debug + Display + Clone + PartialEq + Eq + core::hash::Hash + Send + Sync,
     {
     }
 

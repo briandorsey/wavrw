@@ -1,6 +1,5 @@
-use std::io::SeekFrom;
-
 use binrw::binrw;
+use binrw::io::SeekFrom;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 

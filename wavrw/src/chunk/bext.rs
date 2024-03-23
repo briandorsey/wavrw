@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 use binrw::{binrw, helpers};
 
@@ -174,8 +174,8 @@ impl<'a> Iterator for BextDataIterator<'a> {
 #[cfg(test)]
 mod test {
     use binrw::BinRead;
+    use core::str::FromStr;
     use hex::decode;
-    use std::str::FromStr;
 
     use super::*;
     use crate::testing::hex_to_cursor;

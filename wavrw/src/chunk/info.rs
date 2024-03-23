@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Formatter};
+use core::fmt::{Debug, Formatter};
 
 use binrw::{binrw, helpers, NullString};
 use itertools::Itertools;
@@ -81,7 +81,7 @@ impl<const I: u32> KnownChunkID for InfoData<I> {
 }
 
 impl<const I: u32> Debug for InfoData<I> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(
             f,
             "InfoData<{}> {{ value: {:?} }}",

@@ -39,6 +39,11 @@ missing_crate_level_docs = "warn"
 unwrap_used = "warn"
 needless_pass_by_value = "warn"
 
+# no_std helpers
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+
 # recommended by: https://github.com/EmbarkStudios/rust-ecosystem/blob/main/lints.toml
 await_holding_lock = "warn"
 char_lit_as_u8 = "warn"

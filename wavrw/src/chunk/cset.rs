@@ -1,8 +1,6 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display, Formatter},
-    sync::OnceLock,
-};
+use core::fmt::{Debug, Display, Formatter};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 use binrw::binrw;
 
@@ -169,7 +167,7 @@ pub enum RiffCountryCode {
 
 #[allow(clippy::enum_glob_use)]
 impl Display for RiffCountryCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         use RiffCountryCode::*;
         let output = match self {
             None => "None",
@@ -216,7 +214,7 @@ pub struct UnknownCountryCode {
 }
 
 impl Display for UnknownCountryCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "Unknown (0x{:x})", self.country_code)?;
         Ok(())
     }
@@ -233,7 +231,7 @@ pub enum CsetCountryCode {
 }
 
 impl Display for CsetCountryCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "{}",
