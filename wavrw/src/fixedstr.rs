@@ -42,7 +42,11 @@ impl Display for FixedStrError {
 #[derive(Clone, PartialEq, Eq, Hash, BinWrite)]
 pub struct FixedStr<const N: usize>([u8; N]);
 
-// FixedStr display design question. RIFF spec uses ""Z notation for fixed strings. Should we do the same?
+// FixedStr design question: Should this really be FixedString instead of str?
+// And perhaps more fully implement traits, similar to heapless::String
+// (https://docs.rs/heapless/latest/heapless/struct.String.html)?
+
+// FixedStr display design question: RIFF spec uses ""Z notation for fixed strings. Should we do the same?
 
 impl<const N: usize> Debug for FixedStr<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
