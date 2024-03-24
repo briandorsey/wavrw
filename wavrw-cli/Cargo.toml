@@ -23,4 +23,8 @@ clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-contex
 [[bin]]
 name = "wavrw"
 
+# disable docs in CLI to avoid rustdoc collision
+# https://github.com/rust-lang/cargo/issues/6313
+doc = false
+
 
