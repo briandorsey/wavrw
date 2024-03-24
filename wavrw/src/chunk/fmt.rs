@@ -4,7 +4,12 @@ use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
-#[allow(dead_code)]
+/// A number indicating the WAVE format category of the file.
+///
+/// The content of the format-specific-fields [ed: everything after block_align]
+/// portion of the fmt chunk, and the interpretation of the waveform data, depend on
+/// this value. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+#[allow(dead_code, missing_docs)]
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
@@ -565,11 +570,36 @@ impl Display for FormatTag {
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FmtData {
+    /// A number indicating the WAVE format category of the file.
     pub format_tag: FormatTag,
+
+    /// The number of channels represented in the waveform data.
+    ///
+    /// Example: 1 for mono or 2 for stereo.
     pub channels: u16,
+
+    /// The sampling rate at which each channel should be played.
     pub samples_per_sec: u32,
+
+    /// The average number of bytes per second at which the waveform data should be transferred.
+    ///
+    /// Playback software can estimate the buffer size using this value.
     pub avg_bytes_per_sec: u32,
+
+    /// The block alignment (in bytes) of the waveform data.
+    ///
+    /// Playback software needs to process a multiple of wBlockAlign bytes
+    /// of data at a time, so the value of wBlockAlign can be used for
+    /// buffer alignment. The wBlockAlign field should be equal to the
+    /// following formula, rounded to the next whole number: wChannels x
+    /// ( wBitsPerSample / 8 )
     pub block_align: u16,
+
+    /// The number of bits used to represent each sample of each channel.
+    ///
+    /// If there are multiple channels, the sample size is the same for each
+    /// channel. The wBlockAlign field should be equal to the following formula,
+    /// rounded to the next whole number: wChannels x ( wBitsPerSample / 8 )
     pub bits_per_sample: u16,
 }
 // TODO: properly handle different fmt chunk additions from later specs

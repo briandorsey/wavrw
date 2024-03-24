@@ -11,16 +11,20 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `adtl` Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
+/// `LIST-adtl` Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
 pub struct ListAdtlData {
+    /// A four-character code that identifies the contents of the list.
     #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
     pub list_type: FourCC,
+
+    /// Sub chunks contained within this LIST
     #[br(parse_with = helpers::until_eof)]
     #[bw()]
     pub chunks: Vec<AdtlEnum>,
 }
 
 impl ListAdtlData {
+    /// Chunk id constant: `adtl`
     pub const LIST_TYPE: FourCC = FourCC(*b"adtl");
 }
 
@@ -138,6 +142,7 @@ pub struct LtxtData {
     ///	Specifies the code page for the text. See CSET chunk for details.
     pub code_page: u16,
 
+    /// The text associated with this range.
     #[br(align_after = 2, count = size as u64 -4 -4 -4 -2 -2 -2 -2)]
     pub text: Vec<u8>,
 }
@@ -201,6 +206,8 @@ impl Summarizable for FileData {
 /// `file` Information embedded in other file formats.
 pub type File = KnownChunk<FileData>;
 
+/// All `LIST-adtl` chunk structs as an enum
+#[allow(missing_docs)]
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -216,8 +223,9 @@ pub enum AdtlEnum {
         raw: Vec<u8>,
     },
 }
-impl AdtlEnum {
-    pub fn id(&self) -> FourCC {
+
+impl ChunkID for AdtlEnum {
+    fn id(&self) -> FourCC {
         match self {
             AdtlEnum::Labl(e) => e.id(),
             AdtlEnum::Note(e) => e.id(),
@@ -226,8 +234,10 @@ impl AdtlEnum {
             AdtlEnum::Unknown { id, .. } => *id,
         }
     }
+}
 
-    pub fn summary(&self) -> String {
+impl Summarizable for AdtlEnum {
+    fn summary(&self) -> String {
         match self {
             AdtlEnum::Labl(e) => e.summary(),
             AdtlEnum::Note(e) => e.summary(),

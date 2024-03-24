@@ -9,8 +9,13 @@ use crate::FourCC;
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Riff {
+    /// RIFF chunk id.
     pub id: FourCC,
+
+    /// RIFF chunk size in bytes.
     pub size: u32,
+
+    /// A [`FourCC`] identifying the data representation, or _form type_, of the file.
     pub form_type: FourCC,
 }
 

@@ -47,7 +47,7 @@ pub trait KnownChunkID {
 
 /// Retrieve a chunk ID from a chunk (even if dynamic, ex: [`UnknownChunk`]).
 pub trait ChunkID {
-    /// Return RIFF chunk id.
+    /// Returns the `FourCC` (chunk id) for the contained chunk.
     fn id(&self) -> FourCC;
 }
 
@@ -74,13 +74,13 @@ pub trait Summarizable: ChunkID {
         self.id().to_string().trim().to_string()
     }
 
-    /// Returns an iterator over a sequence of contents of the contained
+    /// Returns an iterator over a sequence of contents of the
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(core::iter::empty())
     }
 
-    /// Alternative header for use above `items`
+    /// Alternative header for use above `items()`.
     fn item_summary_header(&self) -> String {
         self.summary()
     }
@@ -253,17 +253,21 @@ type KCArgs = (u32,);
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
+    /// RIFF chunk id
     #[br(temp, assert(id == T::ID))]
     #[bw(calc = T::ID)]
     pub id: FourCC,
 
     // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
+    /// RIFF chunk size in bytes
     pub size: u32,
 
     #[br(temp)]
     #[bw(ignore)]
     begin_pos: PosValue<()>,
-    // ensure that we don't read outside the bounds for this chunk
+
+    // take_seek() to ensure that we don't read outside the bounds for this chunk
+    /// Generic inner data struct
     #[br(map_stream = |r| r.take_seek(size as u64), args(size))]
     pub data: T,
 
@@ -274,7 +278,10 @@ pub struct KnownChunk<
     #[bw(ignore)]
     end_pos: PosValue<()>,
 
-    // calculate how much was read, and read any extra bytes that remain in the chunk
+    // calculate how much was read, then read...
+    /// Any extra bytes in the chunk after parsing
+    ///
+    /// May include RIFF padding byte.
     #[br(align_after = 2, count = size as u64 - (end_pos.pos - begin_pos.pos))]
     pub extra_bytes: Vec<u8>,
 }
@@ -343,6 +350,7 @@ where
 // {
 // }
 
+/// Raw chunk data container for unrecognized chunks
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -380,10 +388,12 @@ impl Summarizable for UnknownChunk {
 
 // impl Chunk for UnknownChunk {}
 
+/// All chunk structs as an enum
+#[allow(missing_docs)]
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ChunkEnum {
+pub enum SizedChunkEnum {
     Fmt(Fmt),
     Data(Data),
     Fact(Fact),
@@ -400,99 +410,95 @@ pub enum ChunkEnum {
     Unknown(UnknownChunk),
 }
 
-impl Display for ChunkEnum {
+impl Display for SizedChunkEnum {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let display_string = match self {
-            ChunkEnum::Fmt(e) => e.to_string(),
-            ChunkEnum::Data(e) => e.to_string(),
-            ChunkEnum::Fact(e) => e.to_string(),
-            ChunkEnum::Cue(e) => e.to_string(),
-            ChunkEnum::Info(e) => e.to_string(),
-            ChunkEnum::Adtl(e) => e.to_string(),
-            ChunkEnum::Cset(e) => e.to_string(),
-            ChunkEnum::Plst(e) => e.to_string(),
-            ChunkEnum::Bext(e) => e.to_string(),
-            ChunkEnum::Md5(e) => e.to_string(),
-            ChunkEnum::Fllr(e) => e.to_string(),
-            ChunkEnum::Junk(e) => e.to_string(),
-            ChunkEnum::Pad(e) => e.to_string(),
-            ChunkEnum::Unknown(e) => e.to_string(),
+            SizedChunkEnum::Fmt(e) => e.to_string(),
+            SizedChunkEnum::Data(e) => e.to_string(),
+            SizedChunkEnum::Fact(e) => e.to_string(),
+            SizedChunkEnum::Cue(e) => e.to_string(),
+            SizedChunkEnum::Info(e) => e.to_string(),
+            SizedChunkEnum::Adtl(e) => e.to_string(),
+            SizedChunkEnum::Cset(e) => e.to_string(),
+            SizedChunkEnum::Plst(e) => e.to_string(),
+            SizedChunkEnum::Bext(e) => e.to_string(),
+            SizedChunkEnum::Md5(e) => e.to_string(),
+            SizedChunkEnum::Fllr(e) => e.to_string(),
+            SizedChunkEnum::Junk(e) => e.to_string(),
+            SizedChunkEnum::Pad(e) => e.to_string(),
+            SizedChunkEnum::Unknown(e) => e.to_string(),
         };
         write!(f, "{}", display_string)
     }
 }
 
-impl ChunkID for ChunkEnum {
-    /// Returns the `FourCC` (chunk id) for the contained chunk.
+impl ChunkID for SizedChunkEnum {
     fn id(&self) -> FourCC {
         match self {
-            ChunkEnum::Fmt(e) => e.id(),
-            ChunkEnum::Data(e) => e.id(),
-            ChunkEnum::Fact(e) => e.id(),
-            ChunkEnum::Cue(e) => e.id(),
-            ChunkEnum::Info(e) => e.id(),
-            ChunkEnum::Adtl(e) => e.id(),
-            ChunkEnum::Cset(e) => e.id(),
-            ChunkEnum::Plst(e) => e.id(),
-            ChunkEnum::Bext(e) => e.id(),
-            ChunkEnum::Md5(e) => e.id(),
-            ChunkEnum::Fllr(e) => e.id(),
-            ChunkEnum::Junk(e) => e.id(),
-            ChunkEnum::Pad(e) => e.id(),
-            ChunkEnum::Unknown(e) => e.id(),
+            SizedChunkEnum::Fmt(e) => e.id(),
+            SizedChunkEnum::Data(e) => e.id(),
+            SizedChunkEnum::Fact(e) => e.id(),
+            SizedChunkEnum::Cue(e) => e.id(),
+            SizedChunkEnum::Info(e) => e.id(),
+            SizedChunkEnum::Adtl(e) => e.id(),
+            SizedChunkEnum::Cset(e) => e.id(),
+            SizedChunkEnum::Plst(e) => e.id(),
+            SizedChunkEnum::Bext(e) => e.id(),
+            SizedChunkEnum::Md5(e) => e.id(),
+            SizedChunkEnum::Fllr(e) => e.id(),
+            SizedChunkEnum::Junk(e) => e.id(),
+            SizedChunkEnum::Pad(e) => e.id(),
+            SizedChunkEnum::Unknown(e) => e.id(),
         }
     }
 }
 
-impl SizedChunk for ChunkEnum {
-    /// Returns the logical (used) size in bytes of the contained chunk.
+impl SizedChunk for SizedChunkEnum {
     fn size(&self) -> u32 {
         match self {
-            ChunkEnum::Fmt(e) => e.size,
-            ChunkEnum::Data(e) => e.size,
-            ChunkEnum::Fact(e) => e.size,
-            ChunkEnum::Cue(e) => e.size,
-            ChunkEnum::Info(e) => e.size,
-            ChunkEnum::Adtl(e) => e.size,
-            ChunkEnum::Cset(e) => e.size,
-            ChunkEnum::Plst(e) => e.size,
-            ChunkEnum::Bext(e) => e.size,
-            ChunkEnum::Md5(e) => e.size,
-            ChunkEnum::Fllr(e) => e.size,
-            ChunkEnum::Junk(e) => e.size,
-            ChunkEnum::Pad(e) => e.size,
-            ChunkEnum::Unknown(e) => e.size,
+            SizedChunkEnum::Fmt(e) => e.size,
+            SizedChunkEnum::Data(e) => e.size,
+            SizedChunkEnum::Fact(e) => e.size,
+            SizedChunkEnum::Cue(e) => e.size,
+            SizedChunkEnum::Info(e) => e.size,
+            SizedChunkEnum::Adtl(e) => e.size,
+            SizedChunkEnum::Cset(e) => e.size,
+            SizedChunkEnum::Plst(e) => e.size,
+            SizedChunkEnum::Bext(e) => e.size,
+            SizedChunkEnum::Md5(e) => e.size,
+            SizedChunkEnum::Fllr(e) => e.size,
+            SizedChunkEnum::Junk(e) => e.size,
+            SizedChunkEnum::Pad(e) => e.size,
+            SizedChunkEnum::Unknown(e) => e.size,
         }
     }
 }
 
-impl Summarizable for ChunkEnum {
-    /// Returns a short text summary of the contents of the contained chunk.
+impl Summarizable for SizedChunkEnum {
     fn summary(&self) -> String {
         match self {
-            ChunkEnum::Fmt(e) => e.summary(),
-            ChunkEnum::Data(e) => e.summary(),
-            ChunkEnum::Fact(e) => e.summary(),
-            ChunkEnum::Cue(e) => e.summary(),
-            ChunkEnum::Info(e) => e.summary(),
-            ChunkEnum::Adtl(e) => e.summary(),
-            ChunkEnum::Cset(e) => e.summary(),
-            ChunkEnum::Plst(e) => e.summary(),
-            ChunkEnum::Bext(e) => e.summary(),
-            ChunkEnum::Md5(e) => e.summary(),
-            ChunkEnum::Fllr(e) => e.summary(),
-            ChunkEnum::Junk(e) => e.summary(),
-            ChunkEnum::Pad(e) => e.summary(),
-            ChunkEnum::Unknown(e) => e.summary(),
+            SizedChunkEnum::Fmt(e) => e.summary(),
+            SizedChunkEnum::Data(e) => e.summary(),
+            SizedChunkEnum::Fact(e) => e.summary(),
+            SizedChunkEnum::Cue(e) => e.summary(),
+            SizedChunkEnum::Info(e) => e.summary(),
+            SizedChunkEnum::Adtl(e) => e.summary(),
+            SizedChunkEnum::Cset(e) => e.summary(),
+            SizedChunkEnum::Plst(e) => e.summary(),
+            SizedChunkEnum::Bext(e) => e.summary(),
+            SizedChunkEnum::Md5(e) => e.summary(),
+            SizedChunkEnum::Fllr(e) => e.summary(),
+            SizedChunkEnum::Junk(e) => e.summary(),
+            SizedChunkEnum::Pad(e) => e.summary(),
+            SizedChunkEnum::Unknown(e) => e.summary(),
         }
     }
-    /// Returns an iterator over a sequence of contents of the contained
-    /// chunk as strings (field, value).
+
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
-            ChunkEnum::Fmt(e) => Box::new(e.items()),
-            ChunkEnum::Info(e) => Box::new(e.items()),
-            ChunkEnum::Bext(e) => Box::new(e.items()),
+            SizedChunkEnum::Fmt(e) => Box::new(e.items()),
+            SizedChunkEnum::Info(e) => Box::new(e.items()),
+            SizedChunkEnum::Bext(e) => Box::new(e.items()),
             _ => Box::new(core::iter::empty()),
         }
     }
@@ -519,7 +525,7 @@ mod test {
 
     #[test]
     fn chunkenum_as_trait() {
-        let md5 = ChunkEnum::Md5(Md5 {
+        let md5 = SizedChunkEnum::Md5(Md5 {
             size: 16,
             data: chunk::Md5Data { md5: 0 },
             extra_bytes: vec![],
@@ -540,6 +546,6 @@ mod test {
         has_standard_traits::<Riff>();
 
         // this Enum transitively ensures the traits of all subchunks
-        has_standard_traits::<ChunkEnum>();
+        has_standard_traits::<SizedChunkEnum>();
     }
 }

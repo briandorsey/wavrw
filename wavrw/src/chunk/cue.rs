@@ -4,6 +4,7 @@ use binrw::binrw;
 
 use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
+/// A position in the waveform `data` chunk.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,10 +36,12 @@ impl CuePoint {
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `cue ` A series of positions in the waveform data chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
+/// `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
 pub struct CueData {
     /// Count of cue points. The number of times the cue-point struct repeats within this chunk.
     pub cue_points: u32, // dwCuePoints
+
+    /// A series of [`CuePoint`]s.
     #[br(count = cue_points)]
     pub points: Vec<CuePoint>,
 }
@@ -62,7 +65,7 @@ impl Default for CueData {
     }
 }
 
-/// `cue ` A series of positions in the waveform data chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
+/// `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
 pub type Cue = KnownChunk<CueData>;
 
 impl Summarizable for CueData {

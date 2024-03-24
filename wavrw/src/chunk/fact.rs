@@ -12,6 +12,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FactData {
+    /// Number of samples for audio in `data` chunk.
     pub samples: u32,
 }
 
@@ -40,7 +41,7 @@ mod test {
     use binrw::BinRead;
 
     use super::*;
-    use crate::{testing::hex_to_cursor, ChunkEnum, ChunkID};
+    use crate::{testing::hex_to_cursor, ChunkID, SizedChunkEnum};
 
     #[test]
     fn factchunk_small_valid() {
@@ -55,10 +56,10 @@ mod test {
 
         // parse via enum wrapper this time
         buff.set_position(0);
-        let en = ChunkEnum::read(&mut buff).unwrap();
+        let en = SizedChunkEnum::read(&mut buff).unwrap();
         dbg!(&en);
         assert_eq!(en.id(), FourCC(*b"fact"));
-        let ChunkEnum::Fact(fact) = en else {
+        let SizedChunkEnum::Fact(fact) = en else {
             unreachable!("should have been fact")
         };
         assert_eq!(fact.data.samples, 480);

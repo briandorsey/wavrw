@@ -4,6 +4,7 @@ use binrw::binrw;
 
 use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
+/// A segment of the playlist.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,6 +33,8 @@ impl PlstSegment {
 pub struct PlstData {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.
     pub segment_count: u32, // dwSegments
+
+    /// A series of [`PlstSegment`]s.
     #[br(count = segment_count)]
     pub segments: Vec<PlstSegment>,
 }

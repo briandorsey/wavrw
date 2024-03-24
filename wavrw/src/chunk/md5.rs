@@ -10,6 +10,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Md5Data {
+    /// `MD5 ` Checksum of audio `data`.
     pub md5: u128,
 }
 

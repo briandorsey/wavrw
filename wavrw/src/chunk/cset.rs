@@ -12,9 +12,32 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 /// `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
 pub struct CsetData {
+    /// Specifies the code page used for file elements.
+    ///
+    /// If the CSET chunk is not present, or if this field has value zero, assume
+    /// standard ISO 8859/1 code page (identical to code page 1004 without code
+    /// points defined in hex columns 0, 1, 8, and 9).
     pub code_page: u16,
+
+    /// Specifies the country code used for file elements.
+    ///
+    /// See [`RiffCountryCode`] for a list of currently
+    /// defined country codes. If the CSET chunk is not present, or if this
+    /// field has value zero, assume USA (country code 001).
     pub country_code: CsetCountryCode,
+
+    /// Specify the language and dialect used for file elements.
+    ///
+    /// See cset_ld_map, for a list of language and dialect codes. If the CSET
+    /// chunk is not present, or if these fields have value zero, assume US
+    /// English (language code 9, dialect code 1).
     pub language: u16,
+
+    /// Specify the language and dialect used for file elements.
+    ///
+    /// See cset_ld_map, for a list of language and dialect codes. If the CSET
+    /// chunk is not present, or if these fields have value zero, assume US
+    /// English (language code 9, dialect code 1).
     pub dialect: u16,
 }
 
@@ -127,7 +150,8 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
     })
 }
 
-#[allow(dead_code)]
+/// The country codes specified in [RIFF1991](https://wavref.til.cafe/chunk/cset/)
+#[allow(dead_code, missing_docs)]
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
@@ -206,21 +230,36 @@ impl Display for RiffCountryCode {
     }
 }
 
+/// Store any country code found outside of [`RiffCountryCode`].
 #[binrw]
 #[brw(little)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct UnknownCountryCode {
-    pub country_code: u16,
-}
+pub struct UnknownCountryCode(u16);
 
 impl Display for UnknownCountryCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Unknown (0x{:x})", self.country_code)?;
+        write!(f, "Unknown (0x{:x})", self.0)?;
         Ok(())
     }
 }
 
-#[allow(dead_code)]
+impl From<u16> for UnknownCountryCode {
+    fn from(value: u16) -> Self {
+        UnknownCountryCode(value)
+    }
+}
+
+impl From<UnknownCountryCode> for u16 {
+    fn from(value: UnknownCountryCode) -> Self {
+        value.0
+    }
+}
+
+/// Country code enum combining specified and unknown values.
+///
+/// This is to handle values outside of the specification, which are assumed to be
+/// in at least some files.
+#[allow(dead_code, missing_docs)]
 #[binrw]
 #[brw(little)]
 #[repr(u16)]
@@ -244,15 +283,16 @@ impl Display for CsetCountryCode {
     }
 }
 
-impl CsetCountryCode {
-    pub fn new() -> CsetCountryCode {
-        CsetCountryCode::Known(RiffCountryCode::None)
-    }
-}
+// impl CsetCountryCode {
+//     // Constructor depends on try_from, TODO: #86
+//     pub fn new(value: u16) -> CsetCountryCode {
+//         RiffCountryCode::try_from(value)
+//     }
+// }
 
 impl Default for CsetCountryCode {
     fn default() -> Self {
-        CsetCountryCode::new()
+        CsetCountryCode::Known(RiffCountryCode::None)
     }
 }
 
@@ -275,21 +315,25 @@ mod test {
         assert_eq!(canada, RiffCountryCode::Canada);
     }
 
+    // TODO: implement try_from() primitive for enums #86
+    // #[test]
+    // fn riffcountrycode_from_primitive() {
+    //     let canada = RiffCountryCode::try_from(2_u16);
+    //     assert_eq!(canada, Ok(RiffCountryCode::Canada));
+
+    //     let other = RiffCountryCode::try_from(4242_u16);
+    //     assert_eq!(other, Ok(RiffCountryCode::Other(4242_u16)));
+    // }
+
     #[test]
     fn unknowncountrycode() {
-        let country = UnknownCountryCode {
-            country_code: 0xFFFF,
-        };
-        assert_eq!(country.country_code, 0xFFFF);
+        let country = UnknownCountryCode(0xFFFF_u16);
+        let raw_country: u16 = country.into();
+        assert_eq!(raw_country, 0xFFFF_u16);
 
         let mut buff = hex_to_cursor("FFFF");
         let unknown = UnknownCountryCode::read(&mut buff).unwrap();
-        assert_eq!(
-            unknown,
-            UnknownCountryCode {
-                country_code: 0xFFFF
-            }
-        );
+        assert_eq!(unknown, UnknownCountryCode(0xFFFF_u16));
     }
 
     // couldn't find CSET usage in file collection, so just doing a roundtrip test
