@@ -115,6 +115,10 @@ enum Topic {
     /// List currently supported chunks
     #[value(alias = "chunk")]
     Chunks,
+
+    /// Great Wave, by Hokusai
+    #[value(alias = "great_wave")]
+    GreatWave,
 }
 
 fn trim(text: &str, width: u16) -> String {
@@ -302,7 +306,8 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
 fn topic(config: &mut TopicConfig) -> Result<()> {
     match config.topic {
         Topic::Licenses => println!(include_str!("../../generated/licenses.txt")),
-        Topic::Chunks => println!(include_str!("../../static/help/chunks.txt")),
+        Topic::Chunks => println!(include_str!("../../static/topic/chunks.txt")),
+        Topic::GreatWave => println!(include_str!("../../static/topic/wave.ansi")),
     }
     Ok(())
 }
