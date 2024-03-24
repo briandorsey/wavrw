@@ -109,8 +109,12 @@ struct TopicConfig {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum Topic {
     ///  Licences used by wavrw and all dependencies
-    #[value(alias = "licenses")]
-    License,
+    #[value(alias = "license")]
+    Licenses,
+
+    /// List currently supported chunks
+    #[value(alias = "chunk")]
+    Chunks,
 }
 
 fn trim(text: &str, width: u16) -> String {
@@ -297,7 +301,8 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
 
 fn topic(config: &mut TopicConfig) -> Result<()> {
     match config.topic {
-        Topic::License => println!(include_str!("../../generated/licenses.txt")),
+        Topic::Licenses => println!(include_str!("../../generated/licenses.txt")),
+        Topic::Chunks => println!(include_str!("../../static/help/chunks.txt")),
     }
     Ok(())
 }

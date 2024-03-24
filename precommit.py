@@ -1,7 +1,12 @@
 #! /usr/bin/env python3
 
 import subprocess
+import codecs
 
+commands = (["cargo", "run", "--", "help"],
+    ["cargo", "run", "--", "topic", "chunks"],
+)
+    
 def update_readme(path):
     marker = b"## Help overview\n"
     file = open(path, mode="rb")
@@ -9,12 +14,12 @@ def update_readme(path):
     file.close()
     data = data.split(marker)[0]
     #print(data)
-    output = subprocess.check_output(["cargo", "run", "--", "help"])
-    #print(output)
     file = open(path, mode="wb")
     file.write(data)
     file.write(marker)
-    file.write(b"\n```\n" + output + b"\n```\n")
+    for args in commands:
+        output = subprocess.check_output(args)
+        file.write(b"\n```\n$ %s \n%s```\n" % (bytes(" ".join(["wavrw"] + args[3:]), "ascii"), output))
     file.close()
 
 if __name__ == "__main__":
