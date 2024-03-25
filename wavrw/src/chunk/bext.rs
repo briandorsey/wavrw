@@ -44,7 +44,13 @@ pub struct BextData {
     pub reserved: [u8; 180], // Reserved
     /// History coding
     // interpret the remaining bytes as string, ignoring any trailing \x00 bytes
-    #[br(parse_with = helpers::until_eof, map = |v: Vec<u8>| String::from_utf8_lossy(&v).trim_end_matches('\0').to_string())]
+    #[br(parse_with = helpers::until_eof, 
+        try_map = |v: Vec<u8>| {
+            match String::from_utf8(v) {
+                Ok(s) =>  Ok(s.trim_end_matches('\0').to_string()),
+                Err(e) => Err(e),
+            }
+        })]
     #[bw(map = |s: &String| s.as_bytes())]
     pub coding_history: String, // CodingHistory
 }

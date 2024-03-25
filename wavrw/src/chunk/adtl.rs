@@ -96,6 +96,7 @@ pub type Labl = KnownChunk<LablData>;
 pub struct NoteData {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
+
     /// Specifies a NULL-terminated string containing comment text.
     #[br(map= |ns: NullString| ns.to_string())]
     #[bw(map= |s: &String| NullString::from(s.clone()))]
@@ -143,8 +144,11 @@ pub struct LtxtData {
     pub code_page: u16,
 
     /// The text associated with this range.
-    #[br(align_after = 2, count = size as u64 -4 -4 -4 -2 -2 -2 -2)]
-    pub text: Vec<u8>,
+    #[br(count = size as u64 -4 -4 -4 -2 -2 -2 -2, 
+        try_map = |v: Vec<u8>|  String::from_utf8(v) 
+    )]
+    #[bw(map = |s: &String| s.as_bytes())]
+    pub text: String,
 }
 
 impl KnownChunkID for LtxtData {
@@ -158,7 +162,7 @@ impl Summarizable for LtxtData {
             self.name,
             self.sample_length,
             FourCC(self.purpose.to_le_bytes()),
-            String::from_utf8_lossy(&self.text)
+            self.text
         )
     }
 }
@@ -184,7 +188,7 @@ pub struct FileData {
     pub media_type: u32,
 
     /// Contains the media file.
-    #[br(align_after = 2, count = size as u64 -4 -4 )]
+    #[br(count = size as u64 -4 -4 )]
     pub file_data: Vec<u8>,
 }
 
@@ -219,7 +223,8 @@ pub enum AdtlEnum {
     Unknown {
         id: FourCC,
         size: u32,
-        #[br(count = size, align_after=2, pad_size_to= size.to_owned())]
+        #[brw(align_after = 2)]
+        #[br(count = size, pad_size_to= size.to_owned())]
         raw: Vec<u8>,
     },
 }
