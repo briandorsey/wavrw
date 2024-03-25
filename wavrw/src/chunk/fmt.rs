@@ -1,6 +1,7 @@
 use core::fmt::{Display, Formatter};
 
 use binrw::binrw;
+use num_enum::{FromPrimitive, IntoPrimitive};
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
@@ -13,7 +14,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, FromPrimitive)]
 pub enum FormatTag {
     Unknown = 0x0000,
     Pcm = 0x0001,
@@ -283,6 +284,8 @@ pub enum FormatTag {
     Flac = 0xF1AC,
     Extensible = 0xFFFE,
     Development = 0xFFFF,
+    #[num_enum(catch_all)]
+    Other(u16) = 0xABCD,
 }
 
 #[allow(clippy::enum_glob_use)]
@@ -556,11 +559,21 @@ impl Display for FormatTag {
             Codian => "WAVE_FORMAT_CODIAN",
             DolbyAc4 => "WAVE_FORMAT_DOLBY_AC4",
             Flac => "WAVE_FORMAT_FLAC",
+            Other(_) => "Unknown FormatTag",
             Extensible => "WAVE_FORMAT_EXTENSIBLE",
             Development => "WAVE_FORMAT_DEVELOPMENT",
         };
-        write!(f, "{} (0x{:x})", output, *self as u16)?;
+        write!(f, "{} (0x{:04x})", output, u16::from(*self))?;
         Ok(())
+    }
+}
+
+impl TryFrom<&FormatTag> for u16 {
+    // infalible, but binrw seems to need TryFrom?
+    type Error = binrw::io::Error;
+
+    fn try_from(value: &FormatTag) -> Result<Self, Self::Error> {
+        Ok(u16::from(*value))
     }
 }
 
@@ -699,5 +712,21 @@ mod test {
         let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
         // hexdump(remaining_input);
+    }
+
+    #[test]
+    fn formattag_primitive() {
+        let pcm = FormatTag::from(1u16);
+        assert_eq!(pcm, FormatTag::Pcm);
+
+        let unknown = FormatTag::from(0x4242u16);
+        assert_eq!(unknown, FormatTag::Other(0x4242_u16));
+        assert_eq!(unknown.to_string(), "Unknown FormatTag (0x4242)");
+
+        // make sure parsing into Other() works
+        let mut buff = hex_to_cursor("666D7420 10000000 00420100 80BB0000 80320200 03001800");
+        let expected = FormatTag::Other(0x4200);
+        let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
+        assert_eq!(chunk.data.format_tag, expected);
     }
 }

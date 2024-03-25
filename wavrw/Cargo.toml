@@ -17,6 +17,7 @@ binrw = "0.13.3"
 hex = "0.4.3"
 hexdump = "0.1.1"
 itertools.workspace = true
+num_enum = "0.7.2"
 tracing.workspace = true
 
 [dev-dependencies]

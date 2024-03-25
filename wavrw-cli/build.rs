@@ -15,7 +15,8 @@ fn main() -> std::io::Result<()> {
         .current_dir(root_dir)
         .arg("license")
         .arg("--avoid-dev-deps")
-        .arg("--avoid-build-deps")
+        // this seems to be too agressive, leaving out some used libraries
+        // .arg("--avoid-build-deps")
         .arg("-d")
         .output()?;
     // println!("{}", String::from_utf8_lossy(&output.stdout));

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use binrw::binrw;
+use num_enum::{FromPrimitive, IntoPrimitive};
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
@@ -24,7 +25,7 @@ pub struct CsetData {
     /// See [`RiffCountryCode`] for a list of currently
     /// defined country codes. If the CSET chunk is not present, or if this
     /// field has value zero, assume USA (country code 001).
-    pub country_code: CsetCountryCode,
+    pub country_code: RiffCountryCode,
 
     /// Specify the language and dialect used for file elements.
     ///
@@ -155,7 +156,7 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
 #[binrw]
 #[brw(little, repr = u16)]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, IntoPrimitive, FromPrimitive)]
 pub enum RiffCountryCode {
     None = 0x0,
     UnitedStates = 0x1,
@@ -187,6 +188,8 @@ pub enum RiffCountryCode {
     Luxembourg = 0x352,
     Iceland = 0x354,
     Finland = 0x358,
+    #[num_enum(catch_all)]
+    Unknown(u16),
 }
 
 #[allow(clippy::enum_glob_use)]
@@ -224,75 +227,27 @@ impl Display for RiffCountryCode {
             Luxembourg => "Luxembourg",
             Iceland => "Iceland",
             Finland => "Finland",
+            Unknown(_) => "Unknown Country Code",
         };
-        write!(f, "{}({})", output, *self as u16)?;
+        write!(f, "{}({})", output, u16::from(*self))?;
         Ok(())
     }
 }
 
-/// Store any country code found outside of [`RiffCountryCode`].
-#[binrw]
-#[brw(little)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct UnknownCountryCode(u16);
-
-impl Display for UnknownCountryCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Unknown (0x{:x})", self.0)?;
-        Ok(())
-    }
-}
-
-impl From<u16> for UnknownCountryCode {
-    fn from(value: u16) -> Self {
-        UnknownCountryCode(value)
-    }
-}
-
-impl From<UnknownCountryCode> for u16 {
-    fn from(value: UnknownCountryCode) -> Self {
-        value.0
-    }
-}
-
-/// Country code enum combining specified and unknown values.
-///
-/// This is to handle values outside of the specification, which are assumed to be
-/// in at least some files.
-#[allow(dead_code, missing_docs)]
-#[binrw]
-#[brw(little)]
-#[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CsetCountryCode {
-    Known(RiffCountryCode),
-    Unknown(UnknownCountryCode),
-}
-
-impl Display for CsetCountryCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                CsetCountryCode::Known(c) => c.to_string(),
-                CsetCountryCode::Unknown(c) => c.to_string(),
-            }
-        )?;
-        Ok(())
-    }
-}
-
-// impl CsetCountryCode {
-//     // Constructor depends on try_from, TODO: #86
-//     pub fn new(value: u16) -> CsetCountryCode {
-//         RiffCountryCode::try_from(value)
-//     }
-// }
-
-impl Default for CsetCountryCode {
+// num_enum: Attribute `catch_all` is mutually exclusive with `default`
+#[allow(clippy::derivable_impls)]
+impl Default for RiffCountryCode {
     fn default() -> Self {
-        CsetCountryCode::Known(RiffCountryCode::None)
+        RiffCountryCode::None
+    }
+}
+
+impl TryFrom<&RiffCountryCode> for u16 {
+    // infalible, but binrw seems to need TryFrom?
+    type Error = binrw::io::Error;
+
+    fn try_from(value: &RiffCountryCode) -> Result<Self, Self::Error> {
+        Ok(u16::from(*value))
     }
 }
 
@@ -308,32 +263,11 @@ mod test {
     #[test]
     fn riffcountrycode() {
         let country = RiffCountryCode::Canada;
-        assert_eq!(country as u16, 2);
+        assert_eq!(u16::from(country), 2);
 
         let mut buff = hex_to_cursor("0200");
         let canada: RiffCountryCode = RiffCountryCode::read(&mut buff).unwrap();
         assert_eq!(canada, RiffCountryCode::Canada);
-    }
-
-    // TODO: implement try_from() primitive for enums #86
-    // #[test]
-    // fn riffcountrycode_from_primitive() {
-    //     let canada = RiffCountryCode::try_from(2_u16);
-    //     assert_eq!(canada, Ok(RiffCountryCode::Canada));
-
-    //     let other = RiffCountryCode::try_from(4242_u16);
-    //     assert_eq!(other, Ok(RiffCountryCode::Other(4242_u16)));
-    // }
-
-    #[test]
-    fn unknowncountrycode() {
-        let country = UnknownCountryCode(0xFFFF_u16);
-        let raw_country: u16 = country.into();
-        assert_eq!(raw_country, 0xFFFF_u16);
-
-        let mut buff = hex_to_cursor("FFFF");
-        let unknown = UnknownCountryCode::read(&mut buff).unwrap();
-        assert_eq!(unknown, UnknownCountryCode(0xFFFF_u16));
     }
 
     // couldn't find CSET usage in file collection, so just doing a roundtrip test
@@ -343,7 +277,7 @@ mod test {
             size: 8,
             data: CsetData {
                 code_page: 1,
-                country_code: CsetCountryCode::Known(RiffCountryCode::Canada),
+                country_code: RiffCountryCode::Canada,
                 language: 12,
                 dialect: 3,
             },
@@ -357,15 +291,27 @@ mod test {
         let after = Cset::read(&mut buff).unwrap();
         assert_eq!(after, cset);
         assert_eq!(after.data.code_page, 1);
-        assert_eq!(
-            after.data.country_code,
-            CsetCountryCode::Known(RiffCountryCode::Canada)
-        );
+        assert_eq!(after.data.country_code, RiffCountryCode::Canada);
         assert_eq!(after.data.language, 12);
         assert_eq!(after.data.dialect, 3);
         assert_eq!(
             after.summary(),
             "code_page: (1), Canada(2), French(12), Canadian(3)"
         );
+    }
+
+    #[test]
+    fn cset_primitive() {
+        let none = RiffCountryCode::from(0u16);
+        assert_eq!(none, RiffCountryCode::None);
+
+        let unknown = RiffCountryCode::from(4242u16);
+        assert_eq!(unknown, RiffCountryCode::Unknown(4242_u16));
+        assert_eq!(unknown.to_string(), "Unknown Country Code(4242)");
+
+        // make sure it works via BinRead as well
+        let mut buff = hex_to_cursor("0042");
+        let unknown: RiffCountryCode = RiffCountryCode::read(&mut buff).unwrap();
+        assert_eq!(unknown, RiffCountryCode::Unknown(0x4200));
     }
 }

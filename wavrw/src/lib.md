@@ -38,7 +38,7 @@ let chunk = SizedChunkEnum::read(&mut buff).unwrap();
 
 // Use methods from SizedChunk trait on any chunk
 assert_eq!(chunk.id(), FourCC(*b"fmt "));
-assert_eq!(chunk.summary(), "PCM (0x1), 1 chan, 24/48000".to_string());
+assert_eq!(chunk.summary(), "PCM (0x0001), 1 chan, 24/48000".to_string());
 
 // Or match on type and handle various chunks individually
 match chunk {

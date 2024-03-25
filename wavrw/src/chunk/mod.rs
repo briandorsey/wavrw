@@ -14,7 +14,7 @@ mod plst;
 mod riff;
 
 pub use bext::{Bext, BextData};
-pub use cset::{Cset, CsetCountryCode, CsetData, RiffCountryCode, UnknownCountryCode};
+pub use cset::{Cset, CsetData, RiffCountryCode};
 pub use cue::{Cue, CueData, CuePoint};
 pub use data::{Data, DataData};
 pub use fact::{Fact, FactData};
