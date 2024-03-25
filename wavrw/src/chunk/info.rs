@@ -91,13 +91,9 @@ impl<const I: u32> KnownChunkID for InfoData<I> {
 
 impl<const I: u32> Debug for InfoData<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        write!(
-            f,
-            "InfoData<{}> {{ text: {:?} }}",
-            String::from_utf8_lossy(I.to_le_bytes().as_slice()),
-            self.text,
-        )?;
-        Ok(())
+        f.debug_struct(&format!("InfoData<{}>", Self::ID))
+            .field("text", &self.text)
+            .finish()
     }
 }
 
@@ -433,6 +429,7 @@ mod test {
         let icmt = IcmtData {
             text: "comment".to_string(),
         };
+        println!("{icmt:?}");
         assert!(format!("{icmt:?}").starts_with("InfoData<ICMT>"));
     }
 

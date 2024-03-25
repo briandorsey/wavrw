@@ -125,9 +125,9 @@ impl Display for FourCC {
 
 impl Debug for FourCC {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        write!(f, "FourCC({}=", String::from_utf8_lossy(&self.0),)?;
-        write!(f, "{:?})", &self.0)?;
-        Ok(())
+        f.debug_tuple("FourCC")
+            .field(&format!("*b{}", &self.to_string()))
+            .finish()
     }
 }
 
@@ -253,13 +253,13 @@ type KCArgs = (u32,);
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
-    /// RIFF chunk id
+    /// RIFF chunk id.
     #[br(temp, assert(id == T::ID))]
     #[bw(calc = T::ID)]
     pub id: FourCC,
 
     // TODO: calc by querying content + extra_bytes.len() when writing, or seeking back after you know
-    /// RIFF chunk size in bytes
+    /// RIFF chunk size in bytes.
     pub size: u32,
 
     #[br(temp)]
@@ -267,7 +267,7 @@ pub struct KnownChunk<
     begin_pos: PosValue<()>,
 
     // take_seek() to ensure that we don't read outside the bounds for this chunk
-    /// Generic inner data struct
+    /// Generic inner data struct.
     #[br(map_stream = |r| r.take_seek(size as u64), args(size))]
     pub data: T,
 
@@ -279,10 +279,11 @@ pub struct KnownChunk<
     end_pos: PosValue<()>,
 
     // calculate how much was read, then read...
-    /// Any extra bytes in the chunk after parsing
+    /// Any extra bytes in the chunk after parsing.
     ///
     /// May include RIFF padding byte.
-    #[br(align_after = 2, count = size as u64 - (end_pos.pos - begin_pos.pos))]
+    #[brw(align_after = 2)]
+    #[br(count = size as u64 - (end_pos.pos - begin_pos.pos))]
     pub extra_bytes: Vec<u8>,
 }
 
@@ -357,8 +358,8 @@ where
 pub struct UnknownChunk {
     id: FourCC,
     size: u32,
-    #[br(align_after = 2, count = size )]
-    #[bw(align_after = 2)]
+    #[brw(align_after = 2)]
+    #[br(count = size )]
     raw: Vec<u8>,
 }
 
@@ -511,6 +512,16 @@ impl Summarizable for SizedChunkEnum {
 mod test {
 
     use super::*;
+
+    #[test]
+    fn fourcc() {
+        let f = FourCC(*b"TST ");
+
+        println!("Display: {f}");
+        assert_eq!(f.to_string(), "TST ");
+        println!("Debug: {f:?}");
+        assert_eq!(format!("{f:?}"), r#"FourCC("*bTST ")"#);
+    }
 
     #[test]
     fn knownchunk_as_trait() {
