@@ -129,7 +129,7 @@ pub struct LtxtData {
     pub sample_length: u32,
 
     /// Specifies the type or purpose of the text. For example, dwPurpose can specify a FOURCC code like `scrp` for script text or `capt` for close-caption text. `rgn ` is commonly used for "region notes"
-    pub purpose: u32,
+    pub purpose: FourCC,
 
     /// Specifies the country code for the text. See "Country Codes" in CSET chunk, for a current list of country codes.
     pub country_code: u16,
@@ -161,7 +161,7 @@ impl Summarizable for LtxtData {
             "{:>3}, len:{}, purpose:{}, {}",
             self.name,
             self.sample_length,
-            FourCC(self.purpose.to_le_bytes()),
+            self.purpose,
             self.text
         )
     }
