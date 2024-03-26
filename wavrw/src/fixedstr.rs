@@ -10,9 +10,9 @@ use binrw::io::{Read, Seek, SeekFrom};
 use binrw::{BinRead, BinResult, BinWrite, Endian};
 
 #[derive(Debug, Clone, PartialEq)]
-/// Error when converting from a string would truncate
+/// Errors when creating a [`FixedStr`].
 pub enum FixedStrError {
-    /// Error when converting from a string would truncate
+    /// Input string larger (in bytes) than size (N) of [`FixedStr<N>`]
     Truncated {
         /// The fixed length (N) of [`FixedStr<N>`]
         limit: usize,
@@ -20,13 +20,21 @@ pub enum FixedStrError {
         len: usize,
     },
 
-    /// Embedded [`alloc::string::FromUtf8Error`];
-    FromUtf8Error(FromUtf8Error),
+    /// Input data not valid UTF-8.
+    FromUtf8Error {
+        /// Embedded [`alloc::string::FromUtf8Error`];
+        source: alloc::string::FromUtf8Error,
+        /// Context or reason for the error.
+        context: String,
+    },
 }
 
 impl Error for FixedStrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
+        match &self {
+            FixedStrError::Truncated { .. } => None,
+            FixedStrError::FromUtf8Error { source, .. } => Some(source),
+        }
     }
 }
 
@@ -36,14 +44,22 @@ impl Display for FixedStrError {
             Self::Truncated { limit, len } => {
                 write!(f, "truncated string of length {} at {}", len, limit)
             }
-            Self::FromUtf8Error(err) => write!(f, "{}", err),
+            Self::FromUtf8Error {
+                source: err,
+                context,
+            } => {
+                write!(f, "{}: {}", context, err)
+            }
         }
     }
 }
 
 impl From<FromUtf8Error> for FixedStrError {
     fn from(err: FromUtf8Error) -> Self {
-        FixedStrError::FromUtf8Error(err)
+        FixedStrError::FromUtf8Error {
+            source: err,
+            context: "FixedStr input not UTF-8".into(),
+        }
     }
 }
 
@@ -103,9 +119,16 @@ impl<const N: usize> FixedStr<N> {
     ///
     /// let data = vec![0, 159, 141, 181];
     ///
-    /// let FixedStrError::FromUtf8Error(e) = FixedStr::<4>::from_utf8(data).unwrap_err()
-    ///     else { unreachable!()};
-    /// assert_eq!(e.utf8_error().valid_up_to(), 1);
+    /// match FixedStr::<4>::from_utf8(data) {
+    ///     Ok(_) => unreachable!(),
+    ///     Err(err) => {
+    ///         assert_eq!(
+    ///             err.to_string(),
+    ///             "FixedStr input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
+    ///         );
+    ///     }
+    /// };
+    ///
     /// # Ok::<(), wavrw::fixedstr::FixedStrError>(())
     /// ```
     pub fn from_utf8(vec: Vec<u8>) -> Result<Self, FixedStrError> {
@@ -309,6 +332,42 @@ mod test {
             fs.to_bytes(),
             *v,
             "to_bytes() and serialzation should be the same"
+        );
+    }
+
+    #[test]
+    fn fixedstr_error_handling() {
+        let data = vec![0, 159, 141, 181];
+
+        match FixedStr::<4>::from_utf8(data.clone()) {
+            Ok(_) => unreachable!(),
+            Err(err) => {
+                assert_eq!(
+                    err.to_string(),
+                    "FixedStr input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
+                );
+            }
+        };
+
+        let FixedStrError::FromUtf8Error {
+            source: err,
+            context,
+        } = FixedStr::<4>::from_utf8(data.clone()).unwrap_err()
+        else {
+            unreachable!()
+        };
+        assert_eq!(context, "FixedStr input not UTF-8");
+        assert_eq!(err.utf8_error().valid_up_to(), 1);
+
+        let err = FixedStr::<4>::from_utf8(data.clone()).unwrap_err();
+        assert_eq!(
+            err.source()
+                .unwrap()
+                .downcast_ref::<FromUtf8Error>()
+                .unwrap()
+                .utf8_error()
+                .valid_up_to(),
+            1
         );
     }
 }
