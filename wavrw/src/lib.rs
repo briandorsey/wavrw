@@ -25,7 +25,7 @@ use crate::chunk::Md5;
 use crate::chunk::Pad;
 use crate::chunk::Plst;
 use crate::chunk::Riff;
-pub mod fixedstr;
+pub mod fixedstring;
 pub mod testing;
 
 // helper types

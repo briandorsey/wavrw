@@ -2,7 +2,7 @@ use core::fmt::Debug;
 
 use binrw::{binrw, helpers};
 
-use crate::{fixedstr::FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{fixedstring::FixedString, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII, but we're parsing it as utf8, since
@@ -15,15 +15,15 @@ use crate::{fixedstr::FixedStr, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BextData {
     /// Description of the sound sequence
-    pub description: FixedStr<256>, // Description
+    pub description: FixedString<256>, // Description
     /// Name of the originator
-    pub originator: FixedStr<32>, // Originator
+    pub originator: FixedString<32>, // Originator
     /// Reference of the originator
-    pub originator_reference: FixedStr<32>, // OriginatorReference
+    pub originator_reference: FixedString<32>, // OriginatorReference
     /// yyyy:mm:dd
-    pub origination_date: FixedStr<10>, // OriginationDate
+    pub origination_date: FixedString<10>, // OriginationDate
     /// hh:mm:ss
-    pub origination_time: FixedStr<8>, // OriginationTime
+    pub origination_time: FixedString<8>, // OriginationTime
     /// First sample count since midnight
     pub time_reference: u64, // TimeReference
     /// Version of the BWF; unsigned binary number
@@ -62,11 +62,11 @@ impl KnownChunkID for BextData {
 impl BextData {
     fn new() -> BextData {
         BextData {
-            description: FixedStr::<256>::default(),
-            originator: FixedStr::<32>::default(),
-            originator_reference: FixedStr::<32>::default(),
-            origination_date: FixedStr::<10>::default(),
-            origination_time: FixedStr::<8>::default(),
+            description: FixedString::<256>::default(),
+            originator: FixedString::<32>::default(),
+            originator_reference: FixedString::<32>::default(),
+            origination_date: FixedString::<10>::default(),
+            origination_time: FixedString::<8>::default(),
             time_reference: 0,
             version: 0,
             umid: [0_u8; 64],
@@ -221,27 +221,27 @@ mod test {
         print!("{:?}", bext);
         assert_eq!(
             bext.data.description,
-            FixedStr::<256>::from_str("Description").unwrap(),
+            FixedString::<256>::from_str("Description").unwrap(),
             "description"
         );
         assert_eq!(
             bext.data.originator,
-            FixedStr::<32>::from_str("Originator").unwrap(),
+            FixedString::<32>::from_str("Originator").unwrap(),
             "originator"
         );
         assert_eq!(
             bext.data.originator_reference,
-            FixedStr::<32>::from_str("OriginatorReference").unwrap(),
+            FixedString::<32>::from_str("OriginatorReference").unwrap(),
             "originator_reference"
         );
         assert_eq!(
             bext.data.origination_date,
-            FixedStr::<10>::from_str("2006/01/02").unwrap(),
+            FixedString::<10>::from_str("2006/01/02").unwrap(),
             "origination_date"
         );
         assert_eq!(
             bext.data.origination_time,
-            FixedStr::<8>::from_str("03:04:05").unwrap(),
+            FixedString::<8>::from_str("03:04:05").unwrap(),
             "origination_time"
         );
         assert_eq!(bext.data.time_reference, 12345, "time_reference");

@@ -1,4 +1,4 @@
-#![doc = include_str!("fixedstr.md")]
+#![doc = include_str!("fixedstring.md")]
 
 use alloc::string::FromUtf8Error;
 use core::cmp::min;
@@ -10,11 +10,11 @@ use binrw::io::{Read, Seek, SeekFrom};
 use binrw::{BinRead, BinResult, BinWrite, Endian};
 
 #[derive(Debug, Clone, PartialEq)]
-/// Errors when creating a [`FixedStr`].
-pub enum FixedStrError {
-    /// Input string larger (in bytes) than size (N) of [`FixedStr<N>`]
+/// Errors when creating a [`FixedString`].
+pub enum FixedStringError {
+    /// Input string larger (in bytes) than size (N) of [`FixedString<N>`]
     Truncated {
-        /// The fixed length (N) of [`FixedStr<N>`]
+        /// The fixed length (N) of [`FixedString<N>`]
         limit: usize,
         /// The length of the string that would have been truncated
         len: usize,
@@ -29,16 +29,16 @@ pub enum FixedStrError {
     },
 }
 
-impl Error for FixedStrError {
+impl Error for FixedStringError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match &self {
-            FixedStrError::Truncated { .. } => None,
-            FixedStrError::FromUtf8Error { source, .. } => Some(source),
+            FixedStringError::Truncated { .. } => None,
+            FixedStringError::FromUtf8Error { source, .. } => Some(source),
         }
     }
 }
 
-impl Display for FixedStrError {
+impl Display for FixedStringError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Truncated { limit, len } => {
@@ -54,86 +54,86 @@ impl Display for FixedStrError {
     }
 }
 
-impl From<FromUtf8Error> for FixedStrError {
+impl From<FromUtf8Error> for FixedStringError {
     fn from(err: FromUtf8Error) -> Self {
-        FixedStrError::FromUtf8Error {
+        FixedStringError::FromUtf8Error {
             source: err,
-            context: "FixedStr input not UTF-8".into(),
+            context: "FixedString input not UTF-8".into(),
         }
     }
 }
 
-#[doc = include_str!("fixedstr.md")]
+#[doc = include_str!("fixedstring.md")]
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct FixedStr<const N: usize>(String);
+pub struct FixedString<const N: usize>(String);
 // This is only immutable because it would be a lot of work to correctly DeRef
 // to the inner string while still enforcing the length constraint. Design
 // quesion: is it worth the work? Maybe if it turns out to be annoying to work
 // with them?
 
-impl<const N: usize> Debug for FixedStr<N> {
+impl<const N: usize> Debug for FixedString<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        f.debug_tuple(&format!("FixedStr::<{}>", N))
+        f.debug_tuple(&format!("FixedString::<{}>", N))
             .field(&self.to_string())
             .finish()
     }
 }
 
-impl<const N: usize> Display for FixedStr<N> {
+impl<const N: usize> Display for FixedString<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(f, "{}", &self.0)
     }
 }
 
-impl<const N: usize> FixedStr<N> {
-    /// Length of a [`FixedStr<N>`] is always N.
+impl<const N: usize> FixedString<N> {
+    /// Length of a [`FixedString<N>`] is always N.
     pub fn len(&self) -> usize {
         N
     }
 
-    /// A [`FixedStr`] is never empty or always empty, depending on N.
+    /// A [`FixedString`] is never empty or always empty, depending on N.
     pub const fn is_empty(&self) -> bool {
         !N == 0
     }
 
-    /// Convert UTF-8 bytes into a `FixedStr`.
+    /// Convert UTF-8 bytes into a `FixedString`.
     ///
     /// # Examples
     ///
     /// Basic usage:
     ///
     /// ```
-    /// use wavrw::fixedstr::FixedStr;
+    /// use wavrw::fixedstring::FixedString;
     ///
     /// let tea = vec![240, 159, 141, 181];
-    /// let tea = FixedStr::<4>::from_utf8(tea)?;
+    /// let tea = FixedString::<4>::from_utf8(tea)?;
     ///
     /// assert_eq!("🍵", tea.to_string());
-    /// # Ok::<(), wavrw::fixedstr::FixedStrError>(())
+    /// # Ok::<(), wavrw::fixedstring::FixedStringError>(())
     /// ```
     ///
     /// Invalid UTF-8:
     ///
     /// ```
-    /// use wavrw::fixedstr::{FixedStr, FixedStrError};
+    /// use wavrw::fixedstring::{FixedString, FixedStringError};
     ///
     /// let data = vec![0, 159, 141, 181];
     ///
-    /// match FixedStr::<4>::from_utf8(data) {
+    /// match FixedString::<4>::from_utf8(data) {
     ///     Ok(_) => unreachable!(),
     ///     Err(err) => {
     ///         assert_eq!(
     ///             err.to_string(),
-    ///             "FixedStr input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
+    ///             "FixedString input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
     ///         );
     ///     }
     /// };
     ///
-    /// # Ok::<(), wavrw::fixedstr::FixedStrError>(())
+    /// # Ok::<(), wavrw::fixedstring::FixedStringError>(())
     /// ```
-    pub fn from_utf8(vec: Vec<u8>) -> Result<Self, FixedStrError> {
+    pub fn from_utf8(vec: Vec<u8>) -> Result<Self, FixedStringError> {
         if vec.len() > N {
-            return Err(FixedStrError::Truncated {
+            return Err(FixedStringError::Truncated {
                 limit: N,
                 len: vec.len(),
             });
@@ -153,10 +153,10 @@ impl<const N: usize> FixedStr<N> {
     /// Basic usage:
     ///
     /// ```
-    /// use wavrw::fixedstr::FixedStr;
+    /// use wavrw::fixedstring::FixedString;
     /// use core::str::FromStr;
     ///
-    /// let fs = FixedStr::<6>::from_str("abc").unwrap();
+    /// let fs = FixedString::<6>::from_str("abc").unwrap();
     /// let arr = fs.to_bytes();
     /// assert_eq!(arr.len(), 6);
     /// assert_eq!(arr, [97, 98, 99, 0, 0, 0]);
@@ -170,27 +170,27 @@ impl<const N: usize> FixedStr<N> {
     }
 }
 
-impl<const N: usize> Default for FixedStr<N> {
+impl<const N: usize> Default for FixedString<N> {
     fn default() -> Self {
-        FixedStr::<N>(String::new())
+        FixedString::<N>(String::new())
     }
 }
 
-impl<const N: usize> FromStr for FixedStr<N> {
-    type Err = FixedStrError;
+impl<const N: usize> FromStr for FixedString<N> {
+    type Err = FixedStringError;
 
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         if s.len() > N {
-            return Err(FixedStrError::Truncated {
+            return Err(FixedStringError::Truncated {
                 limit: N,
                 len: s.len(),
             });
         }
-        Ok(FixedStr(s.to_string()))
+        Ok(FixedString(s.to_string()))
     }
 }
 
-impl<const N: usize> BinRead for FixedStr<N> {
+impl<const N: usize> BinRead for FixedString<N> {
     type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
@@ -237,7 +237,7 @@ impl<const N: usize> BinRead for FixedStr<N> {
     }
 }
 
-impl<const N: usize> BinWrite for FixedStr<N> {
+impl<const N: usize> BinWrite for FixedString<N> {
     type Args<'a> = ();
 
     fn write_options<W: std::io::prelude::Write + Seek>(
@@ -266,12 +266,12 @@ mod test {
 
     #[test]
     fn fixed_string() {
-        let fs = FixedStr::<6>("abc".to_string());
+        let fs = FixedString::<6>("abc".to_string());
         assert_eq!(6, fs.len());
         let s = fs.to_string();
         assert_eq!("abc".to_string(), s);
         assert_eq!(3, s.len());
-        let new_fs = FixedStr::<6>::from_str(&s).unwrap();
+        let new_fs = FixedString::<6>::from_str(&s).unwrap();
         assert_eq!(fs, new_fs);
         assert_eq!(6, fs.len());
         assert_eq!(
@@ -282,7 +282,7 @@ mod test {
 
         // Debug string
         println!("{:?}", fs);
-        assert_eq!(format!("{:?}", fs), "FixedStr::<6>(\"abc\")");
+        assert_eq!(format!("{:?}", fs), "FixedString::<6>(\"abc\")");
     }
 
     #[test]
@@ -291,17 +291,17 @@ mod test {
 
         // initializing with ::new() truncates without error
         // let long_str = "this is a longer str";
-        // let fs = FixedStr::<6>::new(long_str);
+        // let fs = FixedString::<6>::new(long_str);
         // assert_eq!(fs.to_string(), "this i");
 
         // via FromStr returns an error
         let long_str = "this is a longer str";
-        let err = FixedStr::<6>::from_str(long_str);
-        assert_eq!(err, Err(FixedStrError::Truncated { limit: 6, len: 20 }));
+        let err = FixedString::<6>::from_str(long_str);
+        assert_eq!(err, Err(FixedStringError::Truncated { limit: 6, len: 20 }));
 
         // via FromStr returns an error
-        let err = "this is a longer str".parse::<FixedStr<6>>();
-        assert_eq!(err, Err(FixedStrError::Truncated { limit: 6, len: 20 }));
+        let err = "this is a longer str".parse::<FixedString<6>>();
+        assert_eq!(err, Err(FixedStringError::Truncated { limit: 6, len: 20 }));
     }
 
     #[test]
@@ -313,14 +313,14 @@ mod test {
         let mut buff = hex_to_cursor(
             "52454150 45520065 72732F62 7269616E 2F70726F 6A656374 732F7761 7672772F",
         );
-        let fs = FixedStr::<32>::read_options(&mut buff, binrw::Endian::Big, ())
-            .expect("error parsing FixedStr");
-        assert_eq!(fs, FixedStr::<32>::from_str("REAPER").unwrap());
+        let fs = FixedString::<32>::read_options(&mut buff, binrw::Endian::Big, ())
+            .expect("error parsing FixedString");
+        assert_eq!(fs, FixedString::<32>::from_str("REAPER").unwrap());
     }
 
     #[test]
     fn fixedstr_bytes_consistent() {
-        let fs = FixedStr::<6>::from_str("abc").unwrap();
+        let fs = FixedString::<6>::from_str("abc").unwrap();
         let mut buff = Cursor::new(Vec::new());
         fs.write_le(&mut buff)
             .expect("failed to serialized with BinWrite");
@@ -339,27 +339,27 @@ mod test {
     fn fixedstr_error_handling() {
         let data = vec![0, 159, 141, 181];
 
-        match FixedStr::<4>::from_utf8(data.clone()) {
+        match FixedString::<4>::from_utf8(data.clone()) {
             Ok(_) => unreachable!(),
             Err(err) => {
                 assert_eq!(
                     err.to_string(),
-                    "FixedStr input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
+                    "FixedString input not UTF-8: invalid utf-8 sequence of 1 bytes from index 1"
                 );
             }
         };
 
-        let FixedStrError::FromUtf8Error {
+        let FixedStringError::FromUtf8Error {
             source: err,
             context,
-        } = FixedStr::<4>::from_utf8(data.clone()).unwrap_err()
+        } = FixedString::<4>::from_utf8(data.clone()).unwrap_err()
         else {
             unreachable!()
         };
-        assert_eq!(context, "FixedStr input not UTF-8");
+        assert_eq!(context, "FixedString input not UTF-8");
         assert_eq!(err.utf8_error().valid_up_to(), 1);
 
-        let err = FixedStr::<4>::from_utf8(data.clone()).unwrap_err();
+        let err = FixedString::<4>::from_utf8(data.clone()).unwrap_err();
         assert_eq!(
             err.source()
                 .unwrap()
