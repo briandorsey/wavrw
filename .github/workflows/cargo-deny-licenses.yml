@@ -4,6 +4,10 @@ on:
     paths:
       - '**/Cargo.lock'
       - '**/Cargo.toml'
+  push:
+    paths:
+      - '**/Cargo.lock'
+      - '**/Cargo.toml'
 jobs:
   cargo-deny:
     runs-on: ubuntu-22.04
