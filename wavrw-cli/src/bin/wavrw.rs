@@ -176,7 +176,9 @@ fn view_line(file: File) -> Result<String> {
     let mut out = String::new();
     let mut chunk_strings: Vec<String> = vec![];
 
-    let parse_res = wavrw::metadata_chunks(file);
+    let mut wave = wavrw::Wave::new(file)?;
+    let parse_res = wave.metadata_chunks();
+
     match parse_res {
         Ok(it) => {
             for chunk_res in it {
@@ -208,7 +210,8 @@ fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
     writeln!(out, "      offset id              size summary")?;
 
     let mut offset: u32 = 12;
-    for res in wavrw::metadata_chunks(file)? {
+    let mut wave = wavrw::Wave::new(file)?;
+    for res in wave.metadata_chunks()? {
         match res {
             Ok(chunk) => {
                 writeln!(
@@ -240,7 +243,8 @@ fn view_detailed(file: File) -> Result<String> {
     writeln!(out, "      offset id              size summary")?;
 
     let mut offset: u32 = 12;
-    for res in wavrw::metadata_chunks(file)? {
+    let mut wave = wavrw::Wave::new(file)?;
+    for res in wave.metadata_chunks()? {
         match res {
             Ok(chunk) => {
                 writeln!(

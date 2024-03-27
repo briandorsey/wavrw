@@ -7,7 +7,8 @@ Iterate over all dyn [`SizedChunk`] chunk objects from a file:
 ```
 # use std::fs::File;
 let file = File::open("../test_wavs/example_a.wav")?;
-for result in wavrw::metadata_chunks(file)? {
+let mut wave = wavrw::Wave::new(file)?;
+for result in wave.metadata_chunks()? {
     match result {
         Ok(chunk) => {
             println!(
@@ -22,7 +23,7 @@ for result in wavrw::metadata_chunks(file)? {
         }
     }
 }
-# Ok::<(), std::io::Error>(())
+# Ok::<(), wavrw::WaveError>(())
 ```
 
 Or parse a single chunk from a buffer:
