@@ -1,6 +1,8 @@
+#![allow(missing_docs)]
 use core::fmt::Write;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+/// Curiosity hex encoding comparison.
 fn hex_benchmark(c: &mut Criterion) {
     let input_int = 73968139221736414906607698143988937859_u128;
 

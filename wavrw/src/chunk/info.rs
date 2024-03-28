@@ -137,7 +137,7 @@ pub type IprdData = InfoData<{ fourcc(b"IPRD") }>;
 /// Subject. Describes the contents of the file, such as "Aerial view of Seattle".
 pub type IsbjData = InfoData<{ fourcc(b"ISBJ") }>;
 /// Software. Identifies the name of the software package used to create the
-/// file, such as "Microsoft WaveEdit".
+/// file, such as "Microsoft Wave Edit".
 pub type IsftData = InfoData<{ fourcc(b"ISFT") }>;
 /// Sharpness. Identifies the changes in sharpness for the digitizer required to
 /// produce the file (the format depends on the hardware used).
@@ -209,7 +209,7 @@ pub type Iprd = KnownChunk<IprdData>;
 /// Subject. Describes the contents of the file, such as "Aerial view of Seattle".
 pub type Isbj = KnownChunk<IsbjData>;
 /// Software. Identifies the name of the software package used to create the
-/// file, such as "Microsoft WaveEdit".
+/// file, such as "Microsoft Wave Edit".
 pub type Isft = KnownChunk<IsftData>;
 /// Sharpness. Identifies the changes in sharpness for the digitizer required to
 /// produce the file (the format depends on the hardware used).
