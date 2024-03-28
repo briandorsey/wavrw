@@ -14,10 +14,10 @@ categories = ["multimedia::encoding", "command-line-utilities"]
 
 [dependencies]
 wavrw = { path = "../wavrw" }
-anyhow.workspace = true
+anyhow = { version = "1.0.68", default-features = false, features = ["std"] }
 tracing.workspace = true
 itertools.workspace = true
-tracing-subscriber = "0.3.18"
+tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"]}
 clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
 
 [[bin]]

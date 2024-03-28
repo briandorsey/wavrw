@@ -15,8 +15,7 @@ keywords = ["parser", "metadata", "wav"]
 categories = ["multimedia::encoding", "parser-implementations"]
 
 [workspace.dependencies]
-anyhow = "1.0.68"
-tracing = "0.1.40"
+tracing = { version = "0.1.40", default-features = false, features = ["attributes"] }
 itertools = "0.12.0"
 
 [profile.release]
