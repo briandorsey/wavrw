@@ -127,9 +127,9 @@ impl Display for FourCC {
 
 impl Debug for FourCC {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        f.debug_tuple("FourCC")
-            .field(&format!("*b{}", &self.to_string()))
-            .finish()
+        write!(f, "FourCC(*b\"{}\"=", self.to_string())?;
+        write!(f, "{:?})", &self.0)?;
+        Ok(())
     }
 }
 
