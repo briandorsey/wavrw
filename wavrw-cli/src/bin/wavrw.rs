@@ -189,8 +189,8 @@ fn view_line(file: File) -> Result<String> {
                     Ok(chunk) => {
                         chunk_strings.push(chunk.name());
                     }
-                    Err(err) => {
-                        println!("ERROR: {err}");
+                    Err(_) => {
+                        chunk_strings.push("ERROR".to_string());
                     }
                 }
             }
@@ -291,6 +291,7 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
     paths.sort_unstable();
     for path in paths {
         if path.is_dir() & config.recurse {
+            eprintln!("directory: {}", path.to_string_lossy());
             walk_paths(&path, config)?;
         } else if let Some(ext) = path.extension() {
             let ext = ext.to_ascii_lowercase();
@@ -298,11 +299,13 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
                 continue;
             }
 
-            view(&ViewConfig {
-                wav_path: vec![path.into()],
-                format: Format::Line,
-                ..Default::default()
-            })?;
+            let file = File::open(path.clone())?;
+            let path_name = path.to_string_lossy();
+
+            match view_line(file) {
+                Ok(output) => println!("{path_name}: {output}"),
+                Err(err) => println!("{path_name}: ERROR: {}", err),
+            }
         }
     }
     Ok(())

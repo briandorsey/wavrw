@@ -297,7 +297,7 @@ where
             };
             if offset != reader.stream_position()? {
                 // TODO: inject error into chunk vec and remove print
-                warn!("{}: parsed less data than chunk size", FourCC(chunk_id));
+                warn!("{:?}: parsed less data than chunk size", FourCC(chunk_id));
                 reader.seek(SeekFrom::Start(offset))?;
             }
 
