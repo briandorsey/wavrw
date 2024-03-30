@@ -597,7 +597,6 @@ impl Summarizable for SizedChunkEnum {
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]
@@ -607,7 +606,7 @@ mod test {
         println!("Display: {f}");
         assert_eq!(f.to_string(), "TST ");
         println!("Debug: {f:?}");
-        assert_eq!(format!("{f:?}"), r#"FourCC("*bTST ")"#);
+        assert_eq!(format!("{f:?}"), r#"FourCC(*b"TST "=[84, 83, 84, 32])"#);
     }
 
     #[test]
