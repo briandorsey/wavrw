@@ -5,8 +5,8 @@ extern crate alloc;
 use core::default::Default;
 use core::fmt::{Debug, Display, Formatter};
 use std::error;
+use std::io::BufRead;
 
-use binrw::io::BufReader;
 use binrw::io::TakeSeekExt;
 use binrw::io::{Read, Seek};
 use binrw::{binrw, io::SeekFrom, BinRead, BinWrite, PosValue};
@@ -203,21 +203,21 @@ impl From<binrw::Error> for WaveError {
 /// Wrapper around RIFF-WAVE data.
 pub struct Wave<R>
 where
-    R: Read + Seek + Debug,
+    R: Read + Seek + Debug + BufRead,
 {
-    bytes: BufReader<R>,
+    bytes: R,
     riff: Riff,
 }
 
 impl<R> Wave<R>
 where
-    R: Read + Seek + Debug,
+    R: Read + Seek + Debug + BufRead,
 {
     /// Create a new Wave handle. This keeps a reference to the data
     /// until dropped.
-    pub fn new(reader: R) -> Result<Self, std::io::Error> {
-        let mut reader = BufReader::new(reader);
-
+    // TODO: consider renaming to from_reader/from_bufreader to avoid changing interface
+    // when later adding write support
+    pub fn new(mut reader: R) -> Result<Self, std::io::Error> {
         let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
         // TODO: convert this temp error into returned wavrw error type
         if riff.form_type != FourCC(*b"WAVE") {
@@ -312,7 +312,7 @@ where
 
 impl<R> Debug for Wave<R>
 where
-    R: Read + Seek + Debug,
+    R: Read + Seek + Debug + BufRead,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Wave").finish()
