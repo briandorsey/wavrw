@@ -31,6 +31,13 @@ future_incompatible = "warn"
 nonstandard_style = "warn"
 rust_2018_idioms = "warn"
 
+# via cliffle
+# don't silently tolerate unsafe code inside functions marked unsafe
+# will be default in Rust 2024, it sounds like
+unsafe_op_in_unsafe_fn = "deny"
+# avoid obfuscated lifetimes 
+elided_lifetimes_in_paths = "deny"
+
 [workspace.lints.rustdoc]
 missing_crate_level_docs = "warn"
 
