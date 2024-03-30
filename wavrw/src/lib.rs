@@ -171,7 +171,7 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 #[derive(Debug)]
 pub enum WaveError {
     /// [`std::io::Error`]s
-    IoError(std::io::Error),
+    Io(std::io::Error),
 
     /// temp placeholder: TODO: delete me
     Other(Box<dyn error::Error + Send + Sync>),
@@ -182,7 +182,7 @@ impl error::Error for WaveError {}
 impl Display for WaveError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            WaveError::IoError(err) => write!(f, "{}", err),
+            WaveError::Io(err) => write!(f, "{}", err),
             WaveError::Other(err) => write!(f, "{}", err),
         }
     }
@@ -190,7 +190,7 @@ impl Display for WaveError {
 
 impl From<std::io::Error> for WaveError {
     fn from(err: std::io::Error) -> Self {
-        WaveError::IoError(err)
+        WaveError::Io(err)
     }
 }
 
