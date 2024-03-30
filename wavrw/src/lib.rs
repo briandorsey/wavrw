@@ -287,7 +287,6 @@ where
                 _ => UnknownChunk::read(&mut reader).map(box_chunk),
             };
             chunks.push(res.map_err(WaveError::from));
-            // .map_err(|err| Box::<dyn error::Error + Send + Sync>::new(err)));
 
             // setup for next iteration
             offset += chunk_size as u64 + 8;
