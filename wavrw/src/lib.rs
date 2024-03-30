@@ -128,7 +128,7 @@ impl Display for FourCC {
 
 impl Debug for FourCC {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        write!(f, "FourCC(*b\"{}\"=", self.to_string())?;
+        write!(f, "FourCC(*b\"{}\"=", self)?;
         write!(f, "{:?})", &self.0)?;
         Ok(())
     }
