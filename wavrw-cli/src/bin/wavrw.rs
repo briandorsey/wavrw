@@ -295,6 +295,7 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
             eprintln!("directory: {}", path.to_string_lossy());
             walk_paths(&path, config)?;
         } else if let Some(ext) = path.extension() {
+            // config.ext entries are assumed to have been converted to lowercase already.
             let ext = ext.to_ascii_lowercase();
             if !config.ext.contains(&ext) {
                 continue;
@@ -337,7 +338,7 @@ fn main() -> Result<()> {
         Commands::View(config) => view(config),
 
         Commands::List(config) => {
-            // TODO: figure out how to do this in CLAP
+            // Convert extensions to lowercase for case insensitive comparison later.
             for ext in &mut config.ext {
                 ext.make_ascii_lowercase();
             }
