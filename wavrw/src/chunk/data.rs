@@ -16,8 +16,9 @@ pub struct DataData {
     // Instead, we're passing in the chunk size and using that.
     // The reason for this dance is to seek past the (often very large)
     // audio data entirely, so we don't read it into KnownChunk.extra_bytes.
-    #[br(count = 0, seek_before(SeekFrom::Start(size.into())))]
-    data: Vec<u8>,
+    #[br(count = 0, seek_before(SeekFrom::Current(size.into())))]
+    #[bw()]
+    pub(crate) data: Vec<u8>,
 }
 
 impl KnownChunkID for DataData {
@@ -32,3 +33,43 @@ impl Summarizable for DataData {
 
 /// `data` Audio samples. This parser skips all audio data (for now). [RIFF1991](https://wavref.til.cafe/spec/riff1991/)
 pub type Data = KnownChunk<DataData>;
+
+#[allow(clippy::dbg_macro)]
+#[cfg(test)]
+mod test {
+    use binrw::{BinRead, BinWrite};
+    use hexdump::hexdump;
+
+    use super::*;
+
+    #[test]
+    fn data_roundtrip() {
+        // validate inner DataData roundtrip. Only works for 0 length since data
+        // chunks aren't read yet.
+        let dd = DataData {
+            data: [8_u8; 0].to_vec(),
+        };
+        let mut buff = std::io::Cursor::new(Vec::<u8>::new());
+        dd.write(&mut buff).unwrap();
+        println!("{:?}", hexdump(buff.get_ref()));
+        buff.set_position(0);
+        let after = DataData::read(&mut buff).unwrap();
+        assert_eq!(after, dd,);
+
+        // validate data roundtrip
+        let data = Data {
+            size: 0,
+            data: DataData {
+                data: [8_u8; 0].to_vec(),
+            },
+            extra_bytes: Vec::new(),
+        };
+        let mut buff = std::io::Cursor::new(Vec::<u8>::new());
+        data.write(&mut buff).unwrap();
+        println!("{:?}", hexdump(buff.get_ref()));
+        buff.set_position(0);
+        let after = Data::read(&mut buff).unwrap();
+        assert_eq!(after, data);
+        println!("length of data as bytes: {}", buff.into_inner().len());
+    }
+}
