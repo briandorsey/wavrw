@@ -12,6 +12,7 @@ mod junk;
 mod md5;
 mod plst;
 mod riff;
+pub mod wavl;
 
 pub use bext::{Bext, BextData};
 pub use cset::{Cset, CsetData, RiffCountryCode};

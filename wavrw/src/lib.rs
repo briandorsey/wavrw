@@ -15,6 +15,7 @@ use tracing::{instrument, trace_span, warn};
 pub mod chunk;
 use crate::chunk::adtl::{ListAdtl, ListAdtlData};
 use crate::chunk::info::{ListInfo, ListInfoData};
+use crate::chunk::wavl::{ListWavl, ListWavlData};
 use crate::chunk::Bext;
 use crate::chunk::Cset;
 use crate::chunk::Cue;
@@ -273,6 +274,7 @@ where
                     match list.form_type {
                         ListInfoData::LIST_TYPE => ListInfo::read(&mut reader).map(box_chunk),
                         ListAdtlData::LIST_TYPE => ListAdtl::read(&mut reader).map(box_chunk),
+                        ListWavlData::LIST_TYPE => ListWavl::read(&mut reader).map(box_chunk),
                         _ => UnknownChunk::read(&mut reader).map(box_chunk),
                     }
                 }
@@ -487,6 +489,7 @@ pub enum SizedChunkEnum {
     Cue(Cue),
     Info(ListInfo),
     Adtl(ListAdtl),
+    Wavl(ListWavl),
     Cset(Cset),
     Plst(Plst),
     Bext(Box<Bext>),
@@ -506,6 +509,7 @@ impl Display for SizedChunkEnum {
             SizedChunkEnum::Cue(e) => e.to_string(),
             SizedChunkEnum::Info(e) => e.to_string(),
             SizedChunkEnum::Adtl(e) => e.to_string(),
+            SizedChunkEnum::Wavl(e) => e.to_string(),
             SizedChunkEnum::Cset(e) => e.to_string(),
             SizedChunkEnum::Plst(e) => e.to_string(),
             SizedChunkEnum::Bext(e) => e.to_string(),
@@ -528,6 +532,7 @@ impl ChunkID for SizedChunkEnum {
             SizedChunkEnum::Cue(e) => e.id(),
             SizedChunkEnum::Info(e) => e.id(),
             SizedChunkEnum::Adtl(e) => e.id(),
+            SizedChunkEnum::Wavl(e) => e.id(),
             SizedChunkEnum::Cset(e) => e.id(),
             SizedChunkEnum::Plst(e) => e.id(),
             SizedChunkEnum::Bext(e) => e.id(),
@@ -549,6 +554,7 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Cue(e) => e.size,
             SizedChunkEnum::Info(e) => e.size,
             SizedChunkEnum::Adtl(e) => e.size,
+            SizedChunkEnum::Wavl(e) => e.size,
             SizedChunkEnum::Cset(e) => e.size,
             SizedChunkEnum::Plst(e) => e.size,
             SizedChunkEnum::Bext(e) => e.size,
@@ -570,6 +576,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Cue(e) => e.summary(),
             SizedChunkEnum::Info(e) => e.summary(),
             SizedChunkEnum::Adtl(e) => e.summary(),
+            SizedChunkEnum::Wavl(e) => e.summary(),
             SizedChunkEnum::Cset(e) => e.summary(),
             SizedChunkEnum::Plst(e) => e.summary(),
             SizedChunkEnum::Bext(e) => e.summary(),

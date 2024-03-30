@@ -15,6 +15,9 @@ LIST-INFO A LIST containing descriptive text chunks:
 	IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, 
 	ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, 
 	ICRD, ICRP, IDPI, IENG. 
+LIST-wavl A LIST containing audio and/or silence chunks: 
+	data Audio samples. This parser skips all audio data (for now). 
+	slnt A count of samples to be played as silence.
 MD5  Checksum of audio data of the WAVE. 
 PAD  Padding, filler or outdated information. 
 plst Play order for cue points. Very rare. 
