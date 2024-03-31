@@ -1,4 +1,4 @@
-name: cargo-deny
+name: cargo-deny-main
 on:
   push:
     branches:
