@@ -89,11 +89,14 @@ struct ListConfig {
     #[arg(default_value = ".")]
     path: OsString,
 
-    /// case insensitive file extensions to include
-    #[arg(long, short, default_value_os = "wav")]
+    /// Filter to only these extensions, case insensitive.
+    ///
+    /// To include multiple extenstions, use commas:
+    /// Ex: --ext=wav,wave
+    #[arg(long, short, value_delimiter = ',', default_value_os = "wav")]
     ext: Vec<OsString>,
 
-    /// recurse through subdirectories as well
+    /// Recurse through subdirectories as well
     #[arg(long, short, default_value_t = false)]
     recurse: bool,
 }
