@@ -50,6 +50,9 @@ std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
 
+# compile error when new enum variants added by dependencies
+wildcard_enum_match_arm = "deny"
+
 # recommended by: https://github.com/EmbarkStudios/rust-ecosystem/blob/main/lints.toml
 await_holding_lock = "warn"
 char_lit_as_u8 = "warn"

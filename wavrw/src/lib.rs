@@ -591,9 +591,20 @@ impl Summarizable for SizedChunkEnum {
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
             SizedChunkEnum::Fmt(e) => Box::new(e.items()),
+            SizedChunkEnum::Cue(e) => Box::new(e.items()),
             SizedChunkEnum::Info(e) => Box::new(e.items()),
+            SizedChunkEnum::Adtl(e) => Box::new(e.items()),
+            SizedChunkEnum::Wavl(e) => Box::new(e.items()),
+            SizedChunkEnum::Cset(e) => Box::new(e.items()),
+            SizedChunkEnum::Plst(e) => Box::new(e.items()),
             SizedChunkEnum::Bext(e) => Box::new(e.items()),
-            _ => Box::new(core::iter::empty()),
+            SizedChunkEnum::Data(_)
+            | SizedChunkEnum::Fact(_)
+            | SizedChunkEnum::Md5(_)
+            | SizedChunkEnum::Fllr(_)
+            | SizedChunkEnum::Junk(_)
+            | SizedChunkEnum::Pad(_)
+            | SizedChunkEnum::Unknown(_) => Box::new(core::iter::empty()),
         }
     }
 }
