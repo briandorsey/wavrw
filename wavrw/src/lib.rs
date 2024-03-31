@@ -111,6 +111,21 @@ fn box_chunk<T: SizedChunk + 'static>(t: T) -> Box<dyn SizedChunk> {
     Box::new(t)
 }
 
+fn box_chunk_res<T>(result: Result<KnownChunk<T>, binrw::Error>) -> Box<dyn SizedChunk>
+where
+    T: for<'a> BinRead<Args<'a> = KCArgs>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + KnownChunkID
+        + Summarizable
+        + Debug
+        + 'static,
+{
+    match result {
+        Ok(chunk) => Box::new(chunk),
+        Err(err) => Box::new(ErrorChunk::from(err)),
+    }
+}
+
 /// RIFF FOURCC type. Four bytes, often readable id of a chunk.
 ///
 /// Used as chunk ids, [`ListInfoData.list_type`], etc.
@@ -170,8 +185,30 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 /// Bin Read Error, Bin Error, Parse Error, Deserialize Error, Chunk Read Error
 #[derive(Debug)]
 pub enum WaveError {
-    /// [`std::io::Error`]s
+    /// An unknown FourCC code, could not process.
+    UnknownFourCC {
+        /// The encountered FourCC code.
+        found: FourCC,
+
+        /// Summary of the context.
+        message: String,
+    },
+
+    /// An error occurred in the underlying reader while reading or seeking to data.
+    ///
+    /// Contains an [`std::io::Error`]
     Io(std::io::Error),
+
+    /// An error occured while parsing wav chunk data.
+    ///
+    /// A string representation of the underlying error.
+    Parse {
+        /// The byte position of the unparsable data in the reader.
+        pos: Option<u64>,
+
+        /// Summary of the underlying parsing error.
+        message: String,
+    },
 
     /// temp placeholder: TODO: delete me
     Other(Box<dyn error::Error + Send + Sync>),
@@ -182,7 +219,9 @@ impl error::Error for WaveError {}
 impl Display for WaveError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            WaveError::Io(err) => write!(f, "{}", err),
+            WaveError::UnknownFourCC { message, .. } => write!(f, "UnknownFourCC: {}", message),
+            WaveError::Io(err) => write!(f, "Io: {}", err),
+            WaveError::Parse { message, .. } => write!(f, "Parse: {}", message),
             WaveError::Other(err) => write!(f, "{}", err),
         }
     }
@@ -194,9 +233,245 @@ impl From<std::io::Error> for WaveError {
     }
 }
 
+/// Map `binrw::Error` to Parse, to avoid introducing external dependencies on it.
 impl From<binrw::Error> for WaveError {
     fn from(err: binrw::Error) -> Self {
-        WaveError::Other(Box::new(err))
+        #[allow(clippy::match_same_arms)] // so _ is its own case
+        match err {
+            binrw::Error::BadMagic { pos, .. }
+            | binrw::Error::Custom { pos, .. }
+            | binrw::Error::EnumErrors { pos, .. }
+            | binrw::Error::NoVariantMatch { pos } => WaveError::Parse {
+                pos: Some(pos),
+                message: err.to_string(),
+            },
+            binrw::Error::AssertFail { pos, message } => WaveError::Parse {
+                pos: Some(pos),
+                message,
+            },
+            binrw::Error::Io(_) | binrw::Error::Backtrace(_) => WaveError::Parse {
+                pos: None,
+                message: err.to_string(),
+            },
+            _ => WaveError::Parse {
+                pos: None,
+                message: err.to_string(),
+            },
+        }
+    }
+}
+
+/// Error wrapper satisfying chunk traits
+#[derive(Debug)]
+pub struct ErrorChunk {
+    error: WaveError,
+}
+
+impl ErrorChunk {
+    fn new(error: WaveError) -> Self {
+        ErrorChunk { error }
+    }
+}
+
+impl Display for ErrorChunk {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ErrorChunk({}, {})", self.id(), self.error)
+    }
+}
+
+impl ChunkID for ErrorChunk {
+    fn id(&self) -> FourCC {
+        FourCC(*b"ERR:")
+    }
+}
+
+impl SizedChunk for ErrorChunk {
+    // TODO: consider this... ErrorChunk isn't actually a sized chunk,
+    // since we don't know its size... bleh.
+    fn size(&self) -> u32 {
+        0
+    }
+}
+
+impl Summarizable for ErrorChunk {
+    fn summary(&self) -> String {
+        self.error.to_string()
+    }
+}
+
+impl From<binrw::Error> for ErrorChunk {
+    fn from(err: binrw::Error) -> Self {
+        Self::new(WaveError::from(err))
+    }
+}
+
+// TODO: test this... use it from the cli
+#[derive(Debug)]
+pub struct WaveIterator<'a, R>
+where
+    R: Read + Seek + Debug + BufRead,
+{
+    reader: &'a mut R,
+    riff_size: u32,
+    finished: bool,
+}
+
+impl<'a, R> WaveIterator<'a, R>
+where
+    R: Read + Seek + Debug + BufRead,
+{
+    fn handle(&mut self, err: WaveError) -> Option<Box<dyn SizedChunk>> {
+        self.finished = true;
+        Some(Box::new(ErrorChunk::new(err)))
+    }
+}
+
+impl<'a, R> Iterator for WaveIterator<'a, R>
+where
+    R: Read + Seek + Debug + BufRead,
+{
+    type Item = Box<dyn SizedChunk>;
+
+    #[instrument]
+    fn next(&mut self) -> Option<Self::Item> {
+        // errors must call self.handle() before returning to avoid infinite iteration
+        // instead, what if we refactored to have a helper function which returned result
+        // io::Error, and we handle turning that into ErrorChunk here?
+        // then we could use ? for all the io::Error issues below.
+        if self.finished {
+            return None;
+        }
+
+        let mut offset = match self.reader.stream_position() {
+            Ok(v) => v,
+            Err(err) => {
+                return self.handle(WaveError::Parse {
+                    pos: None,
+                    message: err.to_string(),
+                })
+            }
+        };
+
+        let mut buff: [u8; 4] = [0; 4];
+        let chunk_id: [u8; 4] = match self.reader.read_exact(&mut buff) {
+            Ok(_) => buff,
+            Err(err) => {
+                return self.handle(WaveError::Parse {
+                    pos: Some(offset),
+                    message: format!("Io: {}", err),
+                });
+            }
+        };
+        let chunk_size = match self.reader.read_exact(&mut buff) {
+            Ok(_) => u32::from_le_bytes(buff),
+            Err(err) => {
+                return self.handle(WaveError::Parse {
+                    pos: Some(offset + 4),
+                    message: format!("Io: {}", err),
+                });
+            }
+        };
+
+        match self.reader.seek(SeekFrom::Current(-8)) {
+            Ok(_) => (),
+            Err(err) => {
+                return self.handle(WaveError::Parse {
+                    pos: Some(offset),
+                    message: format!("Io: {}", err),
+                });
+            }
+        }
+
+        let id = FourCC(chunk_id);
+        let chunk = match id {
+            Fmt::ID => box_chunk_res(Fmt::read(&mut self.reader)),
+            Data::ID => box_chunk_res(Data::read(&mut self.reader)),
+            Fact::ID => box_chunk_res(Fact::read(&mut self.reader)),
+            ListInfo::ID => {
+                let list = match Riff::read(&mut self.reader) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        return self.handle(WaveError::Parse {
+                            pos: Some(offset),
+                            message: err.to_string(),
+                        })
+                    }
+                };
+                match self.reader.seek(SeekFrom::Current(-12)) {
+                    Ok(_) => (),
+                    Err(err) => {
+                        return self.handle(WaveError::Parse {
+                            pos: Some(offset),
+                            message: format!("Io: {}", err),
+                        });
+                    }
+                }
+                match list.form_type {
+                    ListInfoData::LIST_TYPE => box_chunk_res(ListInfo::read(&mut self.reader)),
+                    ListAdtlData::LIST_TYPE => box_chunk_res(ListAdtl::read(&mut self.reader)),
+                    ListWavlData::LIST_TYPE => box_chunk_res(ListWavl::read(&mut self.reader)),
+                    _ => match UnknownChunk::read(&mut self.reader) {
+                        Ok(chunk) => box_chunk(chunk),
+                        Err(err) => Box::new(ErrorChunk::from(err)),
+                    },
+                }
+            }
+            Cue::ID => box_chunk_res(Cue::read(&mut self.reader)),
+            Cset::ID => box_chunk_res(Cset::read(&mut self.reader)),
+            Plst::ID => box_chunk_res(Plst::read(&mut self.reader)),
+            Bext::ID => box_chunk_res(Bext::read(&mut self.reader)),
+            Md5::ID => box_chunk_res(Md5::read(&mut self.reader)),
+            Junk::ID => box_chunk_res(Junk::read(&mut self.reader)),
+            Pad::ID => box_chunk_res(Pad::read(&mut self.reader)),
+            Fllr::ID => box_chunk_res(Fllr::read(&mut self.reader)),
+            _ => match UnknownChunk::read(&mut self.reader) {
+                Ok(chunk) => box_chunk(chunk),
+                Err(err) => Box::new(ErrorChunk::from(err)),
+            },
+        };
+
+        // setup for next iteration
+        offset += chunk_size as u64 + 8;
+        // RIFF offsets must be on word boundaries (divisible by 2)
+        if offset % 2 == 1 {
+            offset += 1;
+        };
+
+        // returns after parsing a chunk would cause a missing chunk
+        // this logic needs refactoring for an iterator, I guess. :/
+        let stream_position = match self.reader.stream_position() {
+            Ok(v) => v,
+            Err(err) => {
+                return self.handle(WaveError::Parse {
+                    pos: Some(offset),
+                    message: format!("Io: {}", err),
+                });
+            }
+        };
+        if offset != stream_position {
+            // TODO: inject error into chunk vec and remove print
+            // oh dang, this is tricky. We actually successfully (probably)
+            // parsed the chunk, but there is still an error.
+            // I guess we could add a syntetic error chunk as well... but...
+            // should we have a mechanism for annotating chunks with
+            // warnings and notes from the parsers?
+            warn!("{:?}: parsed less data than chunk size", FourCC(chunk_id));
+            match self.reader.seek(SeekFrom::Start(offset)) {
+                Ok(_) => (),
+                Err(err) => {
+                    return self.handle(WaveError::Parse {
+                        pos: Some(offset),
+                        message: format!("Io: {}", err),
+                    });
+                }
+            }
+        }
+
+        // TODO: is this correct? Should it be > instead of >=  ??
+        if offset >= self.riff_size as u64 {
+            return None;
+        };
+        Some(chunk)
     }
 }
 
@@ -217,19 +492,31 @@ where
     /// until dropped.
     // TODO: consider renaming to from_reader/from_bufreader to avoid changing interface
     // when later adding write support
-    pub fn new(mut reader: R) -> Result<Self, std::io::Error> {
+    pub fn new(mut reader: R) -> Result<Self, WaveError> {
         let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
-        // TODO: convert this temp error into returned wavrw error type
         if riff.form_type != FourCC(*b"WAVE") {
-            return Err(std::io::Error::other(format!(
-                "not a wave file. Expected RIFF form_type 'WAVE', found: {}",
-                riff.form_type
-            )));
+            return Err(WaveError::UnknownFourCC {
+                found: riff.form_type,
+                message: format!(
+                    "not a wave file. Expected RIFF form_type 'WAVE', found: {}",
+                    riff.form_type
+                ),
+            });
         }
         Ok(Self {
             bytes: reader,
             riff,
         })
+    }
+
+    #[instrument]
+    pub fn iter_chunks<'a>(&'a mut self) -> WaveIterator<'a, R> {
+        tracing::info!("hello, from iter_chunks()");
+        WaveIterator {
+            reader: &mut self.bytes,
+            riff_size: self.riff.size,
+            finished: false,
+        }
     }
 
     // TODO: rename: chunks(), read_chunks()?
@@ -253,9 +540,15 @@ where
         loop {
             let _span_ = trace_span!("metadata_chunks_loop").entered();
 
-            let chunk_id = {
-                reader.read_exact(&mut buff)?;
-                buff
+            let chunk_id: [u8; 4] = match reader.read_exact(&mut buff) {
+                Ok(_) => buff,
+                Err(err) => {
+                    chunks.push(Err(WaveError::Parse {
+                        pos: Some(offset),
+                        message: format!("Io: {}", err),
+                    }));
+                    return Ok(chunks);
+                }
             };
             let chunk_size = {
                 reader.read_exact(&mut buff)?;
@@ -269,7 +562,7 @@ where
                 Data::ID => Data::read(&mut reader).map(box_chunk),
                 Fact::ID => Fact::read(&mut reader).map(box_chunk),
                 ListInfo::ID => {
-                    let list = Riff::read(&mut reader).map_err(std::io::Error::other)?;
+                    let list = Riff::read(&mut reader)?;
                     reader.seek(SeekFrom::Current(-12))?;
                     match list.form_type {
                         ListInfoData::LIST_TYPE => ListInfo::read(&mut reader).map(box_chunk),

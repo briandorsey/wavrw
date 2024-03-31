@@ -12,7 +12,9 @@ use std::{ffi::OsString, io::BufReader};
 use anyhow::Result;
 use clap::{crate_version, ArgAction, Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
+use tracing::instrument;
 use tracing::Level;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -146,6 +148,7 @@ fn trim(text: &str, width: u16) -> String {
     text
 }
 
+#[instrument]
 fn view(config: &ViewConfig) -> Result<()> {
     for path in &config.wav_path {
         let path = PathBuf::from(path);
@@ -176,6 +179,7 @@ fn view(config: &ViewConfig) -> Result<()> {
     Ok(())
 }
 
+#[instrument]
 fn view_line(file: BufReader<File>) -> Result<String> {
     let mut out = String::new();
     let mut chunk_strings: Vec<String> = vec![];
@@ -209,39 +213,34 @@ fn view_line(file: BufReader<File>) -> Result<String> {
     Ok(out)
 }
 
+#[instrument]
 fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
     let mut offset: u32 = 12;
     let mut wave = wavrw::Wave::new(file)?;
-    for res in wave.metadata_chunks()? {
-        match res {
-            Ok(chunk) => {
-                writeln!(
-                    out,
-                    "{:12} {:9} {:10} {}",
-                    offset,
-                    chunk.name(),
-                    chunk.size(),
-                    trim(&chunk.summary(), config.width.saturating_sub(29))
-                )?;
+    for chunk in wave.iter_chunks() {
+        writeln!(
+            out,
+            "{:12} {:9} {:10} {}",
+            offset,
+            chunk.name(),
+            chunk.size(),
+            trim(&chunk.summary(), config.width.saturating_sub(29))
+        )?;
 
-                // remove offset calculations once handled by metadata_chunks()
-                offset += chunk.size() + 8;
-                // RIFF offsets must be on word boundaries (divisible by 2)
-                if offset % 2 == 1 {
-                    offset += 1;
-                };
-            }
-            Err(err) => {
-                println!("ERROR: {err}");
-            }
-        }
+        // remove offset calculations once handled by metadata_chunks()
+        offset += chunk.size() + 8;
+        // RIFF offsets must be on word boundaries (divisible by 2)
+        if offset % 2 == 1 {
+            offset += 1;
+        };
     }
     Ok(out)
 }
 
+#[instrument]
 fn view_detailed(file: BufReader<File>) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
@@ -283,11 +282,13 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
     Ok(out)
 }
 
+#[instrument]
 fn list(config: &ListConfig) -> Result<()> {
     walk_paths(&config.path.clone().into(), config)?;
     Ok(())
 }
 
+#[instrument]
 fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
     let mut paths = fs::read_dir(base_path)?
         .map(|res| res.map(|e| e.path()))
@@ -304,9 +305,10 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
                 continue;
             }
 
-            let file = File::open(path.clone())?;
+            let path_name = path.clone();
+            let path_name = path_name.to_string_lossy();
+            let file = File::open(path)?;
             let file = BufReader::new(file);
-            let path_name = path.to_string_lossy();
 
             match view_line(file) {
                 Ok(output) => println!("{path_name}: {output}"),
@@ -317,6 +319,7 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
     Ok(())
 }
 
+#[instrument]
 fn topic(config: &mut TopicConfig) -> Result<()> {
     match config.topic {
         Topic::Licenses => println!(include_str!("../../generated/licenses.txt")),
@@ -329,9 +332,12 @@ fn topic(config: &mut TopicConfig) -> Result<()> {
     Ok(())
 }
 
+#[instrument]
 fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
+        // TODO: --option to set log level and span events
+        // .with_span_events(FmtSpan::EXIT)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
