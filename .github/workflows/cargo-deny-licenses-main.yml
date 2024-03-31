@@ -1,9 +1,5 @@
 name: cargo-deny
 on:
-  pull_request:
-    paths:
-      - '**/Cargo.lock'
-      - '**/Cargo.toml'
   push:
     branches:
       - main
