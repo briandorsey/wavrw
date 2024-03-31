@@ -2,12 +2,12 @@
 
 #![deny(missing_docs)]
 
-use std::ffi::OsString;
 use std::fmt::Write;
 use std::fs;
 use std::fs::File;
 use std::io;
 use std::path::PathBuf;
+use std::{ffi::OsString, io::BufReader};
 
 use anyhow::Result;
 use clap::{crate_version, ArgAction, Parser, Subcommand, ValueEnum};
@@ -156,6 +156,7 @@ fn view(config: &ViewConfig) -> Result<()> {
 
         print!("{}: ", path.to_string_lossy());
         let file = File::open(path)?;
+        let file = BufReader::new(file);
 
         match config.format {
             Format::Line => {
@@ -172,7 +173,7 @@ fn view(config: &ViewConfig) -> Result<()> {
     Ok(())
 }
 
-fn view_line(file: File) -> Result<String> {
+fn view_line(file: BufReader<File>) -> Result<String> {
     let mut out = String::new();
     let mut chunk_strings: Vec<String> = vec![];
 
@@ -205,7 +206,7 @@ fn view_line(file: File) -> Result<String> {
     Ok(out)
 }
 
-fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
+fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
@@ -238,7 +239,7 @@ fn view_summary(file: File, config: &ViewConfig) -> Result<String> {
     Ok(out)
 }
 
-fn view_detailed(file: File) -> Result<String> {
+fn view_detailed(file: BufReader<File>) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
@@ -294,12 +295,14 @@ fn walk_paths(base_path: &PathBuf, config: &ListConfig) -> Result<()> {
             eprintln!("directory: {}", path.to_string_lossy());
             walk_paths(&path, config)?;
         } else if let Some(ext) = path.extension() {
+            // config.ext entries are assumed to have been converted to lowercase already.
             let ext = ext.to_ascii_lowercase();
             if !config.ext.contains(&ext) {
                 continue;
             }
 
             let file = File::open(path.clone())?;
+            let file = BufReader::new(file);
             let path_name = path.to_string_lossy();
 
             match view_line(file) {
@@ -335,7 +338,7 @@ fn main() -> Result<()> {
         Commands::View(config) => view(config),
 
         Commands::List(config) => {
-            // TODO: figure out how to do this in CLAP
+            // Convert extensions to lowercase for case insensitive comparison later.
             for ext in &mut config.ext {
                 ext.make_ascii_lowercase();
             }

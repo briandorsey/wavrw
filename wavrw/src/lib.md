@@ -6,7 +6,9 @@ Iterate over all dyn [`SizedChunk`] chunk objects from a file:
 
 ```
 # use std::fs::File;
+# use std::io::BufReader; 
 let file = File::open("../test_wavs/example_a.wav")?;
+let file = BufReader::new(file);
 let mut wave = wavrw::Wave::new(file)?;
 for result in wave.metadata_chunks()? {
     match result {
