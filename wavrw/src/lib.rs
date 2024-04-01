@@ -272,16 +272,15 @@ where
             offset += 1;
         };
 
-        // returns after parsing a chunk would cause a missing chunk
-        // this logic needs refactoring for an iterator, I guess. :/
+        // Returning after parsing a chunk would cause a missing chunk.
+        // Oh dang, this is tricky. We actually successfully (probably)
+        // parsed the chunk, but there could be additional errors.
+        // Should we have a mechanism for annotating chunks with
+        // warnings and notes from the parsers?
+        // https://github.com/briandorsey/wavrw/issues/95
+        // if/when fixed, update docs on iter_chunks()
         let stream_position = self.reader.stream_position()?;
-
         if offset != stream_position {
-            // oh dang, this is tricky. We actually successfully (probably)
-            // parsed the chunk, but there is still an error.
-            // I guess we could add a syntetic error chunk as well... but...
-            // should we have a mechanism for annotating chunks with
-            // warnings and notes from the parsers?
             warn!("{:?}: parsed less data than chunk size", FourCC(chunk_id));
             self.reader.seek(SeekFrom::Start(offset))?;
         }
@@ -305,6 +304,9 @@ where
         let (chunk, offset) = match self.parse_next_chunk() {
             Ok(v) => v,
             Err(err) => {
+                // TODO... hmmm... would be great to continue after normal errors
+                // but if we remove this, we get an infinite loop on files
+                // with a larger riff.size than disk size.
                 self.finished = true;
                 return Some(Err(err));
             }
@@ -391,7 +393,7 @@ type KCArgs = (u32,);
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
-    /// Calculated offset from the beginning of the data stream this chunk is from or None.
+    /// Calculated byte offset from the beginning of the data stream or None.
     ///
     /// Ignored when writing chunks.
     #[br(try_calc = Some(r.stream_position()).transpose())]
@@ -714,6 +716,46 @@ impl Summarizable for SizedChunkEnum {
             | SizedChunkEnum::Junk(_)
             | SizedChunkEnum::Pad(_)
             | SizedChunkEnum::Unknown(_) => Box::new(core::iter::empty()),
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            SizedChunkEnum::Fmt(e) => e.name(),
+            SizedChunkEnum::Data(e) => e.name(),
+            SizedChunkEnum::Fact(e) => e.name(),
+            SizedChunkEnum::Cue(e) => e.name(),
+            SizedChunkEnum::Info(e) => e.name(),
+            SizedChunkEnum::Adtl(e) => e.name(),
+            SizedChunkEnum::Wavl(e) => e.name(),
+            SizedChunkEnum::Cset(e) => e.name(),
+            SizedChunkEnum::Plst(e) => e.name(),
+            SizedChunkEnum::Bext(e) => e.name(),
+            SizedChunkEnum::Md5(e) => e.name(),
+            SizedChunkEnum::Fllr(e) => e.name(),
+            SizedChunkEnum::Junk(e) => e.name(),
+            SizedChunkEnum::Pad(e) => e.name(),
+            SizedChunkEnum::Unknown(e) => e.name(),
+        }
+    }
+
+    fn item_summary_header(&self) -> String {
+        match self {
+            SizedChunkEnum::Fmt(e) => e.item_summary_header(),
+            SizedChunkEnum::Data(e) => e.item_summary_header(),
+            SizedChunkEnum::Fact(e) => e.item_summary_header(),
+            SizedChunkEnum::Cue(e) => e.item_summary_header(),
+            SizedChunkEnum::Info(e) => e.item_summary_header(),
+            SizedChunkEnum::Adtl(e) => e.item_summary_header(),
+            SizedChunkEnum::Wavl(e) => e.item_summary_header(),
+            SizedChunkEnum::Cset(e) => e.item_summary_header(),
+            SizedChunkEnum::Plst(e) => e.item_summary_header(),
+            SizedChunkEnum::Bext(e) => e.item_summary_header(),
+            SizedChunkEnum::Md5(e) => e.item_summary_header(),
+            SizedChunkEnum::Fllr(e) => e.item_summary_header(),
+            SizedChunkEnum::Junk(e) => e.item_summary_header(),
+            SizedChunkEnum::Pad(e) => e.item_summary_header(),
+            SizedChunkEnum::Unknown(e) => e.item_summary_header(),
         }
     }
 }
