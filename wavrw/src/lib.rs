@@ -334,9 +334,7 @@ where
 {
     /// Create a new Wave handle. This keeps a reference to the data
     /// until dropped.
-    // TODO: consider renaming to from_reader/from_bufreader to avoid changing interface
-    // when later adding write support
-    pub fn new(mut reader: R) -> Result<Self, WaveError> {
+    pub fn from_reader(mut reader: R) -> Result<Self, WaveError> {
         let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
         if riff.form_type != FourCC(*b"WAVE") {
             return Err(WaveError::UnknownFourCC {

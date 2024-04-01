@@ -12,7 +12,7 @@ use wavrw::{Summarizable, SizedChunk};
 
 let file = File::open("../test_wavs/example_a.wav")?;
 let file = BufReader::new(file);
-let mut wave = wavrw::Wave::new(file)?;
+let mut wave = wavrw::Wave::from_reader(file)?;
 
 for result in wave.iter_chunks() {
     match result {

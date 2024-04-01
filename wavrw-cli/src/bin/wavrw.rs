@@ -185,7 +185,7 @@ fn view_line(file: BufReader<File>) -> Result<String> {
     let mut out = String::new();
     let mut chunk_strings: Vec<String> = vec![];
 
-    let mut wave = wavrw::Wave::new(file)?;
+    let mut wave = wavrw::Wave::from_reader(file)?;
 
     for result in wave.iter_chunks() {
         match result {
@@ -210,7 +210,7 @@ fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
-    let mut wave = wavrw::Wave::new(file)?;
+    let mut wave = wavrw::Wave::from_reader(file)?;
     for result in wave.iter_chunks() {
         match result {
             Ok(chunk) => {
@@ -243,7 +243,7 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
-    let mut wave = wavrw::Wave::new(file)?;
+    let mut wave = wavrw::Wave::from_reader(file)?;
     for result in wave.iter_chunks() {
         match result {
             Ok(chunk) => {
