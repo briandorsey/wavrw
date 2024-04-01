@@ -331,12 +331,9 @@ fn topic(config: &mut TopicConfig) -> Result<()> {
 
 #[instrument]
 fn main() -> Result<()> {
-    // TODO: read about subscribers... seems like it's behaving differently now that I
-    // have #[instrument] in this file?!? Shouldn't the ones in lib have already been
-    // reporting? Weird.
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
         // TODO: --option to set log level and span events
+        .with_max_level(Level::TRACE)
         .with_span_events(FmtSpan::NONE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
