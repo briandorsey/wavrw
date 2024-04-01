@@ -698,6 +698,7 @@ mod test {
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
         let expected = Fmt {
+            offset: Some(0),
             size: 16,
             data: FmtData {
                 format_tag: FormatTag::Pcm,
@@ -711,7 +712,12 @@ mod test {
         };
         let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
-        // hexdump(remaining_input);
+
+        // make sure parsing via SizedChunkEnum also works
+        use crate::SizedChunkEnum;
+        buff.set_position(0);
+        let chunk = SizedChunkEnum::read(&mut buff).expect("error parsing WAV chunks");
+        assert_eq!(chunk, SizedChunkEnum::Fmt(expected));
     }
 
     #[test]

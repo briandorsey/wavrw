@@ -274,6 +274,7 @@ mod test {
     #[test]
     fn cset_roundtrip() {
         let cset = Cset {
+            offset: Some(0),
             size: 8,
             data: CsetData {
                 code_page: 1,

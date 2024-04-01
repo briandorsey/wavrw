@@ -2,15 +2,19 @@ Read (and someday write) wave audio file chunks with a focus on metadata.
 
 This is the API reference documentation, it is a bit dry.
 
-Iterate over all dyn [`SizedChunk`] chunk objects from a file:
+Iterate over all chunk objects from a file, returns [`SizedChunkEnum`]s with
+convenience methods exposed via the [`SizedChunk`] trait:
 
 ```
 # use std::fs::File;
 # use std::io::BufReader; 
+use wavrw::{Summarizable, SizedChunk}; 
+
 let file = File::open("../test_wavs/example_a.wav")?;
 let file = BufReader::new(file);
-let mut wave = wavrw::Wave::new(file)?;
-for result in wave.metadata_chunks()? {
+let mut wave = wavrw::Wave::from_reader(file)?;
+
+for result in wave.iter_chunks() {
     match result {
         Ok(chunk) => {
             println!(
@@ -18,10 +22,10 @@ for result in wave.metadata_chunks()? {
                 chunk.name(),
                 chunk.size(),
                 chunk.summary()
-            );
-        }
+            )
+        },
         Err(err) => {
-            println!("ERROR: {err}");
+            println!("{:12} {}", "ERROR".to_string(), err)
         }
     }
 }
@@ -34,8 +38,7 @@ Or parse a single chunk from a buffer:
 # use binrw::BinRead;
 # use wavrw::testing::hex_to_cursor;
 # let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
-use wavrw::{SizedChunkEnum, ChunkID, Summarizable};
-use wavrw::FourCC;
+use wavrw::{SizedChunkEnum, ChunkID, Summarizable, FourCC};
 
 let chunk = SizedChunkEnum::read(&mut buff).unwrap();
 

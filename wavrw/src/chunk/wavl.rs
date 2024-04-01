@@ -139,7 +139,8 @@ mod test {
     // couldn't find slnt usage in file collection, so just doing a roundtrip test
     #[test]
     fn slnt_roundtrip() {
-        let slnt = Slnt {
+        let mut slnt = Slnt {
+            offset: Some(0),
             size: 4,
             data: SlntData { samples: 12345 },
             extra_bytes: Vec::new(),
@@ -155,7 +156,9 @@ mod test {
         assert_eq!(after.summary(), "12345 samples");
 
         // now in a wavl LIST
+        slnt.offset = Some(12);
         let wavl = ListWavl {
+            offset: Some(0),
             size: 16,
             data: ListWavlData {
                 list_type: ListWavlData::LIST_TYPE,
@@ -174,7 +177,8 @@ mod test {
     #[test]
     fn data_in_wavl() {
         // validate data roundtrip
-        let data = Data {
+        let mut data = Data {
+            offset: Some(0),
             size: 0,
             data: DataData {
                 data: [8_u8; 0].to_vec(),
@@ -189,8 +193,10 @@ mod test {
         assert_eq!(after, data);
         println!("length of data as bytes: {}", buff.into_inner().len());
 
+        data.offset = Some(12);
         // finally validate via wavl
         let wavl = ListWavl {
+            offset: Some(0),
             size: 12,
             data: ListWavlData {
                 list_type: ListWavlData::LIST_TYPE,

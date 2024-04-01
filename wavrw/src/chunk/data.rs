@@ -58,6 +58,7 @@ mod test {
 
         // validate data roundtrip
         let data = Data {
+            offset: Some(0),
             size: 0,
             data: DataData {
                 data: [8_u8; 0].to_vec(),
