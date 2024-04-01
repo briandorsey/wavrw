@@ -711,7 +711,12 @@ mod test {
         };
         let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
-        // hexdump(remaining_input);
+
+        // make sure parsing via SizedChunkEnum also works
+        use crate::SizedChunkEnum;
+        buff.set_position(0);
+        let chunk = SizedChunkEnum::read(&mut buff).expect("error parsing WAV chunks");
+        assert_eq!(chunk, SizedChunkEnum::Fmt(expected));
     }
 
     #[test]

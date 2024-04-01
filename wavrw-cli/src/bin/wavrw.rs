@@ -185,27 +185,15 @@ fn view_line(file: BufReader<File>) -> Result<String> {
     let mut chunk_strings: Vec<String> = vec![];
 
     let mut wave = wavrw::Wave::new(file)?;
-    let parse_res = wave.metadata_chunks();
 
-    match parse_res {
-        Ok(it) => {
-            for chunk_res in it {
-                match chunk_res {
-                    Ok(chunk) if chunk.id() == b"LIST" => {
-                        chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
-                    }
-                    Ok(chunk) => {
-                        chunk_strings.push(chunk.name());
-                    }
-                    Err(_) => {
-                        chunk_strings.push("ERROR".to_string());
-                    }
-                }
+    for chunk in wave.iter_chunks() {
+        match chunk {
+            chunk if chunk.id() == b"LIST" => {
+                chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
             }
-        }
-
-        Err(err) => {
-            println!("ERROR: {err}");
+            chunk => {
+                chunk_strings.push(chunk.name());
+            }
         }
     }
     out.push_str(&chunk_strings.iter().join(", "));
@@ -247,37 +235,30 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
 
     let mut offset: u32 = 12;
     let mut wave = wavrw::Wave::new(file)?;
-    for res in wave.metadata_chunks()? {
-        match res {
-            Ok(chunk) => {
-                writeln!(
-                    out,
-                    "{:12} {:9} {:10} {}",
-                    offset,
-                    chunk.name(),
-                    chunk.size(),
-                    chunk.item_summary_header()
-                )?;
-                let mut had_items = false;
-                for (key, value) in chunk.items() {
-                    had_items = true;
-                    writeln!(out, "             |{key:>23} : {value}")?;
-                }
-                if had_items {
-                    writeln!(out, "             --------------------------------------")?;
-                }
-
-                // remove offset calculations once handled by metadata_chunks()
-                offset += chunk.size() + 8;
-                // RIFF offsets must be on word boundaries (divisible by 2)
-                if offset % 2 == 1 {
-                    offset += 1;
-                };
-            }
-            Err(err) => {
-                println!("ERROR: {err}");
-            }
+    for chunk in wave.iter_chunks() {
+        writeln!(
+            out,
+            "{:12} {:9} {:10} {}",
+            offset,
+            chunk.name(),
+            chunk.size(),
+            chunk.item_summary_header()
+        )?;
+        let mut had_items = false;
+        for (key, value) in chunk.items() {
+            had_items = true;
+            writeln!(out, "             |{key:>23} : {value}")?;
         }
+        if had_items {
+            writeln!(out, "             --------------------------------------")?;
+        }
+
+        // remove offset calculations once handled by metadata_chunks()
+        offset += chunk.size() + 8;
+        // RIFF offsets must be on word boundaries (divisible by 2)
+        if offset % 2 == 1 {
+            offset += 1;
+        };
     }
     Ok(out)
 }
@@ -334,10 +315,13 @@ fn topic(config: &mut TopicConfig) -> Result<()> {
 
 #[instrument]
 fn main() -> Result<()> {
+    // TODO: read about subscribers... seems like it's behaving differently now that I
+    // have #[instrument] in this file?!? Shouldn't the ones in lib have already been
+    // reporting? Weird.
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         // TODO: --option to set log level and span events
-        // .with_span_events(FmtSpan::EXIT)
+        .with_span_events(FmtSpan::NONE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 

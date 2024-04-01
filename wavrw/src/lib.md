@@ -10,20 +10,13 @@ Iterate over all dyn [`SizedChunk`] chunk objects from a file:
 let file = File::open("../test_wavs/example_a.wav")?;
 let file = BufReader::new(file);
 let mut wave = wavrw::Wave::new(file)?;
-for result in wave.metadata_chunks()? {
-    match result {
-        Ok(chunk) => {
-            println!(
-                "{:12} {:10} {}",
-                chunk.name(),
-                chunk.size(),
-                chunk.summary()
-            );
-        }
-        Err(err) => {
-            println!("ERROR: {err}");
-        }
-    }
+for chunk in wave.iter_chunks() {
+    println!(
+        "{:12} {:10} {}",
+        chunk.name(),
+        chunk.size(),
+        chunk.summary()
+    );
 }
 # Ok::<(), wavrw::WaveError>(())
 ```

@@ -360,7 +360,7 @@ mod test {
     use hexdump::hexdump;
 
     use super::*;
-    use crate::{box_chunk, testing::hex_to_cursor, SizedChunk, SizedChunkEnum};
+    use crate::{testing::hex_to_cursor, SizedChunk, SizedChunkEnum};
 
     #[test]
     fn infochunk_roundtrip() {
@@ -417,7 +417,7 @@ mod test {
 
         // parse via enum wrapper this time
         buff.set_position(0);
-        let chunk = SizedChunkEnum::read(&mut buff).map(box_chunk).unwrap();
+        let chunk = SizedChunkEnum::read(&mut buff).unwrap();
         assert_eq!(chunk.id(), FourCC(*b"LIST"));
 
         // let list = ListInfo::read(&mut buff).unwrap();
