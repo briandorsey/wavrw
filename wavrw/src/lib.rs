@@ -230,7 +230,10 @@ impl From<binrw::Error> for WaveError {
     }
 }
 
-/// Error wrapper satisfying chunk traits
+/// Error wrapper satisfying chunk traits.
+///
+/// This is used to wrap errors in a consistent interface (like other chunks) for
+/// use in high level APIs which
 #[derive(Debug)]
 pub struct ErrorChunk {
     error: WaveError,
@@ -255,8 +258,6 @@ impl ChunkID for ErrorChunk {
 }
 
 impl SizedChunk for ErrorChunk {
-    // TODO: consider this... ErrorChunk isn't actually a sized chunk,
-    // since we don't know its size... bleh.
     fn size(&self) -> u32 {
         0
     }
@@ -289,11 +290,6 @@ impl<'a, R> WaveIterator<'a, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
-    fn handle(&mut self, err: WaveError) -> Option<Box<dyn SizedChunk>> {
-        self.finished = true;
-        Some(Box::new(ErrorChunk::new(err)))
-    }
-
     fn parse_next_chunk(&mut self) -> Result<(SizedChunkEnum, u64), WaveError> {
         let mut offset = self.reader.stream_position()?;
         let mut buff: [u8; 4] = [0; 4];
@@ -323,7 +319,6 @@ where
         let stream_position = self.reader.stream_position()?;
 
         if offset != stream_position {
-            // TODO: inject error into chunk vec and remove print
             // oh dang, this is tricky. We actually successfully (probably)
             // parsed the chunk, but there is still an error.
             // I guess we could add a syntetic error chunk as well... but...
@@ -341,14 +336,10 @@ impl<'a, R> Iterator for WaveIterator<'a, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
-    type Item = Box<dyn SizedChunk>;
+    type Item = Result<SizedChunkEnum, WaveError>;
 
     #[instrument]
     fn next(&mut self) -> Option<Self::Item> {
-        // errors must call self.handle() before returning to avoid infinite iteration
-        // instead, what if we refactored to have a helper function which returned result
-        // io::Error, and we handle turning that into ErrorChunk here?
-        // then we could use ? for all the io::Error issues below.
         if self.finished {
             return None;
         }
@@ -356,19 +347,15 @@ where
         let (chunk, offset) = match self.parse_next_chunk() {
             Ok(v) => v,
             Err(err) => {
-                return self.handle(WaveError::Parse {
-                    pos: None,
-                    message: err.to_string(),
-                })
+                self.finished = true;
+                return Some(Err(err));
             }
         };
-
-        let chunk = chunk.into_chunk();
 
         if offset >= self.riff_size as u64 {
             self.finished = true;
         };
-        Some(chunk)
+        Some(Ok(chunk))
     }
 }
 
@@ -409,9 +396,11 @@ where
     /// Parses WAV (RIFF-WAVE) data, returns all known chunks.
     ///
     /// It attempts to continue parsing even if some chunks have parsing errors.
-    /// In some cases, it may return before reading all chunks, such when
-    /// an error results from parsing the RIFF container, or the data is
-    /// not a WAVE form type.
+    /// In some cases, it may return before reading all chunks, such as:
+    ///
+    /// * when an error results from parsing the RIFF container
+    /// * the data is not a WAVE form type
+    /// * an IO error occurs while seeking before or after parsing chunk data
     #[instrument]
     pub fn iter_chunks<'a>(&'a mut self) -> WaveIterator<'a, R> {
         WaveIterator {
@@ -610,29 +599,6 @@ pub enum SizedChunkEnum {
     Junk(Junk),
     Pad(Pad),
     Unknown(UnknownChunk),
-}
-
-impl SizedChunkEnum {
-    /// Converts Self into the inner chunk as a [`SizedChunk`] trait.
-    fn into_chunk(self) -> Box<dyn SizedChunk> {
-        match self {
-            SizedChunkEnum::Fmt(c) => Box::new(c),
-            SizedChunkEnum::Data(c) => Box::new(c),
-            SizedChunkEnum::Fact(c) => Box::new(c),
-            SizedChunkEnum::Cue(c) => Box::new(c),
-            SizedChunkEnum::Info(c) => Box::new(c),
-            SizedChunkEnum::Adtl(c) => Box::new(c),
-            SizedChunkEnum::Wavl(c) => Box::new(c),
-            SizedChunkEnum::Cset(c) => Box::new(c),
-            SizedChunkEnum::Plst(c) => Box::new(c),
-            SizedChunkEnum::Bext(c) => c,
-            SizedChunkEnum::Md5(c) => Box::new(c),
-            SizedChunkEnum::Fllr(c) => Box::new(c),
-            SizedChunkEnum::Junk(c) => Box::new(c),
-            SizedChunkEnum::Pad(c) => Box::new(c),
-            SizedChunkEnum::Unknown(c) => Box::new(c),
-        }
-    }
 }
 
 impl Display for SizedChunkEnum {

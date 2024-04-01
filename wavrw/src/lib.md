@@ -7,16 +7,26 @@ Iterate over all dyn [`SizedChunk`] chunk objects from a file:
 ```
 # use std::fs::File;
 # use std::io::BufReader; 
+use wavrw::{Summarizable, SizedChunk}; 
+
 let file = File::open("../test_wavs/example_a.wav")?;
 let file = BufReader::new(file);
 let mut wave = wavrw::Wave::new(file)?;
-for chunk in wave.iter_chunks() {
-    println!(
-        "{:12} {:10} {}",
-        chunk.name(),
-        chunk.size(),
-        chunk.summary()
-    );
+
+for result in wave.iter_chunks() {
+    match result {
+        Ok(chunk) => {
+            println!(
+                "{:12} {:10} {}",
+                chunk.name(),
+                chunk.size(),
+                chunk.summary()
+            )
+        },
+        Err(err) => {
+            println!("{:12} {}", "ERROR".to_string(), err)
+        }
+    }
 }
 # Ok::<(), wavrw::WaveError>(())
 ```
@@ -27,8 +37,7 @@ Or parse a single chunk from a buffer:
 # use binrw::BinRead;
 # use wavrw::testing::hex_to_cursor;
 # let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
-use wavrw::{SizedChunkEnum, ChunkID, Summarizable};
-use wavrw::FourCC;
+use wavrw::{SizedChunkEnum, ChunkID, Summarizable, FourCC};
 
 let chunk = SizedChunkEnum::read(&mut buff).unwrap();
 

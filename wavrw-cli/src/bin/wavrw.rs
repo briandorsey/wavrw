@@ -16,6 +16,7 @@ use tracing::instrument;
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::FmtSubscriber;
+use wavrw::{ChunkID, SizedChunk, Summarizable};
 
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None,
@@ -186,13 +187,16 @@ fn view_line(file: BufReader<File>) -> Result<String> {
 
     let mut wave = wavrw::Wave::new(file)?;
 
-    for chunk in wave.iter_chunks() {
-        match chunk {
-            chunk if chunk.id() == b"LIST" => {
+    for result in wave.iter_chunks() {
+        match result {
+            Ok(chunk) if chunk.id() == b"LIST" => {
                 chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
             }
-            chunk => {
+            Ok(chunk) => {
                 chunk_strings.push(chunk.name());
+            }
+            Err(_) => {
+                chunk_strings.push("ERROR".to_string());
             }
         }
     }
@@ -206,23 +210,29 @@ fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
-    let mut offset: u32 = 12;
     let mut wave = wavrw::Wave::new(file)?;
-    for chunk in wave.iter_chunks() {
-        writeln!(
-            out,
-            "{:12} {:9} {:10} {}",
-            offset,
-            chunk.name(),
-            chunk.size(),
-            trim(&chunk.summary(), config.width.saturating_sub(29))
-        )?;
-
-        // remove offset calculations once handled by metadata_chunks()
-        offset += chunk.size() + 8;
-        // RIFF offsets must be on word boundaries (divisible by 2)
-        if offset % 2 == 1 {
-            offset += 1;
+    for result in wave.iter_chunks() {
+        match result {
+            Ok(chunk) => {
+                writeln!(
+                    out,
+                    "{:12} {:9} {:10} {}",
+                    "offset".to_string(),
+                    chunk.name(),
+                    chunk.size(),
+                    trim(&chunk.summary(), config.width.saturating_sub(29))
+                )?;
+            }
+            Err(err) => {
+                writeln!(
+                    out,
+                    "{:12} {:9} {:10} {}",
+                    "offset".to_string(),
+                    "ERROR".to_string(),
+                    "".to_string(),
+                    trim(&err.to_string(), config.width.saturating_sub(29))
+                )?;
+            }
         };
     }
     Ok(out)
@@ -233,32 +243,38 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
     let mut out = "\n".to_string();
     writeln!(out, "      offset id              size summary")?;
 
-    let mut offset: u32 = 12;
     let mut wave = wavrw::Wave::new(file)?;
-    for chunk in wave.iter_chunks() {
-        writeln!(
-            out,
-            "{:12} {:9} {:10} {}",
-            offset,
-            chunk.name(),
-            chunk.size(),
-            chunk.item_summary_header()
-        )?;
-        let mut had_items = false;
-        for (key, value) in chunk.items() {
-            had_items = true;
-            writeln!(out, "             |{key:>23} : {value}")?;
+    for result in wave.iter_chunks() {
+        match result {
+            Ok(chunk) => {
+                writeln!(
+                    out,
+                    "{:12} {:9} {:10} {}",
+                    "offset".to_string(),
+                    chunk.name(),
+                    chunk.size(),
+                    chunk.item_summary_header()
+                )?;
+                let mut had_items = false;
+                for (key, value) in chunk.items() {
+                    had_items = true;
+                    writeln!(out, "             |{key:>23} : {value}")?;
+                }
+                if had_items {
+                    writeln!(out, "             --------------------------------------")?;
+                }
+            }
+            Err(err) => {
+                writeln!(
+                    out,
+                    "{:12} {:9} {:10} {}",
+                    "offset".to_string(),
+                    "ERROR".to_string(),
+                    "".to_string(),
+                    err,
+                )?;
+            }
         }
-        if had_items {
-            writeln!(out, "             --------------------------------------")?;
-        }
-
-        // remove offset calculations once handled by metadata_chunks()
-        offset += chunk.size() + 8;
-        // RIFF offsets must be on word boundaries (divisible by 2)
-        if offset % 2 == 1 {
-            offset += 1;
-        };
     }
     Ok(out)
 }
