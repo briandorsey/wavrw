@@ -90,6 +90,7 @@ mod test {
     #[test]
     fn plst_roundtrip() {
         let plst = Plst {
+            offset: Some(0),
             size: 0x1c, // u32 + 2x(3x u32)
             data: PlstData {
                 segment_count: 2,

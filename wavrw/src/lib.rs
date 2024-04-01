@@ -59,8 +59,11 @@ pub trait ChunkID {
 /// Parsed representation of the full chunk data as stored. Likely a [`KnownChunk<T>`]
 /// where T is the inner chunk specific data.
 pub trait SizedChunk: Summarizable + Debug {
-    /// Returns the logical (used) size in bytes of the chunk.
+    /// The logical (used) size in bytes of the chunk.
     fn size(&self) -> u32;
+
+    /// The byte offset from the start of the read data stream.
+    fn offset(&self) -> Option<u64>;
 }
 
 /// Utility methods for describing any chunk.
@@ -230,51 +233,6 @@ impl From<binrw::Error> for WaveError {
     }
 }
 
-/// Error wrapper satisfying chunk traits.
-///
-/// This is used to wrap errors in a consistent interface (like other chunks) for
-/// use in high level APIs which
-#[derive(Debug)]
-pub struct ErrorChunk {
-    error: WaveError,
-}
-
-impl ErrorChunk {
-    fn new(error: WaveError) -> Self {
-        ErrorChunk { error }
-    }
-}
-
-impl Display for ErrorChunk {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "ErrorChunk({}, {})", self.id(), self.error)
-    }
-}
-
-impl ChunkID for ErrorChunk {
-    fn id(&self) -> FourCC {
-        FourCC(*b"ERR:")
-    }
-}
-
-impl SizedChunk for ErrorChunk {
-    fn size(&self) -> u32 {
-        0
-    }
-}
-
-impl Summarizable for ErrorChunk {
-    fn summary(&self) -> String {
-        self.error.to_string()
-    }
-}
-
-impl From<binrw::Error> for ErrorChunk {
-    fn from(err: binrw::Error) -> Self {
-        Self::new(WaveError::from(err))
-    }
-}
-
 /// Implements `Wave.iter_chunks()`
 #[derive(Debug)]
 pub struct WaveIterator<'a, R>
@@ -428,10 +386,18 @@ type KCArgs = (u32,);
 /// A generic wrapper around chunk data, handling ID, size and padding.
 #[binrw]
 #[brw(little)]
+#[br(stream = r)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KnownChunk<
     T: for<'a> BinRead<Args<'a> = KCArgs> + for<'a> BinWrite<Args<'a> = ()> + KnownChunkID,
 > {
+    /// Calculated offset from the beginning of the data stream this chunk is from or None.
+    ///
+    /// Ignored when writing chunks.
+    #[br(try_calc = Some(r.stream_position()).transpose())]
+    #[bw(ignore)]
+    pub offset: Option<u64>,
+
     /// RIFF chunk id.
     #[br(temp, assert(id == T::ID))]
     #[bw(calc = T::ID)]
@@ -496,6 +462,10 @@ where
     fn size(&self) -> u32 {
         self.size
     }
+
+    fn offset(&self) -> Option<u64> {
+        self.offset
+    }
 }
 
 impl<T> Summarizable for KnownChunk<T>
@@ -533,13 +503,26 @@ where
 /// Raw chunk data container for unrecognized chunks
 #[binrw]
 #[brw(little)]
+#[br(stream = r)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnknownChunk {
-    id: FourCC,
-    size: u32,
+    /// Calculated offset from the beginning of the data stream this chunk is from or None.
+    ///
+    /// Ignored when writing chunks.
+    #[br(try_calc = Some(r.stream_position()).transpose())]
+    #[bw(ignore)]
+    pub offset: Option<u64>,
+
+    /// RIFF chunk id.
+    pub id: FourCC,
+
+    /// RIFF chunk size in bytes.
+    pub size: u32,
+
+    /// Unparsed chunk data as bytes.
     #[brw(align_after = 2)]
     #[br(count = size )]
-    raw: Vec<u8>,
+    pub raw: Vec<u8>,
 }
 
 impl Display for UnknownChunk {
@@ -554,6 +537,7 @@ impl Default for UnknownChunk {
             id: FourCC(*b"UNKN"),
             size: 0,
             raw: Vec::new(),
+            offset: None,
         }
     }
 }
@@ -567,6 +551,10 @@ impl ChunkID for UnknownChunk {
 impl SizedChunk for UnknownChunk {
     fn size(&self) -> u32 {
         self.size
+    }
+
+    fn offset(&self) -> Option<u64> {
+        self.offset
     }
 }
 
@@ -666,6 +654,26 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Unknown(e) => e.size,
         }
     }
+
+    fn offset(&self) -> Option<u64> {
+        match self {
+            SizedChunkEnum::Fmt(e) => e.offset,
+            SizedChunkEnum::Data(e) => e.offset,
+            SizedChunkEnum::Fact(e) => e.offset,
+            SizedChunkEnum::Cue(e) => e.offset,
+            SizedChunkEnum::Info(e) => e.offset,
+            SizedChunkEnum::Adtl(e) => e.offset,
+            SizedChunkEnum::Wavl(e) => e.offset,
+            SizedChunkEnum::Cset(e) => e.offset,
+            SizedChunkEnum::Plst(e) => e.offset,
+            SizedChunkEnum::Bext(e) => e.offset,
+            SizedChunkEnum::Md5(e) => e.offset,
+            SizedChunkEnum::Fllr(e) => e.offset,
+            SizedChunkEnum::Junk(e) => e.offset,
+            SizedChunkEnum::Pad(e) => e.offset,
+            SizedChunkEnum::Unknown(e) => e.offset,
+        }
+    }
 }
 
 impl Summarizable for SizedChunkEnum {
@@ -730,6 +738,7 @@ mod test {
     #[test]
     fn knownchunk_as_trait() {
         let md5 = Md5 {
+            offset: Some(0),
             size: 16,
             data: chunk::Md5Data { md5: 0 },
             extra_bytes: vec![],
@@ -741,6 +750,7 @@ mod test {
     #[test]
     fn chunkenum_as_trait() {
         let md5 = SizedChunkEnum::Md5(Md5 {
+            offset: None,
             size: 16,
             data: chunk::Md5Data { md5: 0 },
             extra_bytes: vec![],

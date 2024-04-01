@@ -216,8 +216,8 @@ fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
             Ok(chunk) => {
                 writeln!(
                     out,
-                    "{:12} {:9} {:10} {}",
-                    "offset".to_string(),
+                    "{:>12} {:9} {:10} {}",
+                    chunk.offset().map_or("???".to_string(), |v| v.to_string()),
                     chunk.name(),
                     chunk.size(),
                     trim(&chunk.summary(), config.width.saturating_sub(29))
@@ -226,8 +226,8 @@ fn view_summary(file: BufReader<File>, config: &ViewConfig) -> Result<String> {
             Err(err) => {
                 writeln!(
                     out,
-                    "{:12} {:9} {:10} {}",
-                    "offset".to_string(),
+                    "{:>12} {:9} {:10} {}",
+                    "???".to_string(),
                     "ERROR".to_string(),
                     "".to_string(),
                     trim(&err.to_string(), config.width.saturating_sub(29))
@@ -249,8 +249,8 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
             Ok(chunk) => {
                 writeln!(
                     out,
-                    "{:12} {:9} {:10} {}",
-                    "offset".to_string(),
+                    "{:>12} {:9} {:10} {}",
+                    chunk.offset().map_or("???".to_string(), |v| v.to_string()),
                     chunk.name(),
                     chunk.size(),
                     chunk.item_summary_header()
@@ -267,8 +267,8 @@ fn view_detailed(file: BufReader<File>) -> Result<String> {
             Err(err) => {
                 writeln!(
                     out,
-                    "{:12} {:9} {:10} {}",
-                    "offset".to_string(),
+                    "{:>12} {:9} {:10} {}",
+                    "???".to_string(),
                     "ERROR".to_string(),
                     "".to_string(),
                     err,

@@ -1,6 +1,6 @@
 use binrw::binrw;
 
-use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
+use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 /// `MD5 ` Checksum of audio `data` of the WAVE. [MD5_2017](https://wavref.til.cafe/chunk/md5/)
 ///
@@ -16,12 +16,6 @@ pub struct Md5Data {
 
 impl KnownChunkID for Md5Data {
     const ID: FourCC = FourCC(*b"MD5 ");
-}
-
-impl SizedChunk for Md5Data {
-    fn size(&self) -> u32 {
-        16
-    }
 }
 
 impl Summarizable for Md5Data {
@@ -45,6 +39,7 @@ mod test {
     fn parse_md5() {
         let mut buff = hex_to_cursor("4D443520 10000000 83F4C759 5E3F9608 378F3B39 D4BEA537");
         let expected = Md5 {
+            offset: Some(0),
             size: 16,
             data: Md5Data {
                 md5: 0x37A5BED4393B8F3708963F5E59C7F483,

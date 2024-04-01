@@ -698,6 +698,7 @@ mod test {
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
         let expected = Fmt {
+            offset: Some(0),
             size: 16,
             data: FmtData {
                 format_tag: FormatTag::Pcm,

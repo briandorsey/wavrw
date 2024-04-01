@@ -365,6 +365,7 @@ mod test {
     #[test]
     fn infochunk_roundtrip() {
         let icmt = InfoEnum::Icmt(Icmt {
+            offset: Some(0),
             size: 8,
             data: IcmtData {
                 text: String::from("comment"),
@@ -436,6 +437,7 @@ mod test {
     #[test]
     fn icmtchunk_as_trait() {
         let icmt = Icmt {
+            offset: None,
             size: 8,
             data: IcmtData::new("comment"),
             extra_bytes: vec![],

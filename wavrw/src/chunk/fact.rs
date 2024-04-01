@@ -1,6 +1,6 @@
 use binrw::binrw;
 
-use crate::{FourCC, KnownChunk, KnownChunkID, SizedChunk, Summarizable};
+use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 /// `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
 ///
@@ -18,12 +18,6 @@ pub struct FactData {
 
 impl KnownChunkID for FactData {
     const ID: FourCC = FourCC(*b"fact");
-}
-
-impl SizedChunk for FactData {
-    fn size(&self) -> u32 {
-        4
-    }
 }
 
 impl Summarizable for FactData {

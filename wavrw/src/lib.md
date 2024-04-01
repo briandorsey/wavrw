@@ -2,7 +2,8 @@ Read (and someday write) wave audio file chunks with a focus on metadata.
 
 This is the API reference documentation, it is a bit dry.
 
-Iterate over all dyn [`SizedChunk`] chunk objects from a file:
+Iterate over all chunk objects from a file, returns [`SizedChunkEnum`]s with
+convenience methods exposed via the [`SizedChunk`] trait:
 
 ```
 # use std::fs::File;
