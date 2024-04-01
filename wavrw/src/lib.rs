@@ -160,6 +160,7 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 
 /// Wave parsing Errors.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum WaveError {
     /// An unknown FourCC code, could not process.
     UnknownFourCC {
