@@ -16,9 +16,9 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `LIST-wavl` contains a sequence of [`DataChunk`] or [`SlntChunk`] chunks.
-pub struct ListWavlData {
+pub struct ListWavl {
     /// A four-character code that identifies the contents of the list.
-    #[brw(assert(list_type == ListWavlData::LIST_TYPE))]
+    #[brw(assert(list_type == ListWavl::LIST_TYPE))]
     pub list_type: FourCC,
 
     /// Sub chunks contained within this LIST
@@ -27,16 +27,16 @@ pub struct ListWavlData {
     pub chunks: Vec<WavlEnum>,
 }
 
-impl ListWavlData {
+impl ListWavl {
     /// Chunk id constant: `wavl`
     pub const LIST_TYPE: FourCC = FourCC(*b"wavl");
 }
 
-impl KnownChunkID for ListWavlData {
+impl KnownChunkID for ListWavl {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-impl Summarizable for ListWavlData {
+impl Summarizable for ListWavl {
     fn summary(&self) -> String {
         self.chunks
             .iter()
@@ -65,30 +65,30 @@ impl Summarizable for ListWavlData {
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type ListWavlChunk = KnownChunk<ListWavlData>;
+pub type ListWavlChunk = KnownChunk<ListWavl>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// ‘slnt’ represents silence, not necessarily a repeated zero volume.
-pub struct SlntData {
+pub struct Slnt {
     /// Number of samples of silence in this chunk.
     pub samples: u32,
 }
 
-impl KnownChunkID for SlntData {
+impl KnownChunkID for Slnt {
     const ID: FourCC = FourCC(*b"slnt");
 }
 
-impl Summarizable for SlntData {
+impl Summarizable for Slnt {
     fn summary(&self) -> String {
         format!("{} samples", self.samples)
     }
 }
 
 /// ‘slnt’ represents silence, not necessarily a repeated zero volume.
-pub type SlntChunk = KnownChunk<SlntData>;
+pub type SlntChunk = KnownChunk<Slnt>;
 
 /// All `LIST-wavl` chunk structs as an enum
 #[allow(missing_docs)]
@@ -134,7 +134,7 @@ mod test {
     use hexdump::hexdump;
 
     use super::*;
-    use crate::chunk::DataData;
+    use crate::chunk::Data;
 
     // couldn't find slnt usage in file collection, so just doing a roundtrip test
     #[test]
@@ -142,7 +142,7 @@ mod test {
         let mut slnt = SlntChunk {
             offset: Some(0),
             size: 4,
-            data: SlntData { samples: 12345 },
+            data: Slnt { samples: 12345 },
             extra_bytes: Vec::new(),
         };
         println!("{slnt:?}");
@@ -160,8 +160,8 @@ mod test {
         let wavl = ListWavlChunk {
             offset: Some(0),
             size: 16,
-            data: ListWavlData {
-                list_type: ListWavlData::LIST_TYPE,
+            data: ListWavl {
+                list_type: ListWavl::LIST_TYPE,
                 chunks: vec![WavlEnum::Slnt(slnt)],
             },
             extra_bytes: Vec::new(),
@@ -180,7 +180,7 @@ mod test {
         let mut data = DataChunk {
             offset: Some(0),
             size: 0,
-            data: DataData {
+            data: Data {
                 data: [8_u8; 0].to_vec(),
             },
             extra_bytes: Vec::new(),
@@ -198,8 +198,8 @@ mod test {
         let wavl = ListWavlChunk {
             offset: Some(0),
             size: 12,
-            data: ListWavlData {
-                list_type: ListWavlData::LIST_TYPE,
+            data: ListWavl {
+                list_type: ListWavl::LIST_TYPE,
                 chunks: vec![WavlEnum::Data(data)],
             },
             extra_bytes: Vec::new(),

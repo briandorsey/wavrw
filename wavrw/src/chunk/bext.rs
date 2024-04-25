@@ -13,7 +13,7 @@ use crate::{fixedstring::FixedString, FourCC, KnownChunk, KnownChunkID, Summariz
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BextData {
+pub struct Bext {
     /// Description of the sound sequence
     pub description: FixedString<256>, // Description
     /// Name of the originator
@@ -55,13 +55,13 @@ pub struct BextData {
     pub coding_history: String, // CodingHistory
 }
 
-impl KnownChunkID for BextData {
+impl KnownChunkID for Bext {
     const ID: FourCC = FourCC(*b"bext");
 }
 
-impl BextData {
-    fn new() -> BextData {
-        BextData {
+impl Bext {
+    fn new() -> Bext {
+        Bext {
             description: FixedString::<256>::default(),
             originator: FixedString::<32>::default(),
             originator_reference: FixedString::<32>::default(),
@@ -81,16 +81,16 @@ impl BextData {
     }
 }
 
-impl Default for BextData {
+impl Default for Bext {
     fn default() -> Self {
-        BextData::new()
+        Bext::new()
     }
 }
 
 /// `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
-pub type BextChunk = KnownChunk<BextData>;
+pub type BextChunk = KnownChunk<Bext>;
 
-impl Summarizable for BextData {
+impl Summarizable for Bext {
     fn summary(&self) -> String {
         format!(
             "{}, {}, {}",
@@ -107,7 +107,7 @@ impl Summarizable for BextData {
     }
 }
 
-impl<'a> IntoIterator for &'a BextData {
+impl<'a> IntoIterator for &'a Bext {
     type Item = (String, String);
     type IntoIter = BextDataIterator<'a>;
 
@@ -121,7 +121,7 @@ impl<'a> IntoIterator for &'a BextData {
 
 #[derive(Debug)]
 pub struct BextDataIterator<'a> {
-    data: &'a BextData,
+    data: &'a Bext,
     index: usize,
 }
 

@@ -9,7 +9,7 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlstSegment {
-    /// The cue point name. This value must match a [`CuePoint.name`][crate::chunk::cue::CuePoint] in the [`CueData`][crate::chunk::cue::CueData] chunk.
+    /// The cue point name. This value must match a [`CuePoint.name`][crate::chunk::cue::CuePoint] in the [`Cue`][crate::chunk::cue::Cue] chunk.
     pub name: u32,
 
     /// The length of the section in samples.
@@ -30,7 +30,7 @@ impl PlstSegment {
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
-pub struct PlstData {
+pub struct Plst {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.
     pub segment_count: u32, // dwSegments
 
@@ -39,7 +39,7 @@ pub struct PlstData {
     pub segments: Vec<PlstSegment>,
 }
 
-impl KnownChunkID for PlstData {
+impl KnownChunkID for Plst {
     const ID: FourCC = FourCC(*b"plst");
 }
 
@@ -47,9 +47,9 @@ impl KnownChunkID for PlstData {
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type PlstChunk = KnownChunk<PlstData>;
+pub type PlstChunk = KnownChunk<Plst>;
 
-impl Summarizable for PlstData {
+impl Summarizable for Plst {
     fn summary(&self) -> String {
         let label = match self.segment_count {
             1 => "segment",
@@ -92,7 +92,7 @@ mod test {
         let plst = PlstChunk {
             offset: Some(0),
             size: 0x1c, // u32 + 2x(3x u32)
-            data: PlstData {
+            data: Plst {
                 segment_count: 2,
                 segments: vec![
                     PlstSegment {

@@ -776,7 +776,7 @@ mod test {
         let md5 = Md5Chunk {
             offset: Some(0),
             size: 16,
-            data: chunk::Md5Data { md5: 0 },
+            data: chunk::Md5 { md5: 0 },
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
@@ -788,7 +788,7 @@ mod test {
         let md5 = SizedChunkEnum::Md5(Md5Chunk {
             offset: None,
             size: 16,
-            data: chunk::Md5Data { md5: 0 },
+            data: chunk::Md5 { md5: 0 },
             extra_bytes: vec![],
         });
         // ensure trait bounds are satisfied

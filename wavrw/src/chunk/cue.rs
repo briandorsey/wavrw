@@ -37,7 +37,7 @@ impl CuePoint {
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
-pub struct CueData {
+pub struct Cue {
     /// Count of cue points. The number of times the cue-point struct repeats within this chunk.
     pub cue_points: u32, // dwCuePoints
 
@@ -46,29 +46,29 @@ pub struct CueData {
     pub points: Vec<CuePoint>,
 }
 
-impl KnownChunkID for CueData {
+impl KnownChunkID for Cue {
     const ID: FourCC = FourCC(*b"cue ");
 }
 
-impl CueData {
+impl Cue {
     fn new() -> Self {
-        CueData {
+        Cue {
             cue_points: 0,
             points: Vec::new(),
         }
     }
 }
 
-impl Default for CueData {
+impl Default for Cue {
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
-pub type CueChunk = KnownChunk<CueData>;
+pub type CueChunk = KnownChunk<Cue>;
 
-impl Summarizable for CueData {
+impl Summarizable for Cue {
     fn summary(&self) -> String {
         let label = match self.cue_points {
             1 => "cue point",

@@ -12,9 +12,9 @@ use crate::{fourcc, ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ListInfoData {
+pub struct ListInfo {
     /// A four-character code that identifies the contents of the list.
-    #[brw(assert(list_type == ListInfoData::LIST_TYPE))]
+    #[brw(assert(list_type == ListInfo::LIST_TYPE))]
     pub list_type: FourCC,
 
     /// Sub chunks contained within this LIST
@@ -23,16 +23,16 @@ pub struct ListInfoData {
     pub chunks: Vec<InfoEnum>,
 }
 
-impl ListInfoData {
+impl ListInfo {
     /// Chunk id constant: `INFO`
     pub const LIST_TYPE: FourCC = FourCC(*b"INFO");
 }
 
-impl KnownChunkID for ListInfoData {
+impl KnownChunkID for ListInfo {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-impl Summarizable for ListInfoData {
+impl Summarizable for ListInfo {
     fn summary(&self) -> String {
         self.chunks.iter().map(|c| c.id()).join(", ")
     }
@@ -51,7 +51,7 @@ impl Summarizable for ListInfoData {
 }
 
 /// `LIST-INFO` holds subchunks of strings describing the WAVE.
-pub type ListInfoChunk = KnownChunk<ListInfoData>;
+pub type ListInfoChunk = KnownChunk<ListInfo>;
 
 /// A genericised container for LIST-INFO subchunks.
 ///
@@ -70,189 +70,189 @@ pub type ListInfoChunk = KnownChunk<ListInfoData>;
 ///
 /// Creating a new chunk from scratch:
 /// ```
-/// # use wavrw::chunk::info::IcmtData;
-/// let icmt = IcmtData::new("comment");
+/// # use wavrw::chunk::info::Icmt;
+/// let icmt = Icmt::new("comment");
 /// ```
 ///
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct InfoData<const I: u32> {
+pub struct Info<const I: u32> {
     /// Generic container for `info` chunk text.
     #[br(map= |ns: NullString| ns.to_string())]
     #[bw(map= |s: &String| NullString::from(s.clone()))]
     pub text: String,
 }
 
-impl<const I: u32> KnownChunkID for InfoData<I> {
+impl<const I: u32> KnownChunkID for Info<I> {
     const ID: FourCC = FourCC(I.to_le_bytes());
 }
 
-impl<const I: u32> Debug for InfoData<I> {
+impl<const I: u32> Debug for Info<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        f.debug_struct(&format!("InfoData<{}>", Self::ID))
+        f.debug_struct(&format!("Info<{}>", Self::ID))
             .field("text", &self.text)
             .finish()
     }
 }
 
-impl<const I: u32> Summarizable for InfoData<I> {
+impl<const I: u32> Summarizable for Info<I> {
     fn summary(&self) -> String {
         self.text.clone()
     }
 }
 
-impl<const I: u32> InfoData<I> {
-    /// Creates a new [`InfoData<I>`] chunk.
+impl<const I: u32> Info<I> {
+    /// Creates a new [`Info<I>`] chunk.
     pub fn new(text: &str) -> Self {
-        InfoData::<I> { text: text.into() }
+        Info::<I> { text: text.into() }
     }
 }
 
 /// Archival Location. Indicates where the subject of the file is archived.
-pub type IarlData = InfoData<{ fourcc(b"IARL") }>;
+pub type Iarl = Info<{ fourcc(b"IARL") }>;
 /// Genre. Describes the original work, such as "landscape", "portrait", "still
 /// life", etc.
-pub type IgnrData = InfoData<{ fourcc(b"IGNR") }>;
+pub type Ignr = Info<{ fourcc(b"IGNR") }>;
 /// Keywords. Provides a list of keywords that refer to the file or subject
 /// of the file. Separate multiple keywords with a semicolon and a blank. For
 /// example, "Seattle; aerial view; scenery".
-pub type IkeyData = InfoData<{ fourcc(b"IKEY") }>;
+pub type Ikey = Info<{ fourcc(b"IKEY") }>;
 /// Lightness. Describes the changes in lightness settings on the digitizer
 /// required to produce the file. Note that the format of this information depends
 /// on hardware used.
-pub type IlgtData = InfoData<{ fourcc(b"ILGT") }>;
+pub type Ilgt = Info<{ fourcc(b"ILGT") }>;
 /// Medium. Describes the original subject of the file, such as "computer
 /// image", "drawing", "lithograph", and so forth.
-pub type ImedData = InfoData<{ fourcc(b"IMED") }>;
+pub type Imed = Info<{ fourcc(b"IMED") }>;
 /// Name. Stores the title of the subject of the file, such as "Seattle From Above".
-pub type InamData = InfoData<{ fourcc(b"INAM") }>;
+pub type Inam = Info<{ fourcc(b"INAM") }>;
 /// Palette Setting. Specifies the number of colors requested when digitizing an
 /// image, such as "256".
-pub type IpltData = InfoData<{ fourcc(b"IPLT") }>;
+pub type Iplt = Info<{ fourcc(b"IPLT") }>;
 /// Product. Specifies the name of the title the file was originally intended
 /// for, such as "Encyclopedia of Pacific Northwest Geography".
-pub type IprdData = InfoData<{ fourcc(b"IPRD") }>;
+pub type Iprd = Info<{ fourcc(b"IPRD") }>;
 /// Subject. Describes the contents of the file, such as "Aerial view of Seattle".
-pub type IsbjData = InfoData<{ fourcc(b"ISBJ") }>;
+pub type Isbj = Info<{ fourcc(b"ISBJ") }>;
 /// Software. Identifies the name of the software package used to create the
 /// file, such as "Microsoft Wave Edit".
-pub type IsftData = InfoData<{ fourcc(b"ISFT") }>;
+pub type Isft = Info<{ fourcc(b"ISFT") }>;
 /// Sharpness. Identifies the changes in sharpness for the digitizer required to
 /// produce the file (the format depends on the hardware used).
-pub type IshpData = InfoData<{ fourcc(b"ISHP") }>;
+pub type Ishp = Info<{ fourcc(b"ISHP") }>;
 /// Artist. Lists the artist of the original subject of the file. For example,
 /// "Michaelangelo".
-pub type IartData = InfoData<{ fourcc(b"IART") }>;
+pub type Iart = Info<{ fourcc(b"IART") }>;
 /// Source. Identifies the name of the person or organization who supplied the
 /// original subject of the file. For example, "Trey Research".
-pub type IsrcData = InfoData<{ fourcc(b"ISRC") }>;
+pub type Isrc = Info<{ fourcc(b"ISRC") }>;
 /// Source Form. Identifies the original form of the material that was
 /// digitized, such as "slide", "paper", "map", and so forth. This is not
 /// necessarily the same as IMED.
-pub type IsrfData = InfoData<{ fourcc(b"ISRF") }>;
+pub type Isrf = Info<{ fourcc(b"ISRF") }>;
 /// Technician. Identifies the technician who digitized the subject file. For
 /// example, "Smith, John."
-pub type ItchData = InfoData<{ fourcc(b"ITCH") }>;
+pub type Itch = Info<{ fourcc(b"ITCH") }>;
 /// Commissioned. Lists the name of the person or organization that commissioned
 /// the subject of the file. For example, "Pope Julian II".
-pub type IcmsData = InfoData<{ fourcc(b"ICMS") }>;
+pub type Icms = Info<{ fourcc(b"ICMS") }>;
 /// Comments. Provides general comments about the file or the subject of the
 /// file. If the comment is several sentences long, end each sentence with a
 /// period. Do not include newline characters.
-pub type IcmtData = InfoData<{ fourcc(b"ICMT") }>;
+pub type Icmt = Info<{ fourcc(b"ICMT") }>;
 /// Copyright. Records the copyright information for the file. For example,
 /// "Copyright Encyclopedia International 1991." If there are multiple
 /// copyrights, separate them by a semicolon followed by a space.
-pub type IcopData = InfoData<{ fourcc(b"ICOP") }>;
+pub type Icop = Info<{ fourcc(b"ICOP") }>;
 /// Creation date. Specifies the date the subject of the file was created. List
 /// dates in year-month-day format, padding one-digit months and days with a
 /// zero on the left. For example, "1553-05-03" for May 3, 1553.
-pub type IcrdData = InfoData<{ fourcc(b"ICRD") }>;
+pub type Icrd = Info<{ fourcc(b"ICRD") }>;
 /// Cropped. Describes whether an image has been cropped and, if so, how it was
 /// cropped. For example, "lower right corner". IDIM Dimensions. Specifies the
 /// size of the original subject of the file. For example, "8.5 in h, 11 in w".
-pub type IcrpData = InfoData<{ fourcc(b"ICRP") }>;
+pub type Icrp = Info<{ fourcc(b"ICRP") }>;
 /// Dots Per Inch. Stores dots per inch setting of the digitizer used to produce
 /// the file, such as "300".
-pub type IdpiData = InfoData<{ fourcc(b"IDPI") }>;
+pub type Idpi = Info<{ fourcc(b"IDPI") }>;
 /// Engineer. Stores the name of the engineer who worked on the file. If there
 /// are multiple engineers, separate the names by a semicolon and a blank. For
 /// example, "Smith, John; Adams, Joe".
-pub type IengData = InfoData<{ fourcc(b"IENG") }>;
+pub type Ieng = Info<{ fourcc(b"IENG") }>;
 
 /// Archival Location. Indicates where the subject of the file is archived.
-pub type IarlChunk = KnownChunk<IarlData>;
+pub type IarlChunk = KnownChunk<Iarl>;
 /// Genre. Describes the original work, such as "landscape", "portrait", "still
 /// life", etc.
-pub type IgnrChunk = KnownChunk<IgnrData>;
+pub type IgnrChunk = KnownChunk<Ignr>;
 /// Keywords. Provides a list of keywords that refer to the file or subject
 /// of the file. Separate multiple keywords with a semicolon and a blank. For
 /// example, "Seattle; aerial view; scenery".
-pub type IkeyChunk = KnownChunk<IkeyData>;
+pub type IkeyChunk = KnownChunk<Ikey>;
 /// Lightness. Describes the changes in lightness settings on the digitizer
 /// required to produce the file. Note that the format of this information depends
 /// on hardware used.
-pub type IlgtChunk = KnownChunk<IlgtData>;
+pub type IlgtChunk = KnownChunk<Ilgt>;
 /// Medium. Describes the original subject of the file, such as "computer
 /// image", "drawing", "lithograph", and so forth.
-pub type ImedChunk = KnownChunk<ImedData>;
+pub type ImedChunk = KnownChunk<Imed>;
 /// Name. Stores the title of the subject of the file, such as "Seattle From Above".
-pub type InamChunk = KnownChunk<InamData>;
+pub type InamChunk = KnownChunk<Inam>;
 /// Palette Setting. Specifies the number of colors requested when digitizing an
 /// image, such as "256".
-pub type IpltChunk = KnownChunk<IpltData>;
+pub type IpltChunk = KnownChunk<Iplt>;
 /// Product. Specifies the name of the title the file was originally intended
 /// for, such as "Encyclopedia of Pacific Northwest Geography".
-pub type IprdChunk = KnownChunk<IprdData>;
+pub type IprdChunk = KnownChunk<Iprd>;
 /// Subject. Describes the contents of the file, such as "Aerial view of Seattle".
-pub type IsbjChunk = KnownChunk<IsbjData>;
+pub type IsbjChunk = KnownChunk<Isbj>;
 /// Software. Identifies the name of the software package used to create the
 /// file, such as "Microsoft Wave Edit".
-pub type IsftChunk = KnownChunk<IsftData>;
+pub type IsftChunk = KnownChunk<Isft>;
 /// Sharpness. Identifies the changes in sharpness for the digitizer required to
 /// produce the file (the format depends on the hardware used).
-pub type IshpChunk = KnownChunk<IshpData>;
+pub type IshpChunk = KnownChunk<Ishp>;
 /// Artist. Lists the artist of the original subject of the file. For example,
 /// "Michaelangelo".
-pub type IartChunk = KnownChunk<IartData>;
+pub type IartChunk = KnownChunk<Iart>;
 /// Source. Identifies the name of the person or organization who supplied the
 /// original subject of the file. For example, "Trey Research".
-pub type IsrcChunk = KnownChunk<IsrcData>;
+pub type IsrcChunk = KnownChunk<Isrc>;
 /// Source Form. Identifies the original form of the material that was
 /// digitized, such as "slide", "paper", "map", and so forth. This is not
 /// necessarily the same as IMED.
-pub type IsrfChunk = KnownChunk<IsrfData>;
+pub type IsrfChunk = KnownChunk<Isrf>;
 /// Technician. Identifies the technician who digitized the subject file. For
 /// example, "Smith, John."
-pub type ItchChunk = KnownChunk<ItchData>;
+pub type ItchChunk = KnownChunk<Itch>;
 /// Commissioned. Lists the name of the person or organization that commissioned
 /// the subject of the file. For example, "Pope Julian II".
-pub type IcmsChunk = KnownChunk<IcmsData>;
+pub type IcmsChunk = KnownChunk<Icms>;
 /// Comments. Provides general comments about the file or the subject of the
 /// file. If the comment is several sentences long, end each sentence with a
 /// period. Do not include newline characters.
-pub type IcmtChunk = KnownChunk<IcmtData>;
+pub type IcmtChunk = KnownChunk<Icmt>;
 /// Copyright. Records the copyright information for the file. For example,
 /// "Copyright Encyclopedia International 1991." If there are multiple
 /// copyrights, separate them by a semicolon followed by a space.
-pub type IcopChunk = KnownChunk<IcopData>;
+pub type IcopChunk = KnownChunk<Icop>;
 /// Creation date. Specifies the date the subject of the file was created. List
 /// dates in year-month-day format, padding one-digit months and days with a
 /// zero on the left. For example, "1553-05-03" for May 3, 1553.
-pub type IcrdChunk = KnownChunk<IcrdData>;
+pub type IcrdChunk = KnownChunk<Icrd>;
 /// Cropped. Describes whether an image has been cropped and, if so, how it was
 /// cropped. For example, "lower right corner". IDIM Dimensions. Specifies the
 /// size of the original subject of the file. For example, "8.5 in h, 11 in w".
-pub type IcrpChunk = KnownChunk<IcrpData>;
+pub type IcrpChunk = KnownChunk<Icrp>;
 /// Dots Per Inch. Stores dots per inch setting of the digitizer used to produce
 /// the file, such as "300".
-pub type IdpiChunk = KnownChunk<IdpiData>;
+pub type IdpiChunk = KnownChunk<Idpi>;
 /// Engineer. Stores the name of the engineer who worked on the file. If there
 /// are multiple engineers, separate the names by a semicolon and a blank. For
 /// example, "Smith, John; Adams, Joe".
-pub type IengChunk = KnownChunk<IengData>;
+pub type IengChunk = KnownChunk<Ieng>;
 
 /// All `LIST-INFO` chunk structs as an enum
 #[allow(missing_docs)]
@@ -367,7 +367,7 @@ mod test {
         let icmt = InfoEnum::Icmt(IcmtChunk {
             offset: Some(0),
             size: 8,
-            data: IcmtData {
+            data: Icmt {
                 text: String::from("comment"),
             },
             extra_bytes: vec![],
@@ -427,11 +427,11 @@ mod test {
 
     #[test]
     fn infochunk_debug_string() {
-        let icmt = IcmtData {
+        let icmt = Icmt {
             text: "comment".to_string(),
         };
         println!("{icmt:?}");
-        assert!(format!("{icmt:?}").starts_with("InfoData<ICMT>"));
+        assert!(format!("{icmt:?}").starts_with("Info<ICMT>"));
     }
 
     #[test]
@@ -439,7 +439,7 @@ mod test {
         let icmt = IcmtChunk {
             offset: None,
             size: 8,
-            data: IcmtData::new("comment"),
+            data: Icmt::new("comment"),
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied

@@ -12,7 +12,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 /// `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
-pub struct CsetData {
+pub struct Cset {
     /// Specifies the code page used for file elements.
     ///
     /// If the CSET chunk is not present, or if this field has value zero, assume
@@ -42,11 +42,11 @@ pub struct CsetData {
     pub dialect: u16,
 }
 
-impl KnownChunkID for CsetData {
+impl KnownChunkID for Cset {
     const ID: FourCC = FourCC(*b"CSET");
 }
 
-impl Summarizable for CsetData {
+impl Summarizable for Cset {
     fn summary(&self) -> String {
         let (language, dialect) = cset_ld_map()
             .get(&(self.language, self.dialect))
@@ -64,7 +64,7 @@ impl Summarizable for CsetData {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a CsetData {
+impl<'a> IntoIterator for &'a Cset {
     type Item = (String, String);
     type IntoIter = CsetDataIterator<'a>;
 
@@ -78,7 +78,7 @@ impl<'a> IntoIterator for &'a CsetData {
 
 #[derive(Debug)]
 pub struct CsetDataIterator<'a> {
-    data: &'a CsetData,
+    data: &'a Cset,
     index: usize,
 }
 
@@ -119,7 +119,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type CsetChunk = KnownChunk<CsetData>;
+pub type CsetChunk = KnownChunk<Cset>;
 
 #[allow(clippy::type_complexity)]
 fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
@@ -276,7 +276,7 @@ mod test {
         let cset = CsetChunk {
             offset: Some(0),
             size: 8,
-            data: CsetData {
+            data: Cset {
                 code_page: 1,
                 country_code: RiffCountryCode::Canada,
                 language: 12,

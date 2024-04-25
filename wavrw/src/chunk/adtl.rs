@@ -12,9 +12,9 @@ use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `LIST-adtl` Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
-pub struct ListAdtlData {
+pub struct ListAdtl {
     /// A four-character code that identifies the contents of the list.
-    #[brw(assert(list_type == ListAdtlData::LIST_TYPE))]
+    #[brw(assert(list_type == ListAdtl::LIST_TYPE))]
     pub list_type: FourCC,
 
     /// Sub chunks contained within this LIST
@@ -23,16 +23,16 @@ pub struct ListAdtlData {
     pub chunks: Vec<AdtlEnum>,
 }
 
-impl ListAdtlData {
+impl ListAdtl {
     /// Chunk id constant: `adtl`
     pub const LIST_TYPE: FourCC = FourCC(*b"adtl");
 }
 
-impl KnownChunkID for ListAdtlData {
+impl KnownChunkID for ListAdtl {
     const ID: FourCC = FourCC(*b"LIST");
 }
 
-impl Summarizable for ListAdtlData {
+impl Summarizable for ListAdtl {
     fn summary(&self) -> String {
         self.chunks
             .iter()
@@ -58,14 +58,14 @@ impl Summarizable for ListAdtlData {
 }
 
 /// `adtl` Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
-pub type ListAdtlChunk = KnownChunk<ListAdtlData>;
+pub type ListAdtlChunk = KnownChunk<ListAdtl>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `labl` A label, or title, to associate with a [`CuePoint`][super::CuePoint].
-pub struct LablData {
+pub struct Labl {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
 
@@ -75,25 +75,25 @@ pub struct LablData {
     pub text: String,
 }
 
-impl KnownChunkID for LablData {
+impl KnownChunkID for Labl {
     const ID: FourCC = FourCC(*b"labl");
 }
 
-impl Summarizable for LablData {
+impl Summarizable for Labl {
     fn summary(&self) -> String {
         format!("{:>3}, {}", self.name, self.text)
     }
 }
 
 /// `labl` A label, or title, to associate with a [`CuePoint`][super::CuePoint].
-pub type LablChunk = KnownChunk<LablData>;
+pub type LablChunk = KnownChunk<Labl>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// `note` Comment text for a [`CuePoint`][super::CuePoint].
-pub struct NoteData {
+pub struct Note {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
 
@@ -103,25 +103,25 @@ pub struct NoteData {
     pub text: String,
 }
 
-impl KnownChunkID for NoteData {
+impl KnownChunkID for Note {
     const ID: FourCC = FourCC(*b"note");
 }
 
-impl Summarizable for NoteData {
+impl Summarizable for Note {
     fn summary(&self) -> String {
         format!("{:>3}, {}", self.name, self.text)
     }
 }
 
 /// `note` Comment text for a [`CuePoint`][super::CuePoint].
-pub type NoteChunk = KnownChunk<NoteData>;
+pub type NoteChunk = KnownChunk<Note>;
 
 /// `ltxt` Text associated with a range of `data` samples.
 #[binrw]
 #[br(little)]
 #[br(import(size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LtxtData {
+pub struct Ltxt {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
 
@@ -151,11 +151,11 @@ pub struct LtxtData {
     pub text: String,
 }
 
-impl KnownChunkID for LtxtData {
+impl KnownChunkID for Ltxt {
     const ID: FourCC = FourCC(*b"ltxt");
 }
 
-impl Summarizable for LtxtData {
+impl Summarizable for Ltxt {
     fn summary(&self) -> String {
         format!(
             "{:>3}, len:{}, purpose:{}, {}",
@@ -168,7 +168,7 @@ impl Summarizable for LtxtData {
 }
 
 /// `ltxt` Text associated with a range of `data` samples.
-pub type LtxtChunk = KnownChunk<LtxtData>;
+pub type LtxtChunk = KnownChunk<Ltxt>;
 
 /// `file` Information embedded in other file formats.
 ///
@@ -180,7 +180,7 @@ pub type LtxtChunk = KnownChunk<LtxtData>;
 #[br(little)]
 #[br(import(size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FileData {
+pub struct File {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
     pub name: u32,
 
@@ -192,11 +192,11 @@ pub struct FileData {
     pub file_data: Vec<u8>,
 }
 
-impl KnownChunkID for FileData {
+impl KnownChunkID for File {
     const ID: FourCC = FourCC(*b"ltxt");
 }
 
-impl Summarizable for FileData {
+impl Summarizable for File {
     fn summary(&self) -> String {
         format!(
             "{:>3}, media_type:{}, {} bytes",
@@ -208,7 +208,7 @@ impl Summarizable for FileData {
 }
 
 /// `file` Information embedded in other file formats.
-pub type FileChunk = KnownChunk<FileData>;
+pub type FileChunk = KnownChunk<File>;
 
 /// All `LIST-adtl` chunk structs as an enum
 #[allow(missing_docs)]

@@ -11,23 +11,23 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FactData {
+pub struct Fact {
     /// Number of samples for audio in `data` chunk.
     pub samples: u32,
 }
 
-impl KnownChunkID for FactData {
+impl KnownChunkID for Fact {
     const ID: FourCC = FourCC(*b"fact");
 }
 
-impl Summarizable for FactData {
+impl Summarizable for Fact {
     fn summary(&self) -> String {
         format!("{} samples", self.samples)
     }
 }
 
 /// `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
-pub type FactChunk = KnownChunk<FactData>;
+pub type FactChunk = KnownChunk<Fact>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]

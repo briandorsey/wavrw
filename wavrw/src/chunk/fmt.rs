@@ -582,7 +582,7 @@ impl TryFrom<&FormatTag> for u16 {
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FmtData {
+pub struct Fmt {
     /// A number indicating the WAVE format category of the file.
     pub format_tag: FormatTag,
 
@@ -617,11 +617,11 @@ pub struct FmtData {
 }
 // TODO: properly handle different fmt chunk additions from later specs
 
-impl KnownChunkID for FmtData {
+impl KnownChunkID for Fmt {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
-impl Summarizable for FmtData {
+impl Summarizable for Fmt {
     fn summary(&self) -> String {
         format!(
             "{}, {} chan, {}/{}",
@@ -640,7 +640,7 @@ impl Summarizable for FmtData {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a FmtData {
+impl<'a> IntoIterator for &'a Fmt {
     type Item = (String, String);
     type IntoIter = FmtDataIterator<'a>;
 
@@ -654,7 +654,7 @@ impl<'a> IntoIterator for &'a FmtData {
 
 #[derive(Debug)]
 pub struct FmtDataIterator<'a> {
-    data: &'a FmtData,
+    data: &'a Fmt,
     index: usize,
 }
 
@@ -684,7 +684,7 @@ impl<'a> Iterator for FmtDataIterator<'a> {
 }
 
 /// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
-pub type FmtChunk = KnownChunk<FmtData>;
+pub type FmtChunk = KnownChunk<Fmt>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -700,7 +700,7 @@ mod test {
         let expected = FmtChunk {
             offset: Some(0),
             size: 16,
-            data: FmtData {
+            data: Fmt {
                 format_tag: FormatTag::Pcm,
                 channels: 1,
                 samples_per_sec: 48000,
