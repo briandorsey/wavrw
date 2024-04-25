@@ -13,21 +13,21 @@ use binrw::{binrw, io::SeekFrom, BinRead, BinWrite, PosValue};
 use tracing::{instrument, warn};
 
 pub mod chunk;
-use crate::chunk::adtl::ListAdtl;
-use crate::chunk::info::ListInfo;
-use crate::chunk::wavl::ListWavl;
-use crate::chunk::Bext;
-use crate::chunk::Cset;
-use crate::chunk::Cue;
-use crate::chunk::Data;
-use crate::chunk::Fact;
-use crate::chunk::Fllr;
-use crate::chunk::Fmt;
-use crate::chunk::Junk;
-use crate::chunk::Md5;
-use crate::chunk::Pad;
-use crate::chunk::Plst;
-use crate::chunk::Riff;
+use crate::chunk::adtl::ListAdtlChunk;
+use crate::chunk::info::ListInfoChunk;
+use crate::chunk::wavl::ListWavlChunk;
+use crate::chunk::BextChunk;
+use crate::chunk::CsetChunk;
+use crate::chunk::CueChunk;
+use crate::chunk::DataChunk;
+use crate::chunk::FactChunk;
+use crate::chunk::FllrChunk;
+use crate::chunk::FmtChunk;
+use crate::chunk::JunkChunk;
+use crate::chunk::Md5Chunk;
+use crate::chunk::PadChunk;
+use crate::chunk::PlstChunk;
+use crate::chunk::RiffChunk;
 pub mod fixedstring;
 pub mod testing;
 
@@ -37,6 +37,7 @@ pub mod testing;
 // Since const generics do not support arrays, generic structs are storing the
 // FourCC id as a `u32`... which makes instantiation awkward. This is a helper
 // function to make it a bit easier.
+// revisit when Rust 1.79 is released
 #[doc(hidden)]
 pub const fn fourcc(id: &[u8; 4]) -> u32 {
     u32::from_le_bytes(*id)
@@ -75,7 +76,7 @@ pub trait Summarizable: ChunkID {
     ///
     /// An ascii friendly chunk name, with whitespace removed. Chunks with
     /// sub types (forms, in RIFF terms) include their sub type in the name.
-    /// Ex: [`ListInfo`] is "LIST-INFO".    
+    /// Ex: [`ListInfoChunk`] is "LIST-INFO".    
     fn name(&self) -> String {
         self.id().to_string().trim().to_string()
     }
@@ -91,12 +92,6 @@ pub trait Summarizable: ChunkID {
         self.summary()
     }
 }
-
-/// A chunk with size information.
-///
-/// We don't actually have these yet, but expect to use them when creating chunks
-/// from scratch and later writing them to a file.
-// pub trait Chunk: Summarizable + Debug {}
 
 impl<T> ChunkID for T
 where
@@ -326,7 +321,7 @@ where
     R: Read + Seek + Debug + BufRead,
 {
     bytes: R,
-    riff: Riff,
+    riff: RiffChunk,
 }
 
 impl<R> Wave<R>
@@ -336,7 +331,7 @@ where
     /// Create a new Wave handle. This keeps a reference to the data
     /// until dropped.
     pub fn from_reader(mut reader: R) -> Result<Self, WaveError> {
-        let riff = Riff::read(&mut reader).map_err(std::io::Error::other)?;
+        let riff = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
         if riff.form_type != FourCC(*b"WAVE") {
             return Err(WaveError::UnknownFourCC {
                 found: riff.form_type,
@@ -573,20 +568,20 @@ impl Summarizable for UnknownChunk {
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SizedChunkEnum {
-    Fmt(Fmt),
-    Data(Data),
-    Fact(Fact),
-    Cue(Cue),
-    Info(ListInfo),
-    Adtl(ListAdtl),
-    Wavl(ListWavl),
-    Cset(Cset),
-    Plst(Plst),
-    Bext(Box<Bext>),
-    Md5(Md5),
-    Fllr(Fllr),
-    Junk(Junk),
-    Pad(Pad),
+    Fmt(FmtChunk),
+    Data(DataChunk),
+    Fact(FactChunk),
+    Cue(CueChunk),
+    Info(ListInfoChunk),
+    Adtl(ListAdtlChunk),
+    Wavl(ListWavlChunk),
+    Cset(CsetChunk),
+    Plst(PlstChunk),
+    Bext(Box<BextChunk>),
+    Md5(Md5Chunk),
+    Fllr(FllrChunk),
+    Junk(JunkChunk),
+    Pad(PadChunk),
     Unknown(UnknownChunk),
 }
 
@@ -778,7 +773,7 @@ mod test {
 
     #[test]
     fn knownchunk_as_trait() {
-        let md5 = Md5 {
+        let md5 = Md5Chunk {
             offset: Some(0),
             size: 16,
             data: chunk::Md5Data { md5: 0 },
@@ -790,7 +785,7 @@ mod test {
 
     #[test]
     fn chunkenum_as_trait() {
-        let md5 = SizedChunkEnum::Md5(Md5 {
+        let md5 = SizedChunkEnum::Md5(Md5Chunk {
             offset: None,
             size: 16,
             data: chunk::Md5Data { md5: 0 },
@@ -809,7 +804,7 @@ mod test {
 
     #[test]
     fn consistent_traits() {
-        has_standard_traits::<Riff>();
+        has_standard_traits::<RiffChunk>();
 
         // this Enum transitively ensures the traits of all subchunks
         has_standard_traits::<SizedChunkEnum>();

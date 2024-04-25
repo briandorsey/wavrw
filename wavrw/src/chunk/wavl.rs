@@ -8,14 +8,14 @@ use core::fmt::Debug;
 use binrw::{binrw, helpers};
 use itertools::Itertools;
 
-use crate::chunk::data::Data;
+use crate::chunk::data::DataChunk;
 use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `LIST-wavl` contains a sequence of [`Data`] or [`Slnt`] chunks.
+/// `LIST-wavl` contains a sequence of [`DataChunk`] or [`SlntChunk`] chunks.
 pub struct ListWavlData {
     /// A four-character code that identifies the contents of the list.
     #[brw(assert(list_type == ListWavlData::LIST_TYPE))]
@@ -61,11 +61,11 @@ impl Summarizable for ListWavlData {
     }
 }
 
-/// `LIST-wavl` contains a sequence of [`Data`] or [`Slnt`] chunks.
+/// `LIST-wavl` contains a sequence of [`DataChunk`] or [`SlntChunk`] chunks.
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type ListWavl = KnownChunk<ListWavlData>;
+pub type ListWavlChunk = KnownChunk<ListWavlData>;
 
 #[binrw]
 #[br(little)]
@@ -88,7 +88,7 @@ impl Summarizable for SlntData {
 }
 
 /// ‘slnt’ represents silence, not necessarily a repeated zero volume.
-pub type Slnt = KnownChunk<SlntData>;
+pub type SlntChunk = KnownChunk<SlntData>;
 
 /// All `LIST-wavl` chunk structs as an enum
 #[allow(missing_docs)]
@@ -96,8 +96,8 @@ pub type Slnt = KnownChunk<SlntData>;
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WavlEnum {
-    Data(Data),
-    Slnt(Slnt),
+    Data(DataChunk),
+    Slnt(SlntChunk),
     Unknown {
         id: FourCC,
         size: u32,
@@ -139,7 +139,7 @@ mod test {
     // couldn't find slnt usage in file collection, so just doing a roundtrip test
     #[test]
     fn slnt_roundtrip() {
-        let mut slnt = Slnt {
+        let mut slnt = SlntChunk {
             offset: Some(0),
             size: 4,
             data: SlntData { samples: 12345 },
@@ -150,14 +150,14 @@ mod test {
         slnt.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = Slnt::read(&mut buff).unwrap();
+        let after = SlntChunk::read(&mut buff).unwrap();
         assert_eq!(after, slnt);
         assert_eq!(after.data.samples, 12345);
         assert_eq!(after.summary(), "12345 samples");
 
         // now in a wavl LIST
         slnt.offset = Some(12);
-        let wavl = ListWavl {
+        let wavl = ListWavlChunk {
             offset: Some(0),
             size: 16,
             data: ListWavlData {
@@ -170,14 +170,14 @@ mod test {
         wavl.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = ListWavl::read(&mut buff).unwrap();
+        let after = ListWavlChunk::read(&mut buff).unwrap();
         assert_eq!(after, wavl);
     }
 
     #[test]
     fn data_in_wavl() {
         // validate data roundtrip
-        let mut data = Data {
+        let mut data = DataChunk {
             offset: Some(0),
             size: 0,
             data: DataData {
@@ -189,13 +189,13 @@ mod test {
         data.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = Data::read(&mut buff).unwrap();
+        let after = DataChunk::read(&mut buff).unwrap();
         assert_eq!(after, data);
         println!("length of data as bytes: {}", buff.into_inner().len());
 
         data.offset = Some(12);
         // finally validate via wavl
-        let wavl = ListWavl {
+        let wavl = ListWavlChunk {
             offset: Some(0),
             size: 12,
             data: ListWavlData {
@@ -208,7 +208,7 @@ mod test {
         wavl.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = ListWavl::read(&mut buff).unwrap();
+        let after = ListWavlChunk::read(&mut buff).unwrap();
         assert_eq!(after, wavl);
     }
 }

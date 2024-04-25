@@ -27,7 +27,7 @@ impl Summarizable for FactData {
 }
 
 /// `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
-pub type Fact = KnownChunk<FactData>;
+pub type FactChunk = KnownChunk<FactData>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -43,7 +43,7 @@ mod test {
         // handling the WORD padding incorrectly can break parsing
         let mut buff = hex_to_cursor("66616374 04000000 E0010000");
         // parse via explicit chunk type
-        let fact = Fact::read(&mut buff).unwrap();
+        let fact = FactChunk::read(&mut buff).unwrap();
         dbg!(&fact);
         assert_eq!(fact.id(), FourCC(*b"fact"));
         assert_eq!(fact.data.samples, 480);

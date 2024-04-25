@@ -30,8 +30,8 @@ pub type PadData = PaddingData<{ fourcc(b"PAD ") }>;
 pub type FllrData = PaddingData<{ fourcc(b"FLLR") }>;
 
 /// `JUNK` Padding, filler or outdated information. [RIFF1991](https://wavref.til.cafe/chunk/junk/)
-pub type Junk = KnownChunk<JunkData>;
+pub type JunkChunk = KnownChunk<JunkData>;
 /// `PAD ` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/pad/)
-pub type Pad = KnownChunk<PadData>;
+pub type PadChunk = KnownChunk<PadData>;
 /// `FLLR` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/fllr/)
-pub type Fllr = KnownChunk<FllrData>;
+pub type FllrChunk = KnownChunk<FllrData>;

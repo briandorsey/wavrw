@@ -684,7 +684,7 @@ impl<'a> Iterator for FmtDataIterator<'a> {
 }
 
 /// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
-pub type Fmt = KnownChunk<FmtData>;
+pub type FmtChunk = KnownChunk<FmtData>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -697,7 +697,7 @@ mod test {
     #[test]
     fn parse_fmt() {
         let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
-        let expected = Fmt {
+        let expected = FmtChunk {
             offset: Some(0),
             size: 16,
             data: FmtData {
@@ -710,7 +710,7 @@ mod test {
             },
             extra_bytes: vec![],
         };
-        let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
+        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk, expected);
 
         // make sure parsing via SizedChunkEnum also works
@@ -732,7 +732,7 @@ mod test {
         // make sure parsing into Other() works
         let mut buff = hex_to_cursor("666D7420 10000000 00420100 80BB0000 80320200 03001800");
         let expected = FormatTag::Other(0x4200);
-        let chunk = Fmt::read(&mut buff).expect("error parsing WAV chunks");
+        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
         assert_eq!(chunk.data.format_tag, expected);
     }
 }

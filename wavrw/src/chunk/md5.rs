@@ -25,7 +25,7 @@ impl Summarizable for Md5Data {
 }
 
 /// `MD5 ` Checksum of audio `data` of the WAVE. [MD5_2017](https://wavref.til.cafe/chunk/md5/)
-pub type Md5 = KnownChunk<Md5Data>;
+pub type Md5Chunk = KnownChunk<Md5Data>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -38,7 +38,7 @@ mod test {
     #[test]
     fn parse_md5() {
         let mut buff = hex_to_cursor("4D443520 10000000 83F4C759 5E3F9608 378F3B39 D4BEA537");
-        let expected = Md5 {
+        let expected = Md5Chunk {
             offset: Some(0),
             size: 16,
             data: Md5Data {
@@ -47,7 +47,7 @@ mod test {
             extra_bytes: vec![],
         };
 
-        let chunk = Md5::read(&mut buff).expect("error parsing WAV chunks");
+        let chunk = Md5Chunk::read(&mut buff).expect("error parsing WAV chunks");
         println!("chunk   : 0x{:X}", chunk.data.md5);
         println!("expected: 0x{:X}", expected.data.md5);
         assert_eq!(chunk, expected);

@@ -58,7 +58,7 @@ impl Summarizable for ListAdtlData {
 }
 
 /// `adtl` Associated data list provides the ability to attach information like labels to sections of the waveform data stream.
-pub type ListAdtl = KnownChunk<ListAdtlData>;
+pub type ListAdtlChunk = KnownChunk<ListAdtlData>;
 
 #[binrw]
 #[br(little)]
@@ -86,7 +86,7 @@ impl Summarizable for LablData {
 }
 
 /// `labl` A label, or title, to associate with a [`CuePoint`][super::CuePoint].
-pub type Labl = KnownChunk<LablData>;
+pub type LablChunk = KnownChunk<LablData>;
 
 #[binrw]
 #[br(little)]
@@ -114,7 +114,7 @@ impl Summarizable for NoteData {
 }
 
 /// `note` Comment text for a [`CuePoint`][super::CuePoint].
-pub type Note = KnownChunk<NoteData>;
+pub type NoteChunk = KnownChunk<NoteData>;
 
 /// `ltxt` Text associated with a range of `data` samples.
 #[binrw]
@@ -168,7 +168,7 @@ impl Summarizable for LtxtData {
 }
 
 /// `ltxt` Text associated with a range of `data` samples.
-pub type Ltxt = KnownChunk<LtxtData>;
+pub type LtxtChunk = KnownChunk<LtxtData>;
 
 /// `file` Information embedded in other file formats.
 ///
@@ -208,7 +208,7 @@ impl Summarizable for FileData {
 }
 
 /// `file` Information embedded in other file formats.
-pub type File = KnownChunk<FileData>;
+pub type FileChunk = KnownChunk<FileData>;
 
 /// All `LIST-adtl` chunk structs as an enum
 #[allow(missing_docs)]
@@ -216,10 +216,10 @@ pub type File = KnownChunk<FileData>;
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AdtlEnum {
-    Labl(Labl),
-    Note(Note),
-    Ltxt(Ltxt),
-    File(File),
+    Labl(LablChunk),
+    Note(NoteChunk),
+    Ltxt(LtxtChunk),
+    File(FileChunk),
     Unknown {
         id: FourCC,
         size: u32,
@@ -268,7 +268,7 @@ mod test {
 "4C495354 24010000 6164746C 6C747874 14000000 01000000 81212000 72676E20 00000000 00000000 6C61626C 10000000 01000000 316B2040 202D3130 64420000 6C747874 14000000 02000000 D5A66400 72676E20 00000000 00000000 6C61626C 0E000000 02000000 316B487A 20546573 74006C74 78741400 00000300 00006A23 05007267 6E200000 00000000 00006C61 626C0A00 00000300 00004469 72616300 6C747874 14000000 04000000 22130200 72676E20 00000000 00000000 6C61626C 0A000000 04000000 43686972 70006E6F 74650800 00000400 00004C6F 67006C74 78741400 00000500 0000CF38 3A007267 6E200000 00000000 00006C61 626C0C00 00000500 00005377 65657020 00006E6F 74651600 00000500 00003130 487A2D39 366B487A 20333020 53656300"
             );
 
-        let adtl = ListAdtl::read(&mut buff).unwrap();
+        let adtl = ListAdtlChunk::read(&mut buff).unwrap();
         dbg!(&adtl);
         assert_eq!(adtl.id(), FourCC(*b"LIST"));
         assert_eq!(adtl.data.list_type, FourCC(*b"adtl"));

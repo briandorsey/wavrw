@@ -119,7 +119,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type Cset = KnownChunk<CsetData>;
+pub type CsetChunk = KnownChunk<CsetData>;
 
 #[allow(clippy::type_complexity)]
 fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
@@ -273,7 +273,7 @@ mod test {
     // couldn't find CSET usage in file collection, so just doing a roundtrip test
     #[test]
     fn cset_roundtrip() {
-        let cset = Cset {
+        let cset = CsetChunk {
             offset: Some(0),
             size: 8,
             data: CsetData {
@@ -289,7 +289,7 @@ mod test {
         cset.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = Cset::read(&mut buff).unwrap();
+        let after = CsetChunk::read(&mut buff).unwrap();
         assert_eq!(after, cset);
         assert_eq!(after.data.code_page, 1);
         assert_eq!(after.data.country_code, RiffCountryCode::Canada);

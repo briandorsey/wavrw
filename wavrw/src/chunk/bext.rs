@@ -88,7 +88,7 @@ impl Default for BextData {
 }
 
 /// `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
-pub type Bext = KnownChunk<BextData>;
+pub type BextChunk = KnownChunk<BextData>;
 
 impl Summarizable for BextData {
     fn summary(&self) -> String {
@@ -217,7 +217,7 @@ mod test {
             00000000 00000000 00000000 00000000 00000000 00000000 0000436F 
             64696E67 48697374 6F7279"#,
         );
-        let bext = Bext::read(&mut buff).expect("error parsing bext chunk");
+        let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
             bext.data.description,
@@ -299,7 +299,7 @@ mod test {
             00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
             00000000 00000000 0000"#,
         );
-        let bext = Bext::read(&mut buff).expect("error parsing bext chunk");
+        let bext = BextChunk::read(&mut buff).expect("error parsing bext chunk");
         print!("{:?}", bext);
         assert_eq!(
             bext.data.coding_history,

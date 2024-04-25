@@ -47,7 +47,7 @@ impl KnownChunkID for PlstData {
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
-pub type Plst = KnownChunk<PlstData>;
+pub type PlstChunk = KnownChunk<PlstData>;
 
 impl Summarizable for PlstData {
     fn summary(&self) -> String {
@@ -89,7 +89,7 @@ mod test {
     // couldn't find plst usage in file collection, so just doing a roundtrip test
     #[test]
     fn plst_roundtrip() {
-        let plst = Plst {
+        let plst = PlstChunk {
             offset: Some(0),
             size: 0x1c, // u32 + 2x(3x u32)
             data: PlstData {
@@ -116,7 +116,7 @@ mod test {
         buff.set_position(0);
         println!("buff length: 0x{:X}", buff.clone().bytes().count());
         buff.set_position(0);
-        let after = Plst::read(&mut buff).unwrap();
+        let after = PlstChunk::read(&mut buff).unwrap();
         assert_eq!(after, plst);
         // assert_eq!(after.data.name, 1);
         assert_eq!(after.data.segments[0].length, 5);
@@ -128,7 +128,7 @@ mod test {
     fn parse_plst() {
         // example bext chunk data from BWF MetaEdit
         let mut buff = hex_to_cursor(r#"706c7374 10000000 01000000 01000000 02000000 03000000"#);
-        let plst = Plst::read(&mut buff).expect("error parsing plst chunk");
+        let plst = PlstChunk::read(&mut buff).expect("error parsing plst chunk");
         print!("{:?}", plst);
         assert_eq!(plst.data.segment_count, 1);
         assert_eq!(

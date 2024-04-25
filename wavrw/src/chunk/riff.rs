@@ -8,7 +8,7 @@ use crate::FourCC;
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Riff {
+pub struct RiffChunk {
     /// RIFF chunk id.
     pub id: FourCC,
 
@@ -19,15 +19,15 @@ pub struct Riff {
     pub form_type: FourCC,
 }
 
-impl Display for Riff {
+impl Display for RiffChunk {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Default for Riff {
+impl Default for RiffChunk {
     fn default() -> Self {
-        Riff {
+        RiffChunk {
             id: FourCC(*b"RIFF"),
             size: 0,
             form_type: FourCC(*b"WAVE"),
@@ -49,10 +49,10 @@ mod test {
         let header = "524946465E09000057415645";
         let mut data = hex_to_cursor(header);
         println!("{header:?}");
-        let wavfile = Riff::read(&mut data).unwrap();
+        let wavfile = RiffChunk::read(&mut data).unwrap();
         assert_eq!(
             wavfile,
-            Riff {
+            RiffChunk {
                 id: FourCC(*b"RIFF"),
                 size: 2398,
                 form_type: FourCC(*b"WAVE"),
@@ -66,11 +66,11 @@ mod test {
         let header = r#"52494646 0000FEFF 57415645 00000000"#;
         let mut buff = hex_to_cursor(header);
         println!("{header:?}");
-        let riff = Riff::read(&mut buff).expect("error parsing large data chunk");
+        let riff = RiffChunk::read(&mut buff).expect("error parsing large data chunk");
         print!("{:?}", riff);
         assert_eq!(
             riff,
-            Riff {
+            RiffChunk {
                 id: FourCC(*b"RIFF"),
                 size: 4294836224,
                 form_type: FourCC(*b"WAVE"),

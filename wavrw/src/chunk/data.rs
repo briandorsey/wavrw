@@ -32,7 +32,7 @@ impl Summarizable for DataData {
 }
 
 /// `data` Audio samples. This parser skips all audio data (for now). [RIFF1991](https://wavref.til.cafe/spec/riff1991/)
-pub type Data = KnownChunk<DataData>;
+pub type DataChunk = KnownChunk<DataData>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -57,7 +57,7 @@ mod test {
         assert_eq!(after, dd,);
 
         // validate data roundtrip
-        let data = Data {
+        let data = DataChunk {
             offset: Some(0),
             size: 0,
             data: DataData {
@@ -69,7 +69,7 @@ mod test {
         data.write(&mut buff).unwrap();
         println!("{:?}", hexdump(buff.get_ref()));
         buff.set_position(0);
-        let after = Data::read(&mut buff).unwrap();
+        let after = DataChunk::read(&mut buff).unwrap();
         assert_eq!(after, data);
         println!("length of data as bytes: {}", buff.into_inner().len());
     }

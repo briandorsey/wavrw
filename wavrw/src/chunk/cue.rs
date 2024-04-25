@@ -66,7 +66,7 @@ impl Default for CueData {
 }
 
 /// `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
-pub type Cue = KnownChunk<CueData>;
+pub type CueChunk = KnownChunk<CueData>;
 
 impl Summarizable for CueData {
     fn summary(&self) -> String {
@@ -108,7 +108,7 @@ mod test {
         let mut buff = hex_to_cursor(
             r#"63756520 4C000000 03000000 01000000 00000000 64617461 00000000 00000000 00000000 02000000 F0000000 64617461 00000000 00000000 F0000000 03000000 68010000 64617461 00000000 00000000 68010000"#,
         );
-        let cue = Cue::read(&mut buff).expect("error parsing cue chunk");
+        let cue = CueChunk::read(&mut buff).expect("error parsing cue chunk");
         print!("{:?}", cue);
         assert_eq!(cue.data.cue_points, 3);
         assert_eq!(
