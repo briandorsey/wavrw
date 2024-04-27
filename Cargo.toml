@@ -10,6 +10,7 @@ description = "WAV file metadata read/write utility"
 authors = ["Brian Dorsey"]
 readme = "README.md"
 repository = "https://github.com/briandorsey/wavrw"
+homepage = "https://github.com/briandorsey/wavrw"
 license = "Apache-2.0 OR MIT"
 keywords = ["parser", "metadata", "wav"]
 categories = ["multimedia::encoding", "parser-implementations"]
@@ -20,6 +21,11 @@ itertools = "0.12.0"
 
 [profile.release]
 overflow-checks = true
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -121,3 +127,22 @@ unused_self = "warn"
 useless_transmute = "warn"
 verbose_file_reads = "warn"
 zero_sized_map_values = "warn"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.13.3"
+# CI backends to support
+ci = ["github"]
+# The installers to generate for each app
+installers = ["shell", "homebrew"]
+# A GitHub repo to push Homebrew formulas to
+tap = "briandorsey/homebrew-tap"
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+# Publish jobs to run in CI
+publish-jobs = ["homebrew"]
+# Publish jobs to run in CI
+pr-run-mode = "plan"
+# Whether to install an updater program
+install-updater = false

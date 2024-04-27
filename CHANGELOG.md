@@ -2,7 +2,9 @@
 
 Annotations: NEW, IMProved, FIX, DEPrecated, REMoved, SECurity
 
-## [0.0.0] - Unreleased
+## [unreleased] - 
+
+## [0.1.0] - 2024/04/27
 
 - [NEW] - Initial release. 
 - [NEW] - Supports reading all [RIFF1991](https://wavref.til.cafe/spec/riff1991/) metadata chunks: RIFF, LIST-INFO, CSET, JUNK, fmt, data, LIST-adtl, info, cue, fact, plst, LIST-wavl, slnt. 
