@@ -5,7 +5,8 @@ edition.workspace = true
 description = "WAV file metadata read/write utility"
 authors.workspace = true
 readme.workspace = true
-repository = "https://github.com/briandorsey/wavrw/wavrw-cli"
+repository.workspace = true
+homepage.workspace = true
 license.workspace = true
 keywords = ["parser", "metadata", "wav"]
 categories = ["multimedia::encoding", "command-line-utilities"]
@@ -27,4 +28,5 @@ name = "wavrw"
 # https://github.com/rust-lang/cargo/issues/6313
 doc = false
 
-
+[package.metadata.dist]
+formula = "wavrw"
