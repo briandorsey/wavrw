@@ -13,7 +13,7 @@
 //!
 //! let file = File::open("../test_wavs/example_a.wav")?;
 //! let file = BufReader::new(file);
-//! let mut wave = wavrw::Wave::from_reader(file)?;
+//! let mut wave = wavrw::WaveFile::from_reader(file)?;
 //!
 //! for result in wave.iter_chunks() {
 //!     match result {
@@ -30,7 +30,7 @@
 //!         }
 //!     }
 //! }
-//! # Ok::<(), wavrw::WaveError>(())
+//! # Ok::<(), wavrw::WaveFileError>(())
 //! ```
 //!
 //! Or parse a single chunk from a buffer:
@@ -223,7 +223,7 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 /// Wave parsing Errors.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum WaveError {
+pub enum WaveFileError {
     /// An unknown FourCC code, could not process.
     UnknownFourCC {
         /// The encountered FourCC code.
@@ -250,45 +250,45 @@ pub enum WaveError {
     },
 }
 
-impl error::Error for WaveError {}
+impl error::Error for WaveFileError {}
 
-impl Display for WaveError {
+impl Display for WaveFileError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            WaveError::UnknownFourCC { message, .. } => write!(f, "UnknownFourCC: {}", message),
-            WaveError::Io(err) => write!(f, "Io: {}", err),
-            WaveError::Parse { message, .. } => write!(f, "Parse: {}", message),
+            WaveFileError::UnknownFourCC { message, .. } => write!(f, "UnknownFourCC: {}", message),
+            WaveFileError::Io(err) => write!(f, "Io: {}", err),
+            WaveFileError::Parse { message, .. } => write!(f, "Parse: {}", message),
         }
     }
 }
 
-impl From<std::io::Error> for WaveError {
+impl From<std::io::Error> for WaveFileError {
     fn from(err: std::io::Error) -> Self {
-        WaveError::Io(err)
+        WaveFileError::Io(err)
     }
 }
 
 /// Map `binrw::Error` to Parse, to avoid introducing external dependencies on it.
-impl From<binrw::Error> for WaveError {
+impl From<binrw::Error> for WaveFileError {
     fn from(err: binrw::Error) -> Self {
         #[allow(clippy::match_same_arms)] // so _ is its own case
         match err {
             binrw::Error::BadMagic { pos, .. }
             | binrw::Error::Custom { pos, .. }
             | binrw::Error::EnumErrors { pos, .. }
-            | binrw::Error::NoVariantMatch { pos } => WaveError::Parse {
+            | binrw::Error::NoVariantMatch { pos } => WaveFileError::Parse {
                 pos: Some(pos),
                 message: err.to_string(),
             },
-            binrw::Error::AssertFail { pos, message } => WaveError::Parse {
+            binrw::Error::AssertFail { pos, message } => WaveFileError::Parse {
                 pos: Some(pos),
                 message,
             },
-            binrw::Error::Io(_) | binrw::Error::Backtrace(_) => WaveError::Parse {
+            binrw::Error::Io(_) | binrw::Error::Backtrace(_) => WaveFileError::Parse {
                 pos: None,
                 message: err.to_string(),
             },
-            _ => WaveError::Parse {
+            _ => WaveFileError::Parse {
                 pos: None,
                 message: err.to_string(),
             },
@@ -298,7 +298,7 @@ impl From<binrw::Error> for WaveError {
 
 /// Implements `Wave.iter_chunks()`
 #[derive(Debug)]
-pub struct WaveIterator<'a, R>
+pub struct WaveFileIterator<'a, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
@@ -307,11 +307,11 @@ where
     finished: bool,
 }
 
-impl<'a, R> WaveIterator<'a, R>
+impl<'a, R> WaveFileIterator<'a, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
-    fn parse_next_chunk(&mut self) -> Result<(SizedChunkEnum, u64), WaveError> {
+    fn parse_next_chunk(&mut self) -> Result<(SizedChunkEnum, u64), WaveFileError> {
         let mut offset = self.reader.stream_position()?;
         let mut buff: [u8; 4] = [0; 4];
 
@@ -352,11 +352,11 @@ where
     }
 }
 
-impl<'a, R> Iterator for WaveIterator<'a, R>
+impl<'a, R> Iterator for WaveFileIterator<'a, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
-    type Item = Result<SizedChunkEnum, WaveError>;
+    type Item = Result<SizedChunkEnum, WaveFileError>;
 
     #[instrument]
     fn next(&mut self) -> Option<Self::Item> {
@@ -382,8 +382,8 @@ where
     }
 }
 
-/// Wrapper around RIFF-WAVE data.
-pub struct Wave<R>
+/// Wrapper around RIFF-WAVE binary data.
+pub struct WaveFile<R>
 where
     R: Read + Seek + Debug + BufRead,
 {
@@ -391,16 +391,16 @@ where
     riff: RiffChunk,
 }
 
-impl<R> Wave<R>
+impl<R> WaveFile<R>
 where
     R: Read + Seek + Debug + BufRead,
 {
-    /// Create a new Wave handle. This keeps a reference to the data
-    /// until dropped.
-    pub fn from_reader(mut reader: R) -> Result<Self, WaveError> {
+    /// Create a new `WaveFile` from a reader. This keeps a reference to the
+    /// data until dropped.
+    pub fn from_reader(mut reader: R) -> Result<Self, WaveFileError> {
         let riff = RiffChunk::read(&mut reader).map_err(std::io::Error::other)?;
         if riff.form_type != FourCC(*b"WAVE") {
-            return Err(WaveError::UnknownFourCC {
+            return Err(WaveFileError::UnknownFourCC {
                 found: riff.form_type,
                 message: format!(
                     "not a wave file. Expected RIFF form_type 'WAVE', found: {}",
@@ -414,7 +414,9 @@ where
         })
     }
 
-    /// Parses WAV (RIFF-WAVE) data, returns all known chunks.
+    /// Parses WAV (RIFF-WAVE) data, returns iterator over all known
+    /// chunks. Each iteration returns a
+    /// `Result<`[`SizedChunkEnum`]`, `[`WaveFileError`]`>`
     ///
     /// It attempts to continue parsing even if some chunks have parsing errors.
     /// In some cases, it may return before reading all chunks, such as:
@@ -423,8 +425,8 @@ where
     /// * the data is not a WAVE form type
     /// * an IO error occurs while seeking before or after parsing chunk data
     #[instrument]
-    pub fn iter_chunks<'a>(&'a mut self) -> WaveIterator<'a, R> {
-        WaveIterator {
+    pub fn iter_chunks<'a>(&'a mut self) -> WaveFileIterator<'a, R> {
+        WaveFileIterator {
             reader: &mut self.bytes,
             riff_size: self.riff.size,
             finished: false,
@@ -432,7 +434,7 @@ where
     }
 }
 
-impl<R> Debug for Wave<R>
+impl<R> Debug for WaveFile<R>
 where
     R: Read + Seek + Debug + BufRead,
 {
