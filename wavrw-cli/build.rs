@@ -1,9 +1,16 @@
+use anyhow::Result;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<()> {
+    let profile = env::var("PROFILE")?;
+    if profile == "release" || profile == "dist" {
+        println!("skipping licenses.txt update because PROFILE = {profile}");
+        return Ok(());
+    }
+
     println!("cargo:rerun-if-changed=Cargo.toml");
     let root_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
     println!("root: {root_dir:?}");
