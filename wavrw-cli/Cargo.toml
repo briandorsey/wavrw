@@ -21,6 +21,9 @@ itertools.workspace = true
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"]}
 clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
 
+[build-dependencies]
+anyhow = "1.0.68"
+
 [[bin]]
 name = "wavrw"
 
