@@ -11,3 +11,4 @@ Annotations: NEW, IMProved, FIX, DEPrecated, REMoved, SECurity
 - [NEW] - bext chunk support. [Broadcast Wave Format](https://en.wikipedia.org/wiki/Broadcast_Wave_Format)
 - [NEW] - MD5 of audio data chunk support. As specified by [BWFMetaEdit's Audio Data Checksums](https://mediaarea.net/BWFMetaEdit/md5)
 
+
