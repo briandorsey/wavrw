@@ -4,6 +4,8 @@ Annotations: NEW, IMProved, FIX, DEPrecated, REMoved, SECurity
 
 ## [unreleased] - 
 
+- [NEW] - inst chunk support. Pitch, volume, and velocity for playback by sampler. [RIFF1994](https://wavref.til.cafe/spec/riff1994/)
+
 ## [0.1.0] - 2024/04/27
 
 - [NEW] - Initial release. 
