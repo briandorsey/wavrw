@@ -129,6 +129,7 @@ data  Audio samples. This parser skips all audio data (for now).
 fact  Number of samples for compressed audio in data. 
 FLLR  Padding, filler or outdated information. 
 fmt   Format of audio samples in data. 
+inst  Pitch, volume, and velocity for playback by sampler. 
 JUNK  Padding, filler or outdated information. 
 MD5   Checksum of audio data of the WAVE. 
 PAD   Padding, filler or outdated information. 

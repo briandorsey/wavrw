@@ -90,6 +90,7 @@ use crate::chunk::DataChunk;
 use crate::chunk::FactChunk;
 use crate::chunk::FllrChunk;
 use crate::chunk::FmtChunk;
+use crate::chunk::InstChunk;
 use crate::chunk::JunkChunk;
 use crate::chunk::Md5Chunk;
 use crate::chunk::PadChunk;
@@ -224,9 +225,9 @@ impl<'a> PartialEq<FourCC> for &'a FourCC {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum WaveFileError {
-    /// An unknown FourCC code, could not process.
+    /// An unknown `FourCC` code, could not process.
     UnknownFourCC {
-        /// The encountered FourCC code.
+        /// The encountered `FourCC` code.
         found: FourCC,
 
         /// Summary of the context.
@@ -646,6 +647,7 @@ pub enum SizedChunkEnum {
     Wavl(ListWavlChunk),
     Cset(CsetChunk),
     Plst(PlstChunk),
+    Inst(InstChunk),
     Bext(Box<BextChunk>),
     Md5(Md5Chunk),
     Fllr(FllrChunk),
@@ -665,6 +667,7 @@ impl Display for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.to_string(),
             SizedChunkEnum::Wavl(e) => e.to_string(),
             SizedChunkEnum::Cset(e) => e.to_string(),
+            SizedChunkEnum::Inst(e) => e.to_string(),
             SizedChunkEnum::Plst(e) => e.to_string(),
             SizedChunkEnum::Bext(e) => e.to_string(),
             SizedChunkEnum::Md5(e) => e.to_string(),
@@ -689,6 +692,7 @@ impl ChunkID for SizedChunkEnum {
             SizedChunkEnum::Wavl(e) => e.id(),
             SizedChunkEnum::Cset(e) => e.id(),
             SizedChunkEnum::Plst(e) => e.id(),
+            SizedChunkEnum::Inst(e) => e.id(),
             SizedChunkEnum::Bext(e) => e.id(),
             SizedChunkEnum::Md5(e) => e.id(),
             SizedChunkEnum::Fllr(e) => e.id(),
@@ -710,6 +714,7 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.size,
             SizedChunkEnum::Wavl(e) => e.size,
             SizedChunkEnum::Cset(e) => e.size,
+            SizedChunkEnum::Inst(e) => e.size,
             SizedChunkEnum::Plst(e) => e.size,
             SizedChunkEnum::Bext(e) => e.size,
             SizedChunkEnum::Md5(e) => e.size,
@@ -730,6 +735,7 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.offset,
             SizedChunkEnum::Wavl(e) => e.offset,
             SizedChunkEnum::Cset(e) => e.offset,
+            SizedChunkEnum::Inst(e) => e.offset,
             SizedChunkEnum::Plst(e) => e.offset,
             SizedChunkEnum::Bext(e) => e.offset,
             SizedChunkEnum::Md5(e) => e.offset,
@@ -752,6 +758,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.summary(),
             SizedChunkEnum::Wavl(e) => e.summary(),
             SizedChunkEnum::Cset(e) => e.summary(),
+            SizedChunkEnum::Inst(e) => e.summary(),
             SizedChunkEnum::Plst(e) => e.summary(),
             SizedChunkEnum::Bext(e) => e.summary(),
             SizedChunkEnum::Md5(e) => e.summary(),
@@ -770,6 +777,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => Box::new(e.items()),
             SizedChunkEnum::Wavl(e) => Box::new(e.items()),
             SizedChunkEnum::Cset(e) => Box::new(e.items()),
+            SizedChunkEnum::Inst(e) => Box::new(e.items()),
             SizedChunkEnum::Plst(e) => Box::new(e.items()),
             SizedChunkEnum::Bext(e) => Box::new(e.items()),
             SizedChunkEnum::Data(_)
@@ -792,6 +800,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.name(),
             SizedChunkEnum::Wavl(e) => e.name(),
             SizedChunkEnum::Cset(e) => e.name(),
+            SizedChunkEnum::Inst(e) => e.name(),
             SizedChunkEnum::Plst(e) => e.name(),
             SizedChunkEnum::Bext(e) => e.name(),
             SizedChunkEnum::Md5(e) => e.name(),
@@ -812,6 +821,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Adtl(e) => e.item_summary_header(),
             SizedChunkEnum::Wavl(e) => e.item_summary_header(),
             SizedChunkEnum::Cset(e) => e.item_summary_header(),
+            SizedChunkEnum::Inst(e) => e.item_summary_header(),
             SizedChunkEnum::Plst(e) => e.item_summary_header(),
             SizedChunkEnum::Bext(e) => e.item_summary_header(),
             SizedChunkEnum::Md5(e) => e.item_summary_header(),
