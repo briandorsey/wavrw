@@ -135,6 +135,7 @@ MD5   Checksum of audio data of the WAVE.
 PAD   Padding, filler or outdated information. 
 plst  Play order for cue points. Very rare. 
 RIFF  Container structure for multimedia data.
+smpl  Information needed for use as a sampling instrument.
 
 LIST-adtl CuePoint annotation chunks. 
 	file  Information embedded in other file formats.
@@ -144,7 +145,7 @@ LIST-adtl CuePoint annotation chunks.
 LIST-INFO Descriptive text chunks: 
 	IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, 
 	ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, 
-	ICRD, ICRP, IDPI, IENG. 
+	ICRD, ICRP, IDPI, IENG, ISMP, IDIT. 
 LIST-wavl Audio and/or silence chunks: 
 	data Audio samples. This parser skips all audio data (for now). 
 	slnt A count of samples to be played as silence.

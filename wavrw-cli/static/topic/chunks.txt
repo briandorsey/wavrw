@@ -21,7 +21,7 @@ LIST-adtl CuePoint annotation chunks.
 LIST-INFO Descriptive text chunks: 
 	IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, 
 	ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, 
-	ICRD, ICRP, IDPI, IENG. 
+	ICRD, ICRP, IDPI, IENG, ISMP, IDIT. 
 LIST-wavl Audio and/or silence chunks: 
 	data Audio samples. This parser skips all audio data (for now). 
 	slnt A count of samples to be played as silence.

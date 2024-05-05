@@ -1,4 +1,4 @@
-//! `INFO` A `LIST` containing descriptive text chunks: IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, ICRD, ICRP, IDPI, IENG. [RIFF1991](https://wavref.til.cafe/chunk/info/)
+//! `INFO` A `LIST` containing descriptive text chunks: IARL, IGNR, IKEY, ILGT, IMED, INAM, IPLT, IPRD, ISBJ, ISFT, ISHP, IART, ISRC, ISRF, ITCH, ICMS, ICMT, ICOP, ICRD, ICRP, IDPI, IENG, ISMP, IDIT. [RIFF1991](https://wavref.til.cafe/chunk/info/), [RIFF1994](https://wavref.til.cafe/chunk/info/)
 
 use core::fmt::{Debug, Formatter};
 
@@ -181,6 +181,17 @@ pub type Idpi = Info<{ fourcc(b"IDPI") }>;
 /// are multiple engineers, separate the names by a semicolon and a blank. For
 /// example, "Smith, John; Adams, Joe".
 pub type Ieng = Info<{ fourcc(b"IENG") }>;
+/// SMPTE time code of digitization start point expressed as a NULL terminated
+/// text string "HH:MM:SS.FF". If performing MCI capture in AVICAP, this chunk
+/// will be automatically set based on the MCI start time.
+pub type Ismp = Info<{ fourcc(b"ISMP") }>;
+/// Digitization Time. Specifies the time and date that digitization commenced.
+/// The digitization time is contained in an ASCII string which contains exactly
+/// 26 characters and is in the format "Wed Jan 02 02:03:55 1990\n\0". The
+/// ctime, asctime, functions can be used to create strings in this format.
+/// This chunk is automatically added to the capture file based on the current
+/// system time at the moment capture is initiated.
+pub type Idit = Info<{ fourcc(b"IDIT") }>;
 
 /// Archival Location. Indicates where the subject of the file is archived.
 pub type IarlChunk = KnownChunk<Iarl>;
@@ -253,6 +264,17 @@ pub type IdpiChunk = KnownChunk<Idpi>;
 /// are multiple engineers, separate the names by a semicolon and a blank. For
 /// example, "Smith, John; Adams, Joe".
 pub type IengChunk = KnownChunk<Ieng>;
+/// SMPTE time code of digitization start point expressed as a NULL terminated
+/// text string "HH:MM:SS.FF". If performing MCI capture in AVICAP, this chunk
+/// will be automatically set based on the MCI start time.
+pub type IsmpChunk = KnownChunk<Ismp>;
+/// Digitization Time. Specifies the time and date that digitization commenced.
+/// The digitization time is contained in an ASCII string which contains exactly
+/// 26 characters and is in the format "Wed Jan 02 02:03:55 1990\n\0". The
+/// ctime, asctime, functions can be used to create strings in this format.
+/// This chunk is automatically added to the capture file based on the current
+/// system time at the moment capture is initiated.
+pub type IditChunk = KnownChunk<Idit>;
 
 /// All `LIST-INFO` chunk structs as an enum
 #[allow(missing_docs)]
@@ -282,6 +304,8 @@ pub enum InfoEnum {
     Icrp(IcrpChunk),
     Idpi(IdpiChunk),
     Ieng(IengChunk),
+    Ismp(IsmpChunk),
+    Idit(IditChunk),
     Unknown {
         id: FourCC,
         size: u32,
@@ -317,6 +341,8 @@ impl ChunkID for InfoEnum {
             InfoEnum::Icrp(e) => e.id(),
             InfoEnum::Idpi(e) => e.id(),
             InfoEnum::Ieng(e) => e.id(),
+            InfoEnum::Ismp(e) => e.id(),
+            InfoEnum::Idit(e) => e.id(),
             InfoEnum::Unknown { id, .. } => *id,
         }
     }
@@ -348,6 +374,8 @@ impl InfoEnum {
             InfoEnum::Icrp(e) => e.data.text.clone(),
             InfoEnum::Idpi(e) => e.data.text.clone(),
             InfoEnum::Ieng(e) => e.data.text.clone(),
+            InfoEnum::Ismp(e) => e.data.text.clone(),
+            InfoEnum::Idit(e) => e.data.text.clone(),
             InfoEnum::Unknown { text, .. } => format!("Unknown(\"{}\")", *text),
         }
     }
