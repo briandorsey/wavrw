@@ -115,7 +115,7 @@ impl<'a> Iterator for CsetDataIterator<'a> {
     }
 }
 
-/// `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
+/// `CSET` Character set information. Code page, language, etc. Very Rare.  [RIFF1991](https://wavref.til.cafe/chunk/cset/), [RIFF1994](https://wavref.til.cafe/chunk/cset/)
 ///
 /// NOTE: Implemented from the spec only, because I couldn't find any files actually
 /// containing this chunk.
@@ -147,6 +147,31 @@ fn cset_ld_map() -> &'static HashMap<(u16, u16), (&'static str, &'static str)> {
             ((12, 3), ("French", "Canadian")),
             ((12, 4), ("French", "Swiss")),
             ((13, 1), ("Hebrew", "")),
+            ((14, 1), ("Hungarian", "")),
+            ((15, 1), ("Icelandic", "")),
+            ((16, 1), ("Italian", "")),
+            ((16, 2), ("Italian", "Swiss")),
+            ((17, 1), ("Japanese", "")),
+            ((18, 1), ("Korean", "")),
+            ((19, 1), ("Dutch", "")),
+            ((19, 2), ("Dutch", "Belgian")),
+            ((20, 1), ("Norwegian", "Bokmal")),
+            ((20, 2), ("Norwegian", "Nynorsk")),
+            ((21, 1), ("Polish", "")),
+            ((22, 1), ("Portuguese", "Brazilian")),
+            ((22, 2), ("Portuguese", "")),
+            ((23, 1), ("Rhaeto-Romanic", "")),
+            ((24, 1), ("Romanian", "")),
+            ((25, 1), ("Russian", "")),
+            ((26, 1), ("Serbo-Croatian", "Latin")),
+            ((26, 2), ("Serbo-Croatian", "Cyrillic")),
+            ((27, 1), ("Slovak", "")),
+            ((28, 1), ("Albanian", "")),
+            ((29, 1), ("Swedish", "")),
+            ((30, 1), ("Thai", "")),
+            ((31, 1), ("Turkish", "")),
+            ((32, 1), ("Urdu", "")),
+            ((33, 1), ("Bahasa", "")),
         ])
     })
 }
