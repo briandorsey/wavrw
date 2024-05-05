@@ -61,15 +61,19 @@ struct ViewConfig {
     /// One or more paths to WAV files
     wav_path: Vec<OsString>,
 
-    /// output format
-    #[arg(long, short, value_enum, default_value_t = Format::Summary)]
+    /// Output format
+    #[arg(long, short, value_enum, default_value_t = Format::Summary, group="output")]
     format: Format,
+
+    /// Alias for: --format detailed
+    #[arg(short = 'd', default_value_t = false, group = "output")]
+    detailed: bool,
 
     #[arg(
         long,
-       short = 'w',
+        short = 'w',
         default_value_t = WIDTH_DEFAULT,
-        help = "trim output to <WIDTH> columns"
+        help = "Trim output to <WIDTH> columns"
     )]
     width: u16,
 }
@@ -79,6 +83,7 @@ impl Default for ViewConfig {
         ViewConfig {
             wav_path: vec![],
             format: Format::Summary,
+            detailed: false,
             width: WIDTH_DEFAULT,
         }
     }
@@ -350,7 +355,13 @@ fn main() -> Result<()> {
     let mut args = WavrwArgs::parse();
 
     match &mut args.command {
-        Commands::View(config) => view(config),
+        Commands::View(config) => {
+            // .detailed is an alias, update format
+            if config.detailed {
+                config.format = Format::Detailed;
+            }
+            view(config)
+        }
 
         Commands::List(config) => {
             // Convert extensions to lowercase for case insensitive comparison later.
