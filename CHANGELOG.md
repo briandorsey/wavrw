@@ -4,7 +4,10 @@ Annotations: NEW, IMProved, FIX, DEPrecated, REMoved, SECurity
 
 ## [unreleased] - 
 
-- [NEW] - inst chunk support. Pitch, volume, and velocity for playback by sampler. [RIFF1994](https://wavref.til.cafe/spec/riff1994/)
+- [NEW] - RIFF1994 updates [RIFF1994](https://wavref.til.cafe/spec/riff1994/)
+  - [IMP] - add new [INFO](https://wavref.til.cafe/chunk/info/) subchunks from RIFF1994: ISMP, IDIT
+  - [NEW] - smpl chunk support. Information needed for use as a sampling instrument. [smpl](https://wavref.til.cafe/chunk/smpl/)
+  - [NEW] - inst chunk support. Pitch, volume, and velocity for playback by sampler. [RIFF1994](https://wavref.til.cafe/chunk/inst/)
 
 ## [0.1.0] - 2024/04/27
 
