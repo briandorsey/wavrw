@@ -16,7 +16,7 @@ use tracing::instrument;
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::FmtSubscriber;
-use wavrw::{ChunkID, SizedChunk, Summarizable};
+use wavrw::{ChunkID, SizedChunk, SizedChunkEnum, Summarizable};
 
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None,
@@ -189,6 +189,15 @@ fn view_line(file: BufReader<File>) -> Result<String> {
 
     for result in wave.iter_chunks() {
         match result {
+            // special case smpl to show loop count
+            Ok(SizedChunkEnum::Smpl(chunk)) => {
+                chunk_strings.push(format!(
+                    "{}[{}]",
+                    chunk.name(),
+                    chunk.data.sample_loops.len()
+                ));
+            }
+            // match on id() to catch all current and future LIST variants
             Ok(chunk) if chunk.id() == b"LIST" => {
                 chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
             }

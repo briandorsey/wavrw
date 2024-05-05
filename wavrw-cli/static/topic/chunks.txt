@@ -11,6 +11,7 @@ MD5   Checksum of audio data of the WAVE.
 PAD   Padding, filler or outdated information. 
 plst  Play order for cue points. Very rare. 
 RIFF  Container structure for multimedia data.
+smpl  Information needed for use as a sampling instrument.
 
 LIST-adtl CuePoint annotation chunks. 
 	file  Information embedded in other file formats.

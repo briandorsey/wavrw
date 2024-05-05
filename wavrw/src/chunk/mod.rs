@@ -23,6 +23,7 @@ mod junk;
 mod md5;
 mod plst;
 mod riff;
+mod smpl;
 pub mod wavl;
 
 pub use bext::{Bext, BextChunk};
@@ -36,3 +37,4 @@ pub use junk::{Fllr, FllrChunk, Junk, JunkChunk, Pad, PadChunk};
 pub use md5::{Md5, Md5Chunk};
 pub use plst::{Plst, PlstChunk, PlstSegment};
 pub use riff::RiffChunk;
+pub use smpl::{Smpl, SmplChunk, SmplLoop};
