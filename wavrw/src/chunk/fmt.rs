@@ -577,13 +577,14 @@ impl TryFrom<&FormatTag> for u16 {
     }
 }
 
-/// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+/// Format of PCM audio samples in `data`. (WAVE_FORMAT_PCM) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Fmt {
+pub struct FmtPcm {
     /// A number indicating the WAVE format category of the file.
+    #[br(assert(format_tag == FormatTag::Pcm))]
     pub format_tag: FormatTag,
 
     /// The number of channels represented in the waveform data.
@@ -615,13 +616,12 @@ pub struct Fmt {
     /// rounded to the next whole number: wChannels x ( wBitsPerSample / 8 )
     pub bits_per_sample: u16,
 }
-// TODO: properly handle different fmt chunk additions from later specs
 
-impl KnownChunkID for Fmt {
+impl KnownChunkID for FmtPcm {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
-impl Summarizable for Fmt {
+impl Summarizable for FmtPcm {
     fn summary(&self) -> String {
         format!(
             "{}, {} chan, {}/{}",
@@ -629,7 +629,6 @@ impl Summarizable for Fmt {
             self.channels,
             self.bits_per_sample,
             self.samples_per_sec,
-            // TODO: format_tag
         )
     }
 
@@ -640,12 +639,12 @@ impl Summarizable for Fmt {
 
 // Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
 
-impl<'a> IntoIterator for &'a Fmt {
+impl<'a> IntoIterator for &'a FmtPcm {
     type Item = (String, String);
-    type IntoIter = FmtDataIterator<'a>;
+    type IntoIter = FmtPcmIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        FmtDataIterator {
+        FmtPcmIterator {
             data: self,
             index: 0,
         }
@@ -653,12 +652,12 @@ impl<'a> IntoIterator for &'a Fmt {
 }
 
 #[derive(Debug)]
-pub struct FmtDataIterator<'a> {
-    data: &'a Fmt,
+pub struct FmtPcmIterator<'a> {
+    data: &'a FmtPcm,
     index: usize,
 }
 
-impl<'a> Iterator for FmtDataIterator<'a> {
+impl<'a> Iterator for FmtPcmIterator<'a> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -683,8 +682,167 @@ impl<'a> Iterator for FmtDataIterator<'a> {
     }
 }
 
-/// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
-pub type FmtChunk = KnownChunk<Fmt>;
+/// `fmt ` Extended format of audio samples in `data`. (WAVEFORMATEX) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+#[binrw]
+#[brw(little)]
+#[br(import(_size: u32))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FmtExtended {
+    // no #[br(assert())] here, this is the default parser
+    /// A number indicating the WAVE format category of the file.
+    pub format_tag: FormatTag,
+
+    /// The number of channels represented in the waveform data.
+    ///
+    /// Example: 1 for mono or 2 for stereo.
+    pub channels: u16,
+
+    /// The sampling rate at which each channel should be played.
+    pub samples_per_sec: u32,
+
+    /// The average number of bytes per second at which the waveform data should be transferred.
+    ///
+    /// Playback software can estimate the buffer size using this value.
+    pub avg_bytes_per_sec: u32,
+
+    /// The block alignment (in bytes) of the waveform data.
+    ///
+    /// Playback software needs to process a multiple of wBlockAlign bytes
+    /// of data at a time, so the value of wBlockAlign can be used for
+    /// buffer alignment. The wBlockAlign field should be equal to the
+    /// following formula, rounded to the next whole number: wChannels x
+    /// ( wBitsPerSample / 8 )
+    pub block_align: u16,
+
+    /// The number of bits used to represent each sample of each channel.
+    ///
+    /// If there are multiple channels, the sample size is the same for each
+    /// channel. The wBlockAlign field should be equal to the following formula,
+    /// rounded to the next whole number: wChannels x ( wBitsPerSample / 8 )
+    pub bits_per_sample: u16,
+
+    /// The count in bytes of the extra extensible data.
+    ///
+    /// The size in bytes of the extra information in the WAVE format header not
+    /// including the size of the WAVEFORMATEX structure. (size of fields from
+    /// format_tag through extra_size inclusive (all fields except id, size and
+    /// the extra_data))
+    #[br()]
+    #[bw(map = |_| self.extra_data.len() as u16)]
+    pub extra_size: u16,
+
+    /// The extra information as bytes.
+    ///
+    /// For use when format_tag is unknown, so this portion can't be parsed
+    /// deteriministically.
+    #[br(count = extra_size as usize)]
+    #[bw()]
+    pub extra_data: Vec<u8>,
+}
+
+impl KnownChunkID for FmtExtended {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+impl Summarizable for FmtExtended {
+    fn summary(&self) -> String {
+        format!(
+            "EX: {}, {} chan, {}/{}",
+            self.format_tag.to_string().replace("WAVE_FORMAT_", ""),
+            self.channels,
+            self.bits_per_sample,
+            self.samples_per_sec,
+        )
+    }
+
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
+}
+
+// Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
+
+impl<'a> IntoIterator for &'a FmtExtended {
+    type Item = (String, String);
+    type IntoIter = FmtExtendedIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FmtExtendedIterator {
+            data: self,
+            index: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FmtExtendedIterator<'a> {
+    data: &'a FmtExtended,
+    index: usize,
+}
+
+impl<'a> Iterator for FmtExtendedIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("format_tag".to_string(), self.data.format_tag.to_string())),
+            2 => Some(("channels".to_string(), self.data.channels.to_string())),
+            3 => Some((
+                "samples_per_sec".to_string(),
+                self.data.samples_per_sec.to_string(),
+            )),
+            4 => Some((
+                "avg_bytes_per_sec".to_string(),
+                self.data.avg_bytes_per_sec.to_string(),
+            )),
+            5 => Some(("block_align".to_string(), self.data.block_align.to_string())),
+            6 => Some((
+                "bits_per_sample".to_string(),
+                self.data.bits_per_sample.to_string(),
+            )),
+            7 => Some(("extra_size".to_string(), self.data.extra_size.to_string())),
+            8 => Some((
+                "extra_data".to_string(),
+                format!("0x{}", hex::encode_upper(&self.data.extra_data)),
+            )),
+            _ => None,
+        }
+    }
+}
+
+/// All `Fmt` structs as an enum
+#[allow(missing_docs)]
+#[binrw]
+#[brw(little)]
+#[br(import(_size: u32))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FmtEnum {
+    Pcm(FmtPcm),
+    Extended(FmtExtended),
+}
+
+impl KnownChunkID for FmtEnum {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+impl Summarizable for FmtEnum {
+    fn summary(&self) -> String {
+        match self {
+            FmtEnum::Pcm(e) => e.summary(),
+            FmtEnum::Extended(e) => e.summary(),
+        }
+    }
+
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        match self {
+            FmtEnum::Pcm(e) => e.items(),
+            FmtEnum::Extended(e) => e.items(),
+        }
+    }
+}
+
+/// `fmt ` Format of audio samples in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fmt/), [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
+pub type FmtChunk = KnownChunk<FmtEnum>;
 
 #[allow(clippy::dbg_macro)]
 #[cfg(test)]
@@ -700,14 +858,14 @@ mod test {
         let expected = FmtChunk {
             offset: Some(0),
             size: 16,
-            data: Fmt {
+            data: FmtEnum::Pcm(FmtPcm {
                 format_tag: FormatTag::Pcm,
                 channels: 1,
                 samples_per_sec: 48000,
                 avg_bytes_per_sec: 144000,
                 block_align: 3,
                 bits_per_sample: 24,
-            },
+            }),
             extra_bytes: vec![],
         };
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
@@ -733,6 +891,10 @@ mod test {
         let mut buff = hex_to_cursor("666D7420 10000000 00420100 80BB0000 80320200 03001800");
         let expected = FormatTag::Other(0x4200);
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
-        assert_eq!(chunk.data.format_tag, expected);
+        if let FmtEnum::Pcm(fmt) = chunk.data {
+            assert_eq!(fmt.format_tag, expected);
+        } else {
+            unreachable!("FmtEnum::Pcm variant match failed");
+        }
     }
 }
