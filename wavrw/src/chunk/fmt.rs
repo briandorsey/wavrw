@@ -1,6 +1,7 @@
 use core::fmt::{Display, Formatter};
 
 use binrw::binrw;
+use itertools::Itertools;
 use num_enum::{FromPrimitive, IntoPrimitive};
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
@@ -577,6 +578,11 @@ impl TryFrom<&FormatTag> for u16 {
     }
 }
 
+pub trait Tag {
+    fn format_tag(&self) -> FormatTag;
+}
+
+//---------------------------
 /// Format of PCM audio samples in `data`. (WAVE_FORMAT_PCM) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
@@ -584,7 +590,8 @@ impl TryFrom<&FormatTag> for u16 {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FmtPcm {
     /// A number indicating the WAVE format category of the file.
-    #[br(assert(format_tag == FormatTag::Pcm))]
+    #[br(temp, assert(format_tag == Self::FORMAT_TAG))]
+    #[bw(calc = Self::FORMAT_TAG)]
     pub format_tag: FormatTag,
 
     /// The number of channels represented in the waveform data.
@@ -621,11 +628,21 @@ impl KnownChunkID for FmtPcm {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
+impl FmtPcm {
+    const FORMAT_TAG: FormatTag = FormatTag::Pcm;
+}
+
+impl Tag for FmtPcm {
+    fn format_tag(&self) -> FormatTag {
+        Self::FORMAT_TAG
+    }
+}
+
 impl Summarizable for FmtPcm {
     fn summary(&self) -> String {
         format!(
             "{}, {} chan, {}/{}",
-            self.format_tag.to_string().replace("WAVE_FORMAT_", ""),
+            self.format_tag().to_string().replace("WAVE_FORMAT_", ""),
             self.channels,
             self.bits_per_sample,
             self.samples_per_sec,
@@ -662,7 +679,7 @@ impl<'a> Iterator for FmtPcmIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
         match self.index {
-            1 => Some(("format_tag".to_string(), self.data.format_tag.to_string())),
+            1 => Some(("format_tag".to_string(), self.data.format_tag().to_string())),
             2 => Some(("channels".to_string(), self.data.channels.to_string())),
             3 => Some((
                 "samples_per_sec".to_string(),
@@ -682,6 +699,197 @@ impl<'a> Iterator for FmtPcmIterator<'a> {
     }
 }
 
+//---------------------------
+
+/// ADPCM implementation specific decoding coefficients.
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AdpcmCoefficients {
+    /// ADPCM implementation specific decoding coefficient.
+    pub coef1: i16,
+
+    /// ADPCM implementation specific decoding coefficient.
+    pub coef2: i16,
+}
+
+impl Display for AdpcmCoefficients {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "({}, {})", self.coef1, self.coef2)
+    }
+}
+
+/// Format of ADPCM audio samples in `data`. (WAVE_FORMAT_ADPCM) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+#[binrw]
+#[brw(little)]
+#[br(import(_size: u32))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FmtAdpcm {
+    /// A number indicating the WAVE format category of the file.
+    #[br(temp, assert(format_tag == Self::FORMAT_TAG))]
+    #[bw(calc = Self::FORMAT_TAG)]
+    pub format_tag: FormatTag,
+
+    /// The number of channels represented in the waveform data.
+    ///
+    /// Example: 1 for mono or 2 for stereo.
+    pub channels: u16,
+
+    /// The sampling rate at which each channel should be played.
+    pub samples_per_sec: u32,
+
+    /// The average number of bytes per second at which the waveform data should be transferred.
+    ///
+    /// Playback software can estimate the buffer size using this value.
+    pub avg_bytes_per_sec: u32,
+
+    /// The block alignment (in bytes) of the waveform data.
+    ///
+    /// Playback software needs to process a multiple of `block_align` bytes
+    /// of data at a time, so the value of `block_align` can be used for
+    /// buffer alignment. The `block_align` field should be equal to the
+    /// following formula, rounded to the next whole number: `channels` x
+    /// ( `bits_per_sample` / 8 )
+    pub block_align: u16,
+
+    /// The number of bits used to represent each sample of each channel.
+    ///
+    /// If there are multiple channels, the sample size is the same for each
+    /// channel. The `block_align` field should be equal to the following formula,
+    /// rounded to the next whole number: `channels` x ( `bits_per_sample` / 8 )
+    pub bits_per_sample: u16,
+
+    /// The count in bytes of the extended data.
+    ///
+    /// The size in bytes of the extra information in the WAVE format header not
+    /// including the size of the `FmtExtended` structure. (size of fields from
+    /// format_tag through extra_size inclusive (all fields except id, size and
+    /// the extra_bytes))
+    #[br()]
+    #[bw(map = |_| (self.coefficient_count * 4 + 4) )]
+    pub extra_size: u16,
+
+    /// Count of number of samples per block.
+    ///
+    /// (((`block_align` - (7 * `channels`)) * 8) / (`bits_per_sample` * `channels`)) + 2
+    pub samples_per_block: u16,
+
+    /// Count of the number of coefficient sets defined in coefficients.
+    pub coefficient_count: u16,
+
+    /// These are the coefficients used by the wave to play.
+    ///
+    /// They may be interpreted as fixed point 8.8 signed values. Currently
+    /// there are 7 preset coefficient sets. They must appear in the following
+    /// order.
+    ///
+    /// |Coef1 |Coef2|
+    /// |-|-|
+    /// |256 |0|
+    /// |512 |-256|
+    /// |0 |0|
+    /// |192 |64|
+    /// |240 |0|
+    /// |460 |-208|
+    /// |392 |-232|
+    ///
+    /// Note that if even only 1 coefficient set was used to encode the file then
+    /// all coefficient sets are still included. More coefficients may be added
+    /// by the encoding software, but the first 7 must always be the same.
+    #[br(count = (coefficient_count) as usize)]
+    #[bw()]
+    pub coefficients: Vec<AdpcmCoefficients>,
+}
+
+impl KnownChunkID for FmtAdpcm {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+impl FmtAdpcm {
+    const FORMAT_TAG: FormatTag = FormatTag::Adpcm;
+}
+
+impl Tag for FmtAdpcm {
+    fn format_tag(&self) -> FormatTag {
+        Self::FORMAT_TAG
+    }
+}
+
+impl Summarizable for FmtAdpcm {
+    fn summary(&self) -> String {
+        format!(
+            "{}, {} chan, {}/{}",
+            self.format_tag().to_string().replace("WAVE_FORMAT_", ""),
+            self.channels,
+            self.bits_per_sample,
+            self.samples_per_sec,
+        )
+    }
+
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
+}
+
+// Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
+
+impl<'a> IntoIterator for &'a FmtAdpcm {
+    type Item = (String, String);
+    type IntoIter = FmtAdpcmIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FmtAdpcmIterator {
+            data: self,
+            index: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FmtAdpcmIterator<'a> {
+    data: &'a FmtAdpcm,
+    index: usize,
+}
+
+impl<'a> Iterator for FmtAdpcmIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("format_tag".to_string(), self.data.format_tag().to_string())),
+            2 => Some(("channels".to_string(), self.data.channels.to_string())),
+            3 => Some((
+                "samples_per_sec".to_string(),
+                self.data.samples_per_sec.to_string(),
+            )),
+            4 => Some((
+                "avg_bytes_per_sec".to_string(),
+                self.data.avg_bytes_per_sec.to_string(),
+            )),
+            5 => Some(("block_align".to_string(), self.data.block_align.to_string())),
+            6 => Some((
+                "bits_per_sample".to_string(),
+                self.data.bits_per_sample.to_string(),
+            )),
+            7 => Some(("extra_size".to_string(), self.data.extra_size.to_string())),
+            8 => Some((
+                "samples_per_block".to_string(),
+                self.data.samples_per_block.to_string(),
+            )),
+            9 => Some((
+                "coefficient_count".to_string(),
+                self.data.coefficient_count.to_string(),
+            )),
+            10 => Some((
+                "coefficients".to_string(),
+                self.data.coefficients.iter().join(" "),
+            )),
+            _ => None,
+        }
+    }
+}
+
+//---------------------------
 /// `fmt ` Extended format of audio samples in `data`. (WAVEFORMATEX) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 ///
 /// This is a fallback parser for unimplmented `FormatTags`, the unparsed
@@ -745,6 +953,12 @@ pub struct FmtExtended {
 
 impl KnownChunkID for FmtExtended {
     const ID: FourCC = FourCC(*b"fmt ");
+}
+
+impl Tag for FmtExtended {
+    fn format_tag(&self) -> FormatTag {
+        self.format_tag
+    }
 }
 
 impl Summarizable for FmtExtended {
@@ -818,7 +1032,9 @@ impl<'a> Iterator for FmtExtendedIterator<'a> {
     }
 }
 
-/// All `Fmt` structs as an enum
+/// All `Fmt` structs as an enum.
+///
+/// TODO: document design of Fmt* structs.
 #[allow(missing_docs)]
 #[binrw]
 #[brw(little)]
@@ -826,6 +1042,7 @@ impl<'a> Iterator for FmtExtendedIterator<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FmtEnum {
     Pcm(FmtPcm),
+    Adpcm(FmtAdpcm),
     Extended(FmtExtended),
 }
 
@@ -833,10 +1050,21 @@ impl KnownChunkID for FmtEnum {
     const ID: FourCC = FourCC(*b"fmt ");
 }
 
+impl Tag for FmtEnum {
+    fn format_tag(&self) -> FormatTag {
+        match self {
+            FmtEnum::Pcm(e) => e.format_tag(),
+            FmtEnum::Adpcm(e) => e.format_tag(),
+            FmtEnum::Extended(e) => e.format_tag(),
+        }
+    }
+}
+
 impl Summarizable for FmtEnum {
     fn summary(&self) -> String {
         match self {
             FmtEnum::Pcm(e) => e.summary(),
+            FmtEnum::Adpcm(e) => e.summary(),
             FmtEnum::Extended(e) => e.summary(),
         }
     }
@@ -844,6 +1072,7 @@ impl Summarizable for FmtEnum {
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         match self {
             FmtEnum::Pcm(e) => e.items(),
+            FmtEnum::Adpcm(e) => e.items(),
             FmtEnum::Extended(e) => e.items(),
         }
     }
@@ -851,6 +1080,7 @@ impl Summarizable for FmtEnum {
     fn name(&self) -> String {
         match self {
             FmtEnum::Pcm(e) => e.name(),
+            FmtEnum::Adpcm(e) => e.name(),
             FmtEnum::Extended(e) => e.name(),
         }
     }
@@ -858,6 +1088,7 @@ impl Summarizable for FmtEnum {
     fn item_summary_header(&self) -> String {
         match self {
             FmtEnum::Pcm(e) => e.item_summary_header(),
+            FmtEnum::Adpcm(e) => e.item_summary_header(),
             FmtEnum::Extended(e) => e.item_summary_header(),
         }
     }
@@ -881,7 +1112,6 @@ mod test {
             offset: Some(0),
             size: 16,
             data: FmtEnum::Pcm(FmtPcm {
-                format_tag: FormatTag::Pcm,
                 channels: 1,
                 samples_per_sec: 48000,
                 avg_bytes_per_sec: 144000,
@@ -925,5 +1155,18 @@ mod test {
         } else {
             unreachable!("FmtEnum::Pcm variant match failed");
         }
+    }
+
+    // compile time check to ensure all chunks implement consistent traits
+    fn has_fmt_standard_traits<T>()
+    where
+        T: Tag,
+    {
+    }
+
+    #[test]
+    fn consistent_traits() {
+        // this Enum transitively ensures the traits of all subchunks
+        has_fmt_standard_traits::<FmtEnum>();
     }
 }

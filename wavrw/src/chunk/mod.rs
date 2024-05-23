@@ -31,7 +31,7 @@ pub use cset::{Cset, CsetChunk, RiffCountryCode};
 pub use cue::{Cue, CueChunk, CuePoint};
 pub use data::{Data, DataChunk};
 pub use fact::{Fact, FactChunk};
-pub use fmt::{FmtChunk, FmtEnum, FmtExtended, FmtPcm, FormatTag};
+pub use fmt::{AdpcmCoefficients, FmtAdpcm, FmtChunk, FmtEnum, FmtExtended, FmtPcm, FormatTag};
 pub use inst::{Inst, InstChunk};
 pub use junk::{Fllr, FllrChunk, Junk, JunkChunk, Pad, PadChunk};
 pub use md5::{Md5, Md5Chunk};
