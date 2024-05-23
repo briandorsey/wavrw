@@ -602,18 +602,18 @@ pub struct FmtPcm {
 
     /// The block alignment (in bytes) of the waveform data.
     ///
-    /// Playback software needs to process a multiple of wBlockAlign bytes
-    /// of data at a time, so the value of wBlockAlign can be used for
-    /// buffer alignment. The wBlockAlign field should be equal to the
-    /// following formula, rounded to the next whole number: wChannels x
-    /// ( wBitsPerSample / 8 )
+    /// Playback software needs to process a multiple of `block_align` bytes
+    /// of data at a time, so the value of `block_align` can be used for
+    /// buffer alignment. The `block_align` field should be equal to the
+    /// following formula, rounded to the next whole number: `channels` x
+    /// ( `bits_per_sample` / 8 )
     pub block_align: u16,
 
     /// The number of bits used to represent each sample of each channel.
     ///
     /// If there are multiple channels, the sample size is the same for each
-    /// channel. The wBlockAlign field should be equal to the following formula,
-    /// rounded to the next whole number: wChannels x ( wBitsPerSample / 8 )
+    /// channel. The `block_align` field should be equal to the following formula,
+    /// rounded to the next whole number: `channels` x ( `bits_per_sample` / 8 )
     pub bits_per_sample: u16,
 }
 
@@ -683,6 +683,9 @@ impl<'a> Iterator for FmtPcmIterator<'a> {
 }
 
 /// `fmt ` Extended format of audio samples in `data`. (WAVEFORMATEX) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+///
+/// This is a fallback parser for unimplmented `FormatTags`, the unparsed
+/// extended data is stored in `extra_bytes`.
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -707,37 +710,37 @@ pub struct FmtExtended {
 
     /// The block alignment (in bytes) of the waveform data.
     ///
-    /// Playback software needs to process a multiple of wBlockAlign bytes
-    /// of data at a time, so the value of wBlockAlign can be used for
-    /// buffer alignment. The wBlockAlign field should be equal to the
-    /// following formula, rounded to the next whole number: wChannels x
-    /// ( wBitsPerSample / 8 )
+    /// Playback software needs to process a multiple of `block_align` bytes
+    /// of data at a time, so the value of `block_align` can be used for
+    /// buffer alignment. The `block_align` field should be equal to the
+    /// following formula, rounded to the next whole number: `channels` x
+    /// ( `bits_per_sample` / 8 )
     pub block_align: u16,
 
     /// The number of bits used to represent each sample of each channel.
     ///
     /// If there are multiple channels, the sample size is the same for each
-    /// channel. The wBlockAlign field should be equal to the following formula,
-    /// rounded to the next whole number: wChannels x ( wBitsPerSample / 8 )
+    /// channel. The `block_align` field should be equal to the following formula,
+    /// rounded to the next whole number: `channels` x ( `bits_per_sample` / 8 )
     pub bits_per_sample: u16,
 
-    /// The count in bytes of the extra extensible data.
+    /// The count in bytes of the extended data.
     ///
     /// The size in bytes of the extra information in the WAVE format header not
-    /// including the size of the WAVEFORMATEX structure. (size of fields from
+    /// including the size of the `FmtExtended` structure. (size of fields from
     /// format_tag through extra_size inclusive (all fields except id, size and
-    /// the extra_data))
+    /// the extra_bytes))
     #[br()]
-    #[bw(map = |_| self.extra_data.len() as u16)]
+    #[bw(map = |_| self.extra_bytes.len() as u16)]
     pub extra_size: u16,
 
     /// The extra information as bytes.
     ///
-    /// For use when format_tag is unknown, so this portion can't be parsed
-    /// deteriministically.
+    /// `FmtExtended` is intended for use when `format_tag` is unknown, so this
+    /// data can't be parsed deteriministically.
     #[br(count = extra_size as usize)]
     #[bw()]
-    pub extra_data: Vec<u8>,
+    pub extra_bytes: Vec<u8>,
 }
 
 impl KnownChunkID for FmtExtended {
@@ -747,16 +750,21 @@ impl KnownChunkID for FmtExtended {
 impl Summarizable for FmtExtended {
     fn summary(&self) -> String {
         format!(
-            "EX: {}, {} chan, {}/{}",
+            "{}, {} chan, {}/{}, EX: {}",
             self.format_tag.to_string().replace("WAVE_FORMAT_", ""),
             self.channels,
             self.bits_per_sample,
             self.samples_per_sec,
+            self.extra_size,
         )
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
         Box::new(self.into_iter())
+    }
+
+    fn item_summary_header(&self) -> String {
+        "(parsed as WAVEFORMATEX; this format tag not implemented)".to_string()
     }
 }
 
@@ -802,8 +810,8 @@ impl<'a> Iterator for FmtExtendedIterator<'a> {
             )),
             7 => Some(("extra_size".to_string(), self.data.extra_size.to_string())),
             8 => Some((
-                "extra_data".to_string(),
-                format!("0x{}", hex::encode_upper(&self.data.extra_data)),
+                "extra_bytes".to_string(),
+                format!("0x{}", hex::encode_upper(&self.data.extra_bytes)),
             )),
             _ => None,
         }
@@ -837,6 +845,20 @@ impl Summarizable for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.items(),
             FmtEnum::Extended(e) => e.items(),
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            FmtEnum::Pcm(e) => e.name(),
+            FmtEnum::Extended(e) => e.name(),
+        }
+    }
+
+    fn item_summary_header(&self) -> String {
+        match self {
+            FmtEnum::Pcm(e) => e.item_summary_header(),
+            FmtEnum::Extended(e) => e.item_summary_header(),
         }
     }
 }
@@ -880,18 +902,25 @@ mod test {
 
     #[test]
     fn formattag_primitive() {
-        let pcm = FormatTag::from(1u16);
+        let pcm = FormatTag::from(1_u16);
         assert_eq!(pcm, FormatTag::Pcm);
 
-        let unknown = FormatTag::from(0x4242u16);
+        // make sure parsing into Other() works
+        let unknown = FormatTag::from(0x4242_u16);
         assert_eq!(unknown, FormatTag::Other(0x4242_u16));
         assert_eq!(unknown.to_string(), "Unknown FormatTag (0x4242)");
+    }
 
-        // make sure parsing into Other() works
-        let mut buff = hex_to_cursor("666D7420 10000000 00420100 80BB0000 80320200 03001800");
-        let expected = FormatTag::Other(0x4200);
+    #[test]
+    fn parse_fmt_extended() {
+        let expected = FormatTag::Unknown;
+
+        let mut buff = hex_to_cursor(
+            "666D7420 14000000 00000200 44AC0000
+        DBAC0000 00080400 0200F907",
+        );
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
-        if let FmtEnum::Pcm(fmt) = chunk.data {
+        if let FmtEnum::Extended(fmt) = chunk.data {
             assert_eq!(fmt.format_tag, expected);
         } else {
             unreachable!("FmtEnum::Pcm variant match failed");
