@@ -1,3 +1,8 @@
+//! `fmt ` Format of the audio samples in `data` chunk. (WAVEFORMATEX) RIFF1991
+//!
+//! This is a fiddly chunk to parse, since the fields vary depending on the [`FormatTag`].
+//! Currently only the most common formats are implemented with specific structs to parse them. Others will be parsed by [`FmtExtended`].
+
 use core::fmt::{Display, Formatter};
 
 use binrw::binrw;
@@ -578,7 +583,11 @@ impl TryFrom<&FormatTag> for u16 {
     }
 }
 
+/// Provided a consistent interface to the [`FormatTag`] for format variations.
+///
+/// This may be stored as an enum or const enum variant by the underlying structs.
 pub trait Tag {
+    /// Return the [`FormatTag`] variant for this struct.
     fn format_tag(&self) -> FormatTag;
 }
 
@@ -668,6 +677,7 @@ impl<'a> IntoIterator for &'a FmtPcm {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct FmtPcmIterator<'a> {
     data: &'a FmtPcm,
@@ -845,6 +855,7 @@ impl<'a> IntoIterator for &'a FmtAdpcm {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct FmtAdpcmIterator<'a> {
     data: &'a FmtAdpcm,
@@ -996,6 +1007,7 @@ impl<'a> IntoIterator for &'a FmtExtended {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct FmtExtendedIterator<'a> {
     data: &'a FmtExtended,

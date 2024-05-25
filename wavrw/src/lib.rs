@@ -84,6 +84,7 @@ use tracing::{instrument, warn};
 
 pub mod chunk;
 use crate::chunk::adtl::ListAdtlChunk;
+use crate::chunk::fmt::FmtChunk;
 use crate::chunk::info::ListInfoChunk;
 use crate::chunk::wavl::ListWavlChunk;
 use crate::chunk::BextChunk;
@@ -92,7 +93,6 @@ use crate::chunk::CueChunk;
 use crate::chunk::DataChunk;
 use crate::chunk::FactChunk;
 use crate::chunk::FllrChunk;
-use crate::chunk::FmtChunk;
 use crate::chunk::InstChunk;
 use crate::chunk::JunkChunk;
 use crate::chunk::Md5Chunk;
