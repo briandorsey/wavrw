@@ -1,4 +1,4 @@
-//! `fmt ` Format of the audio samples in `data` chunk. (WAVEFORMATEX) RIFF1991
+//! `fmt ` Format of the audio samples in `data` chunk. (WAVEFORMATEX)  [RIFF1991](https://wavref.til.cafe/chunk/fmt/), [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
 //!
 //! This is a fiddly chunk to parse, since the fields vary depending on the [`FormatTag`].
 //! Currently only the most common formats are implemented with specific structs to parse them. Others will be parsed by [`FmtExtended`].
@@ -729,7 +729,7 @@ impl Display for AdpcmCoefficients {
     }
 }
 
-/// Format of ADPCM audio samples in `data`. (WAVE_FORMAT_ADPCM) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+/// Format of ADPCM audio samples in `data`. (WAVE_FORMAT_ADPCM) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -751,30 +751,35 @@ pub struct FmtAdpcm {
     /// The average number of bytes per second at which the waveform data should be transferred.
     ///
     /// Playback software can estimate the buffer size using this value.
+    /// ((`samples_per_sec` / `samples_per_block`) * `block_align`).
     pub avg_bytes_per_sec: u32,
 
     /// The block alignment (in bytes) of the waveform data.
     ///
     /// Playback software needs to process a multiple of `block_align` bytes
     /// of data at a time, so the value of `block_align` can be used for
-    /// buffer alignment. The `block_align` field should be equal to the
-    /// following formula, rounded to the next whole number: `channels` x
-    /// ( `bits_per_sample` / 8 )
+    /// buffer alignment.
+    ///
+    /// |(samples_per_sec x channels) | block_align |
+    /// |-|-|
+    /// |8k | 256|
+    /// |11k | 256|
+    /// |22k | 512|
+    /// |44k | 1024|
+    ///
     pub block_align: u16,
 
     /// The number of bits used to represent each sample of each channel.
     ///
-    /// If there are multiple channels, the sample size is the same for each
-    /// channel. The `block_align` field should be equal to the following formula,
-    /// rounded to the next whole number: `channels` x ( `bits_per_sample` / 8 )
+    /// Currently only 4 bits per sample is defined. Other values are reserved.
     pub bits_per_sample: u16,
 
     /// The count in bytes of the extended data.
     ///
     /// The size in bytes of the extra information in the WAVE format header not
-    /// including the size of the `FmtExtended` structure. (size of fields from
-    /// format_tag through extra_size inclusive (all fields except id, size and
-    /// the extra_bytes))
+    /// including the size of the [`FmtExtended`] structure. (size of fields from
+    /// `format_tag` through `extra_size` inclusive (all fields except `id`, `size` and
+    /// the `extra_bytes`))
     #[br()]
     #[bw(map = |_| (self.coefficient_count * 4 + 4) )]
     pub extra_size: u16,
@@ -901,7 +906,160 @@ impl<'a> Iterator for FmtAdpcmIterator<'a> {
 }
 
 //---------------------------
-/// `fmt ` Extended format of audio samples in `data`. (WAVEFORMATEX) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+
+/// Format of DVI ADPCM audio samples in `data`. (WAVE_FORMAT_DVI_ADPCM) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
+#[binrw]
+#[brw(little)]
+#[br(import(_size: u32))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FmtDviAdpcm {
+    /// A number indicating the WAVE format category of the file.
+    #[br(temp, assert(format_tag == Self::FORMAT_TAG))]
+    #[bw(calc = Self::FORMAT_TAG)]
+    pub format_tag: FormatTag,
+
+    /// The number of channels represented in the waveform data.
+    ///
+    /// Example: 1 for mono or 2 for stereo.
+    pub channels: u16,
+
+    /// Sample rate of the WAVE file. This should be 8000, 11025, 22050 or 44100.
+    /// Other sample rates are allowed.
+    pub samples_per_sec: u32,
+
+    /// The average number of bytes per second at which the waveform data should be transferred.
+    ///
+    /// Playback software can estimate the buffer size using this value.
+    /// ((`samples_per_sec` / `samples_per_block`) * `block_align`).
+    pub avg_bytes_per_sec: u32,
+
+    /// The block alignment (in bytes) of the waveform data.
+    ///
+    /// Playback software needs to process a multiple of `block_align` bytes
+    /// of data at a time, so the value of `block_align` can be used for
+    /// buffer alignment.
+    ///
+    /// |bits_per_sample | block_align |
+    /// |-|-|
+    /// |3 | (( N * 3 ) + 1 ) * 4 * channels |
+    /// |4 | (N + 1) * 4 * channels |
+    /// || where N = 0, 1, 2, 3 . . . |    ///
+    ///
+    /// The recommended block size for coding is 256 * bytes* min(1,
+    /// (<`samples_per_second`>/ 11 kHz)) Smaller values cause the block header
+    /// to become a more significant storage overhead. But, it is up to the
+    /// implementation of the coding portion of the algorithm to decide the
+    /// optimal value for `block_align` within the given constraints (see
+    /// above). The decoding portion of the algorithm must be able to handle
+    /// any valid block size. Playback software needs to process a multiple of
+    /// `block_align` bytes of data at a time, so the value of `block_align` can
+    /// be used for allocating buffers.
+    pub block_align: u16,
+
+    /// The number of bits used to represent each sample of each channel.
+    ///
+    /// If there are multiple channels, the sample size is the same for each
+    /// channel. The `block_align` field should be equal to the following formula,
+    /// rounded to the next whole number: `channels` x ( `bits_per_sample` / 8 )
+    pub bits_per_sample: u16,
+
+    /// The count in bytes of the extended data.
+    ///
+    /// The size in bytes of the extra information in the WAVE format header not
+    /// including the size of the [`FmtExtended`] structure. (size of fields from
+    /// `format_tag` through `extra_size` inclusive (all fields except `id`, `size` and
+    /// the `extra_bytes`))
+    pub extra_size: u16,
+
+    /// Count of number of samples per block.
+    ///
+    /// (((`block_align` - (7 * `channels`)) * 8) / (`bits_per_sample` * `channels`)) + 2
+    pub samples_per_block: u16,
+}
+
+impl KnownChunkID for FmtDviAdpcm {
+    const ID: FourCC = FourCC(*b"fmt ");
+}
+
+impl FmtDviAdpcm {
+    const FORMAT_TAG: FormatTag = FormatTag::DviAdpcm;
+}
+
+impl Tag for FmtDviAdpcm {
+    fn format_tag(&self) -> FormatTag {
+        Self::FORMAT_TAG
+    }
+}
+
+impl Summarizable for FmtDviAdpcm {
+    fn summary(&self) -> String {
+        format!(
+            "{}, {} chan, {}/{}",
+            self.format_tag().to_string().replace("WAVE_FORMAT_", ""),
+            self.channels,
+            self.bits_per_sample,
+            self.samples_per_sec,
+        )
+    }
+
+    fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
+        Box::new(self.into_iter())
+    }
+}
+
+// Iteration based on pattern from https://stackoverflow.com/questions/30218886/how-to-implement-iterator-and-intoiterator-for-a-simple-struct
+
+impl<'a> IntoIterator for &'a FmtDviAdpcm {
+    type Item = (String, String);
+    type IntoIter = FmtDviAdpcmIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FmtDviAdpcmIterator {
+            data: self,
+            index: 0,
+        }
+    }
+}
+
+/// Iterate over fields as tuple of Strings (name, value).
+#[derive(Debug)]
+pub struct FmtDviAdpcmIterator<'a> {
+    data: &'a FmtDviAdpcm,
+    index: usize,
+}
+
+impl<'a> Iterator for FmtDviAdpcmIterator<'a> {
+    type Item = (String, String);
+    fn next(&mut self) -> Option<(String, String)> {
+        self.index += 1;
+        match self.index {
+            1 => Some(("format_tag".to_string(), self.data.format_tag().to_string())),
+            2 => Some(("channels".to_string(), self.data.channels.to_string())),
+            3 => Some((
+                "samples_per_sec".to_string(),
+                self.data.samples_per_sec.to_string(),
+            )),
+            4 => Some((
+                "avg_bytes_per_sec".to_string(),
+                self.data.avg_bytes_per_sec.to_string(),
+            )),
+            5 => Some(("block_align".to_string(), self.data.block_align.to_string())),
+            6 => Some((
+                "bits_per_sample".to_string(),
+                self.data.bits_per_sample.to_string(),
+            )),
+            7 => Some(("extra_size".to_string(), self.data.extra_size.to_string())),
+            8 => Some((
+                "samples_per_block".to_string(),
+                self.data.samples_per_block.to_string(),
+            )),
+            _ => None,
+        }
+    }
+}
+
+//---------------------------
+/// `fmt ` Extended format of audio samples in `data`. (WAVEFORMATEX) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
 ///
 /// This is a fallback parser for unimplmented `FormatTags`, the unparsed
 /// extended data is stored in `extra_bytes`.
@@ -1055,6 +1213,7 @@ impl<'a> Iterator for FmtExtendedIterator<'a> {
 pub enum FmtEnum {
     Pcm(FmtPcm),
     Adpcm(FmtAdpcm),
+    DviAdpcm(FmtDviAdpcm),
     Extended(FmtExtended),
 }
 
@@ -1067,6 +1226,7 @@ impl Tag for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.format_tag(),
             FmtEnum::Adpcm(e) => e.format_tag(),
+            FmtEnum::DviAdpcm(e) => e.format_tag(),
             FmtEnum::Extended(e) => e.format_tag(),
         }
     }
@@ -1077,6 +1237,7 @@ impl Summarizable for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.summary(),
             FmtEnum::Adpcm(e) => e.summary(),
+            FmtEnum::DviAdpcm(e) => e.summary(),
             FmtEnum::Extended(e) => e.summary(),
         }
     }
@@ -1085,6 +1246,7 @@ impl Summarizable for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.items(),
             FmtEnum::Adpcm(e) => e.items(),
+            FmtEnum::DviAdpcm(e) => e.items(),
             FmtEnum::Extended(e) => e.items(),
         }
     }
@@ -1093,6 +1255,7 @@ impl Summarizable for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.name(),
             FmtEnum::Adpcm(e) => e.name(),
+            FmtEnum::DviAdpcm(e) => e.name(),
             FmtEnum::Extended(e) => e.name(),
         }
     }
@@ -1101,6 +1264,7 @@ impl Summarizable for FmtEnum {
         match self {
             FmtEnum::Pcm(e) => e.item_summary_header(),
             FmtEnum::Adpcm(e) => e.item_summary_header(),
+            FmtEnum::DviAdpcm(e) => e.item_summary_header(),
             FmtEnum::Extended(e) => e.item_summary_header(),
         }
     }
@@ -1154,6 +1318,47 @@ mod test {
     }
 
     #[test]
+    fn parse_fmt_adpcm() {
+        let expected = FormatTag::Adpcm;
+
+        let mut buff =
+            hex_to_cursor(
+        "666D7420 32000000 02000100 80BB0000 4D5E0000 00040400 2000F407 07000001 00000002 00FF0000 0000C000 4000F000 0000CC01 30FF8801 18FF");
+        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
+        if let FmtEnum::Adpcm(fmt) = chunk.data {
+            assert_eq!(fmt.format_tag(), expected);
+            assert_eq!(fmt.channels, 1);
+            assert_eq!(fmt.extra_size, 32);
+            assert_eq!(fmt.samples_per_block, 2036);
+            assert_eq!(fmt.coefficient_count, 7);
+        } else {
+            panic!(
+                "variant match failed, expected FmtEnum::Adpcm, got: {:?}",
+                chunk
+            );
+        }
+    }
+
+    #[test]
+    fn parse_fmt_dvi_adpcm() {
+        let expected = FormatTag::DviAdpcm;
+
+        let mut buff =
+            hex_to_cursor("666D7420 14000000 11000200 44AC0000 DBAC0000 00080400 0200F907");
+        let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
+        if let FmtEnum::DviAdpcm(fmt) = chunk.data {
+            assert_eq!(fmt.format_tag(), expected);
+            assert_eq!(fmt.extra_size, 2);
+            assert_eq!(fmt.samples_per_block, 2041);
+        } else {
+            panic!(
+                "variant match failed, expected FmtEnum::DviAdpcm, got: {:?}",
+                chunk
+            );
+        }
+    }
+
+    #[test]
     fn parse_fmt_extended() {
         let expected = FormatTag::Unknown;
 
@@ -1165,7 +1370,7 @@ mod test {
         if let FmtEnum::Extended(fmt) = chunk.data {
             assert_eq!(fmt.format_tag, expected);
         } else {
-            unreachable!("FmtEnum::Pcm variant match failed");
+            unreachable!("variant match failed, FmtExtended should cover all cases");
         }
     }
 
