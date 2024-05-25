@@ -575,9 +575,9 @@ impl Display for FormatTag {
 }
 
 impl TryFrom<&FormatTag> for u16 {
-    // infalible, but binrw seems to need TryFrom?
-    type Error = binrw::io::Error;
+    type Error = core::num::TryFromIntError;
 
+    // infalible, but binrw seems to need TryFrom?
     fn try_from(value: &FormatTag) -> Result<Self, Self::Error> {
         Ok(u16::from(*value))
     }
