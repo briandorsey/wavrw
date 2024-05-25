@@ -38,18 +38,21 @@
 //! ```
 //! # use binrw::BinRead;
 //! # use wavrw::testing::hex_to_cursor;
-//! # let mut buff = hex_to_cursor("666D7420 10000000 01000100 80BB0000 80320200 03001800");
+//! # let mut buff = hex_to_cursor("66616374 04000000 E0010000");
 //! use wavrw::{SizedChunkEnum, ChunkID, Summarizable, FourCC};
 //!
 //! let chunk = SizedChunkEnum::read(&mut buff).unwrap();
 //!
 //! // Use methods from SizedChunk trait on any chunk
-//! assert_eq!(chunk.id(), FourCC(*b"fmt "));
-//! assert_eq!(chunk.summary(), "PCM (0x0001), 1 chan, 24/48000".to_string());
+//! assert_eq!(chunk.id(), FourCC(*b"fact"));
+//! assert_eq!(chunk.summary(), "480 samples".to_string());
 //!
 //! // Or match on type and handle various chunks individually
 //! match chunk {
-//!     SizedChunkEnum::Fmt(fmt) => println!("sample rate: {}", fmt.data.samples_per_sec),
+//!     SizedChunkEnum::Fact(fact) => {
+//!         assert_eq!(fact.data.samples, 480);
+//!         println!("samples: {}", fact.data.samples)
+//!     },
 //!     _ => ()
 //! }
 //! ```
@@ -81,6 +84,7 @@ use tracing::{instrument, warn};
 
 pub mod chunk;
 use crate::chunk::adtl::ListAdtlChunk;
+use crate::chunk::fmt::FmtChunk;
 use crate::chunk::info::ListInfoChunk;
 use crate::chunk::wavl::ListWavlChunk;
 use crate::chunk::BextChunk;
@@ -89,7 +93,6 @@ use crate::chunk::CueChunk;
 use crate::chunk::DataChunk;
 use crate::chunk::FactChunk;
 use crate::chunk::FllrChunk;
-use crate::chunk::FmtChunk;
 use crate::chunk::InstChunk;
 use crate::chunk::JunkChunk;
 use crate::chunk::Md5Chunk;

@@ -2,7 +2,7 @@
 //!
 //! At a high level, each chunk module contains at least two structs, an inner
 //! data struct and a wrapper created with [`KnownChunk<T>`][crate::KnownChunk]
-//! type aliases. Ex: [`Fmt`] and [`FmtChunk`]. These type aliases are the primary
+//! type aliases. Ex: [`Fact`] and [`FactChunk`]. These type aliases are the primary
 //! interface to the chunks when reading from a file.
 //!
 //! For specifications and reference materials related to WAVE files, see the
@@ -16,7 +16,7 @@ mod cset;
 mod cue;
 mod data;
 mod fact;
-mod fmt;
+pub mod fmt;
 pub mod info;
 mod inst;
 mod junk;
@@ -31,7 +31,6 @@ pub use cset::{Cset, CsetChunk, RiffCountryCode};
 pub use cue::{Cue, CueChunk, CuePoint};
 pub use data::{Data, DataChunk};
 pub use fact::{Fact, FactChunk};
-pub use fmt::{Fmt, FmtChunk, FormatTag};
 pub use inst::{Inst, InstChunk};
 pub use junk::{Fllr, FllrChunk, Junk, JunkChunk, Pad, PadChunk};
 pub use md5::{Md5, Md5Chunk};
