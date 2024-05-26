@@ -24,14 +24,14 @@ impl<const I: u32> Summarizable for PaddingData<I> {
 
 /// `JUNK` Padding, filler or outdated information. [RIFF1991](https://wavref.til.cafe/chunk/junk/)
 pub type Junk = PaddingData<{ fourcc(b"JUNK") }>;
-/// `PAD ` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/pad/)
+/// `PAD ` Padding, filler or outdated information. [RIFF1994](https://wavref.til.cafe/chunk/pad/)
 pub type Pad = PaddingData<{ fourcc(b"PAD ") }>;
 /// `FLLR` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/fllr/)
 pub type Fllr = PaddingData<{ fourcc(b"FLLR") }>;
 
 /// `JUNK` Padding, filler or outdated information. [RIFF1991](https://wavref.til.cafe/chunk/junk/)
 pub type JunkChunk = KnownChunk<Junk>;
-/// `PAD ` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/pad/)
+/// `PAD ` Padding, filler or outdated information. [RIFF1994](https://wavref.til.cafe/chunk/pad/)
 pub type PadChunk = KnownChunk<Pad>;
 /// `FLLR` Padding, filler or outdated information. [UNKNOWN](https://wavref.til.cafe/chunk/fllr/)
 pub type FllrChunk = KnownChunk<Fllr>;
