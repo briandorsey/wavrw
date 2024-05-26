@@ -1,3 +1,5 @@
+//! `MD5 ` Checksum of audio `data` of the WAVE. [MD5_2017](https://wavref.til.cafe/chunk/md5/)
+
 use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};

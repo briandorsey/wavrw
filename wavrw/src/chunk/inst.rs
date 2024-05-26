@@ -1,10 +1,10 @@
+//! `inst` Pitch, volume, and velocity for playback by sampler. [RIFF1994](https://wavref.til.cafe/chunk/inst/)
+
 use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 /// `inst` Pitch, volume, and velocity for playback by sampler. [RIFF1994](https://wavref.til.cafe/chunk/inst/)
-///
-///
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -89,6 +89,7 @@ impl<'a> IntoIterator for &'a Inst {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct InstIterator<'a> {
     data: &'a Inst,

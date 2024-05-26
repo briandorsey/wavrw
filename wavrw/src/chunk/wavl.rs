@@ -134,7 +134,7 @@ mod test {
     use hexdump::hexdump;
 
     use super::*;
-    use crate::chunk::Data;
+    use crate::chunk::data::Data;
 
     // couldn't find slnt usage in file collection, so just doing a roundtrip test
     #[test]

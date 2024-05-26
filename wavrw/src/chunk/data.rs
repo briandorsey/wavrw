@@ -1,3 +1,5 @@
+//! `data` Audio samples. This parser skips all audio data (for now). [RIFF1991](https://wavref.til.cafe/spec/riff1991/)
+
 use binrw::binrw;
 use binrw::io::SeekFrom;
 

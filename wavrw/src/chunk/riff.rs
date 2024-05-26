@@ -1,3 +1,5 @@
+//! `RIFF` Container structure for multimedia data. [RIFF1991](https://wavref.til.cafe/chunk/wave/)
+
 use core::fmt::Display;
 
 use binrw::binrw;

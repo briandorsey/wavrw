@@ -1,3 +1,5 @@
+//! `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
+
 use core::fmt::Debug;
 
 use binrw::{binrw, helpers};
@@ -119,6 +121,7 @@ impl<'a> IntoIterator for &'a Bext {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct BextDataIterator<'a> {
     data: &'a Bext,

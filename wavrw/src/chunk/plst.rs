@@ -1,3 +1,5 @@
+//! `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
+
 use core::fmt::Debug;
 
 use binrw::binrw;
@@ -25,11 +27,11 @@ impl PlstSegment {
     }
 }
 
+/// `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `plst` Play order for cue points. Very rare. [RIFF1991](https://wavref.til.cafe/chunk/plst/)
 pub struct Plst {
     /// Count of plst segments. The number of times the `PlstSegment` struct repeats within this chunk.
     pub segment_count: u32, // dwSegments

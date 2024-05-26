@@ -84,22 +84,22 @@ use tracing::{instrument, warn};
 
 pub mod chunk;
 use crate::chunk::adtl::ListAdtlChunk;
+use crate::chunk::bext::BextChunk;
+use crate::chunk::cset::CsetChunk;
+use crate::chunk::cue::CueChunk;
+use crate::chunk::data::DataChunk;
+use crate::chunk::fact::FactChunk;
 use crate::chunk::fmt::FmtChunk;
 use crate::chunk::info::ListInfoChunk;
+use crate::chunk::inst::InstChunk;
+use crate::chunk::junk::FllrChunk;
+use crate::chunk::junk::JunkChunk;
+use crate::chunk::junk::PadChunk;
+use crate::chunk::md5::Md5Chunk;
+use crate::chunk::plst::PlstChunk;
+use crate::chunk::riff::RiffChunk;
+use crate::chunk::smpl::SmplChunk;
 use crate::chunk::wavl::ListWavlChunk;
-use crate::chunk::BextChunk;
-use crate::chunk::CsetChunk;
-use crate::chunk::CueChunk;
-use crate::chunk::DataChunk;
-use crate::chunk::FactChunk;
-use crate::chunk::FllrChunk;
-use crate::chunk::InstChunk;
-use crate::chunk::JunkChunk;
-use crate::chunk::Md5Chunk;
-use crate::chunk::PadChunk;
-use crate::chunk::PlstChunk;
-use crate::chunk::RiffChunk;
-use crate::chunk::SmplChunk;
 pub mod fixedstring;
 pub mod testing;
 
@@ -868,7 +868,7 @@ mod test {
         let md5 = Md5Chunk {
             offset: Some(0),
             size: 16,
-            data: chunk::Md5 { md5: 0 },
+            data: chunk::md5::Md5 { md5: 0 },
             extra_bytes: vec![],
         };
         // ensure trait bounds are satisfied
@@ -880,7 +880,7 @@ mod test {
         let md5 = SizedChunkEnum::Md5(Md5Chunk {
             offset: None,
             size: 16,
-            data: chunk::Md5 { md5: 0 },
+            data: chunk::md5::Md5 { md5: 0 },
             extra_bytes: vec![],
         });
         // ensure trait bounds are satisfied

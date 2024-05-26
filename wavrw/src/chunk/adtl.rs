@@ -64,9 +64,9 @@ pub type ListAdtlChunk = KnownChunk<ListAdtl>;
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `labl` A label, or title, to associate with a [`CuePoint`][super::CuePoint].
+/// `labl` A label, or title, to associate with a [`CuePoint`][super::cue::CuePoint].
 pub struct Labl {
-    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::cue::CuePoint] table.
     pub name: u32,
 
     /// Specifies a NULL-terminated string containing a text label.
@@ -85,16 +85,16 @@ impl Summarizable for Labl {
     }
 }
 
-/// `labl` A label, or title, to associate with a [`CuePoint`][super::CuePoint].
+/// `labl` A label, or title, to associate with a [`CuePoint`][super::cue::CuePoint].
 pub type LablChunk = KnownChunk<Labl>;
 
 #[binrw]
 #[br(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `note` Comment text for a [`CuePoint`][super::CuePoint].
+/// `note` Comment text for a [`CuePoint`][super::cue::CuePoint].
 pub struct Note {
-    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::cue::CuePoint] table.
     pub name: u32,
 
     /// Specifies a NULL-terminated string containing comment text.
@@ -113,7 +113,7 @@ impl Summarizable for Note {
     }
 }
 
-/// `note` Comment text for a [`CuePoint`][super::CuePoint].
+/// `note` Comment text for a [`CuePoint`][super::cue::CuePoint].
 pub type NoteChunk = KnownChunk<Note>;
 
 /// `ltxt` Text associated with a range of `data` samples.
@@ -122,7 +122,7 @@ pub type NoteChunk = KnownChunk<Note>;
 #[br(import(size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ltxt {
-    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::cue::CuePoint] table.
     pub name: u32,
 
     /// Specifies the number of samples in the segment of waveform data. 	...>sample_length
@@ -181,7 +181,7 @@ pub type LtxtChunk = KnownChunk<Ltxt>;
 #[br(import(size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct File {
-    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::CuePoint] table.
+    /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::cue::CuePoint] table.
     pub name: u32,
 
     /// Specifies the file type contained in the `file_data` field. If the fileData section contains a RIFF form, the `media_type` field is the same as the RIFF form type for the file. This field can contain a zero value.

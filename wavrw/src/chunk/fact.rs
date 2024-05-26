@@ -1,3 +1,5 @@
+//! `fact` Number of samples for compressed audio in `data`. [RIFF1991](https://wavref.til.cafe/chunk/fact/)
+
 use binrw::binrw;
 
 use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};

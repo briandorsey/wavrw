@@ -1,3 +1,5 @@
+//! `JUNK` Padding, filler or outdated information. Also `PAD `, `FLLR`. [RIFF1991](https://wavref.til.cafe/chunk/junk/)
+
 use binrw::{binrw, helpers};
 
 use crate::{fourcc, FourCC, KnownChunk, KnownChunkID, Summarizable};

@@ -1,3 +1,5 @@
+//! `CSET` Character set information. Code page, language, etc. Very Rare. [RIFF1991](https://wavref.til.cafe/chunk/cset/)
+
 use core::fmt::{Debug, Display, Formatter};
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -76,6 +78,7 @@ impl<'a> IntoIterator for &'a Cset {
     }
 }
 
+/// Iterate over fields as tuple of Strings (name, value).
 #[derive(Debug)]
 pub struct CsetDataIterator<'a> {
     data: &'a Cset,

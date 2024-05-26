@@ -1,3 +1,5 @@
+//! `cue ` A series of positions in the waveform `data` chunk. [RIFF1991](https://wavref.til.cafe/chunk/cue/)
+
 use core::fmt::Debug;
 
 use binrw::binrw;

@@ -1,3 +1,5 @@
+//! `smpl` Information needed for use as a sampling instrument. [RIFF1994](https://wavref.til.cafe/chunk/smpl/)
+
 use core::fmt::Debug;
 
 use binrw::binrw;
@@ -44,11 +46,11 @@ pub struct SmplLoop {
     pub play_count: u32,
 }
 
+/// `smpl` Information needed for use as a sampling instrument. [RIFF1994](https://wavref.til.cafe/chunk/smpl/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// `smpl` Information needed for use as a sampling instrument. [RIFF1994](https://wavref.til.cafe/chunk/smpl/)
 pub struct Smpl {
     /// MIDI Manufacturer's Association Manufacturer code.
     ///
