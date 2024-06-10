@@ -4,7 +4,7 @@ Annotations: NEW, IMProved, FIX, DEPrecated, REMoved, SECurity
 
 ## [unreleased] - 
 
-## [0.2.0] - 2024/06/09 -  
+## [0.2.0] - 2024/06/09 
 
 RIFF1994 specification supported: `smpl`, `inst`, new `INFO` subchunks, WAVEFORMATEX. 
 
