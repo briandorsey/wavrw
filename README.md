@@ -4,12 +4,16 @@
 
 It's initially intended as a learning project with aspirations to be generally useful. It's currently in *very* early days and may not be useful to anyone else. 
 
-Current status: Most chunks from the initial WAV spec [RIFF1991](https://wavref.til.cafe/spec/riff1991/) are supported. Only supports reading metadata. Doesn't yet support writing metadata. Doesn't yet read or write audio data (samples). 
+Current status: Most chunks from the initial WAV specifications are supported: [RIFF1991](https://wavref.til.cafe/spec/riff1991/) and [RIFF1994](https://wavref.til.cafe/spec/riff1994/). Also parses [BEXT](https://wavref.til.cafe/spec/bext1996/). Doesn't yet support writing metadata. Doesn't yet read or write audio data (samples). 
 
 I intend to eventually support every WAV chunk I can find a sample of. If there's something you'd like supported, please let me know by adding [an issue](https://github.com/briandorsey/wavrw/issues). If you have them, please include a link to a specification and one or more example files.
 
 Take care,
 -Brian
+
+# Installation
+
+See [Release Notes](https://github.com/briandorsey/wavrw/releases/) for installation instructions. Currently only have Linux and MacOS builds, happy to add a Windows release if someone requests it.
 
 # Details
 
