@@ -19,10 +19,10 @@ anyhow = { version = "1.0.68", default-features = false, features = ["std"] }
 tracing.workspace = true
 itertools.workspace = true
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"]}
-clap = { version = "4.1.1", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
+clap = { version = "4.5.11", features = ["derive", "help", "usage", "error-context", "wrap_help", "cargo"] }
 
 [build-dependencies]
-anyhow = "1.0.68"
+anyhow = { version = "1.0.68", default-features = false, features = ["std"] }
 
 [[bin]]
 name = "wavrw"
