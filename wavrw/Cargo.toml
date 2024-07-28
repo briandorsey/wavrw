@@ -20,13 +20,9 @@ num_enum = { version = "0.7.2", default-features = false }
 tracing.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
 hexdump = "0.1.1"
 
 [lints]
 workspace = true
 
-[[bench]]
-name = "my_benchmark"
-harness = false
 
