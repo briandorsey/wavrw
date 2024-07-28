@@ -13,7 +13,7 @@ categories.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-binrw = { version = "0.13.3", default-features = false, features = ["std"] }
+binrw = { version = "0.14", default-features = false, features = ["std"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 itertools.workspace = true
 num_enum = { version = "0.7.2", default-features = false }
