@@ -92,6 +92,7 @@ use crate::chunk::fact::FactChunk;
 use crate::chunk::fmt::FmtChunk;
 use crate::chunk::info::ListInfoChunk;
 use crate::chunk::inst::InstChunk;
+use crate::chunk::ixml::IxmlChunk;
 use crate::chunk::junk::FllrChunk;
 use crate::chunk::junk::JunkChunk;
 use crate::chunk::junk::PadChunk;
@@ -658,6 +659,7 @@ pub enum SizedChunkEnum {
     Fllr(FllrChunk),
     Junk(JunkChunk),
     Pad(PadChunk),
+    Ixml(IxmlChunk),
     Unknown(UnknownChunk),
 }
 
@@ -680,6 +682,7 @@ impl Display for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.to_string(),
             SizedChunkEnum::Junk(e) => e.to_string(),
             SizedChunkEnum::Pad(e) => e.to_string(),
+            SizedChunkEnum::Ixml(e) => e.to_string(),
             SizedChunkEnum::Unknown(e) => e.to_string(),
         };
         write!(f, "{}", display_string)
@@ -705,6 +708,7 @@ impl ChunkID for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.id(),
             SizedChunkEnum::Junk(e) => e.id(),
             SizedChunkEnum::Pad(e) => e.id(),
+            SizedChunkEnum::Ixml(e) => e.id(),
             SizedChunkEnum::Unknown(e) => e.id(),
         }
     }
@@ -729,6 +733,7 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.size,
             SizedChunkEnum::Junk(e) => e.size,
             SizedChunkEnum::Pad(e) => e.size,
+            SizedChunkEnum::Ixml(e) => e.size,
             SizedChunkEnum::Unknown(e) => e.size,
         }
     }
@@ -751,6 +756,7 @@ impl SizedChunk for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.offset,
             SizedChunkEnum::Junk(e) => e.offset,
             SizedChunkEnum::Pad(e) => e.offset,
+            SizedChunkEnum::Ixml(e) => e.offset,
             SizedChunkEnum::Unknown(e) => e.offset,
         }
     }
@@ -775,6 +781,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.summary(),
             SizedChunkEnum::Junk(e) => e.summary(),
             SizedChunkEnum::Pad(e) => e.summary(),
+            SizedChunkEnum::Ixml(e) => e.summary(),
             SizedChunkEnum::Unknown(e) => e.summary(),
         }
     }
@@ -791,6 +798,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Smpl(e) => Box::new(e.items()),
             SizedChunkEnum::Plst(e) => Box::new(e.items()),
             SizedChunkEnum::Bext(e) => Box::new(e.items()),
+            SizedChunkEnum::Ixml(e) => Box::new(e.items()),
             SizedChunkEnum::Data(_)
             | SizedChunkEnum::Fact(_)
             | SizedChunkEnum::Md5(_)
@@ -819,6 +827,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.name(),
             SizedChunkEnum::Junk(e) => e.name(),
             SizedChunkEnum::Pad(e) => e.name(),
+            SizedChunkEnum::Ixml(e) => e.name(),
             SizedChunkEnum::Unknown(e) => e.name(),
         }
     }
@@ -841,6 +850,7 @@ impl Summarizable for SizedChunkEnum {
             SizedChunkEnum::Fllr(e) => e.item_summary_header(),
             SizedChunkEnum::Junk(e) => e.item_summary_header(),
             SizedChunkEnum::Pad(e) => e.item_summary_header(),
+            SizedChunkEnum::Ixml(e) => e.item_summary_header(),
             SizedChunkEnum::Unknown(e) => e.item_summary_header(),
         }
     }

@@ -19,6 +19,7 @@ pub mod fact;
 pub mod fmt;
 pub mod info;
 pub mod inst;
+pub mod ixml;
 pub mod junk;
 pub mod md5;
 pub mod plst;
