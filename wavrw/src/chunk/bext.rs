@@ -7,8 +7,15 @@ use binrw::{binrw, helpers};
 use crate::{fixedstring::FixedString, FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
-// BEXT is specified to use ASCII, but we're parsing it as utf8, since
-// that is a superset of ASCII and many WAV files contain utf8 strings here
+// BEXT is specified to use ASCII for strings, but we're parsing it as utf8,
+// since that is a superset of ASCII and many WAV files contain utf8 strings
+// in `bext` chunks.
+// 
+// Technically, this struct implements a BWF Version 2 parser. Previous versions
+// are specified to always pad extra data with NULL bytes, so loudness fields
+// added in V2 will usually default to 0s when reading a V1 or V0 chunk.
+// However, it is possible to have incorrect data in those fields when `version`
+// field is less than 2.
 
 /// `bext` Broadcast Extension for motion picture, radio and television production. [BEXT1996](https://wavref.til.cafe/spec/bext1996/)
 #[binrw]
@@ -44,8 +51,10 @@ pub struct Bext {
     pub max_short_term_loudness: i16, // MaxShortTermLoudness
     /// 180 bytes, reserved for future use, set to “NULL”
     pub reserved: [u8; 180], // Reserved
-    /// History coding
-    // interpret the remaining bytes as string, ignoring any trailing \x00 bytes
+
+    // Interpret the remaining bytes as string, ignoring any trailing \x00 bytes
+    // Some recorders write `bext` chunks with trailing 0x0 padding. Perhaps to
+    // allow later writing coding_history data without needing move chunks?
     #[br(parse_with = helpers::until_eof, 
         try_map = |v: Vec<u8>| {
             match String::from_utf8(v) {
@@ -54,6 +63,7 @@ pub struct Bext {
             }
         })]
     #[bw(map = |s: &String| s.as_bytes())]
+    /// History coding
     pub coding_history: String, // CodingHistory
 }
 
