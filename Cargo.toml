@@ -17,7 +17,7 @@ categories = ["multimedia::encoding", "parser-implementations"]
 
 [workspace.dependencies]
 tracing = { version = "0.1.40", default-features = false, features = ["attributes"] }
-itertools = "0.13"
+itertools = "0.14"
 
 [profile.release]
 overflow-checks = true
