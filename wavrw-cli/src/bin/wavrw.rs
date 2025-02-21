@@ -10,12 +10,12 @@ use std::path::PathBuf;
 use std::{ffi::OsString, io::BufReader};
 
 use anyhow::Result;
-use clap::{crate_version, ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum, crate_version};
 use itertools::Itertools;
-use tracing::instrument;
 use tracing::Level;
-use tracing_subscriber::fmt::format::FmtSpan;
+use tracing::instrument;
 use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::fmt::format::FmtSpan;
 use wavrw::{ChunkID, SizedChunk, SizedChunkEnum, Summarizable};
 
 #[derive(Parser, Debug)]

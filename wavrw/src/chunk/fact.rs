@@ -37,7 +37,7 @@ mod test {
     use binrw::BinRead;
 
     use super::*;
-    use crate::{testing::hex_to_cursor, ChunkID, SizedChunkEnum};
+    use crate::{ChunkID, SizedChunkEnum, testing::hex_to_cursor};
 
     #[test]
     fn factchunk_small_valid() {

@@ -4,13 +4,13 @@ use core::fmt::Debug;
 
 use binrw::{binrw, helpers};
 
-use crate::{fixedstring::FixedString, FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable, fixedstring::FixedString};
 
 // BEXT, based on https://tech.ebu.ch/docs/tech/tech3285.pdf
 // BEXT is specified to use ASCII for strings, but we're parsing it as utf8,
 // since that is a superset of ASCII and many WAV files contain utf8 strings
 // in `bext` chunks.
-// 
+//
 // Technically, this struct implements a BWF Version 2 parser. Previous versions
 // are specified to always pad extra data with NULL bytes, so loudness fields
 // added in V2 will usually default to 0s when reading a V1 or V0 chunk.
@@ -55,7 +55,7 @@ pub struct Bext {
     // Interpret the remaining bytes as string, ignoring any trailing \x00 bytes
     // Some recorders write `bext` chunks with trailing 0x0 padding. Perhaps to
     // allow later writing coding_history data without needing move chunks?
-    #[br(parse_with = helpers::until_eof, 
+    #[br(parse_with = helpers::until_eof,
         try_map = |v: Vec<u8>| {
             match String::from_utf8(v) {
                 Ok(s) =>  Ok(s.trim_end_matches('\0').to_string()),

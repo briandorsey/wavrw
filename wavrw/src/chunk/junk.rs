@@ -2,7 +2,7 @@
 
 use binrw::{binrw, helpers};
 
-use crate::{fourcc, FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable, fourcc};
 
 /// `data` chunk parser which skips all audio data
 #[binrw]

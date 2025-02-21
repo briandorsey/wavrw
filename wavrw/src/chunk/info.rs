@@ -2,10 +2,10 @@
 
 use core::fmt::{Debug, Formatter};
 
-use binrw::{binrw, helpers, NullString};
+use binrw::{NullString, binrw, helpers};
 use itertools::Itertools;
 
-use crate::{fourcc, ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable};
+use crate::{ChunkID, FourCC, KnownChunk, KnownChunkID, Summarizable, fourcc};
 
 /// `LIST-INFO` holds subchunks of strings describing the WAVE.
 #[binrw]
@@ -388,7 +388,7 @@ mod test {
     use hexdump::hexdump;
 
     use super::*;
-    use crate::{testing::hex_to_cursor, SizedChunk, SizedChunkEnum};
+    use crate::{SizedChunk, SizedChunkEnum, testing::hex_to_cursor};
 
     #[test]
     fn infochunk_roundtrip() {
@@ -439,8 +439,8 @@ mod test {
         // if infochunk_small_valid() passes, but this fails, error is
         // likely in the ListInfo wrapping
         let mut buff = hex_to_cursor(
-        "4C495354 38000000 494E464F 49534654 0D000000 42574620 4D657461 45646974 00004943 4D541500 00006265 78742063 68756E6B 20746573 74206669 6C6500"
-            );
+            "4C495354 38000000 494E464F 49534654 0D000000 42574620 4D657461 45646974 00004943 4D541500 00006265 78742063 68756E6B 20746573 74206669 6C6500",
+        );
         let list = ListInfoChunk::read(&mut buff).unwrap();
         assert_eq!(list.id(), FourCC(*b"LIST"));
 
