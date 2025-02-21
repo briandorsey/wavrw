@@ -2,9 +2,9 @@
 
 use alloc::string::FromUtf8Error;
 use core::cmp::min;
+use core::error::Error;
 use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
-use std::error::Error;
 
 use binrw::io::{Read, Seek, SeekFrom};
 use binrw::{BinRead, BinResult, BinWrite, Endian};
