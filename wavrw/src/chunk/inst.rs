@@ -96,7 +96,7 @@ pub struct InstIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for InstIterator<'a> {
+impl Iterator for InstIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;

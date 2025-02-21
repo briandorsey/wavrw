@@ -85,7 +85,7 @@ pub struct CsetDataIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for CsetDataIterator<'a> {
+impl Iterator for CsetDataIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;

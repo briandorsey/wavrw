@@ -79,7 +79,7 @@ use std::io::BufRead;
 
 use binrw::io::TakeSeekExt;
 use binrw::io::{Read, Seek};
-use binrw::{binrw, io::SeekFrom, BinRead, BinWrite, PosValue};
+use binrw::{BinRead, BinWrite, PosValue, binrw, io::SeekFrom};
 use tracing::{instrument, warn};
 
 pub mod chunk;
@@ -217,7 +217,7 @@ impl<'a> PartialEq<&'a FourCC> for FourCC {
     }
 }
 
-impl<'a> PartialEq<FourCC> for &'a FourCC {
+impl PartialEq<FourCC> for &FourCC {
     fn eq(&self, other: &FourCC) -> bool {
         *self == other
     }
@@ -313,7 +313,7 @@ where
     finished: bool,
 }
 
-impl<'a, R> WaveFileIterator<'a, R>
+impl<R> WaveFileIterator<'_, R>
 where
     R: Read + Seek + Debug + BufRead,
 {
@@ -358,7 +358,7 @@ where
     }
 }
 
-impl<'a, R> Iterator for WaveFileIterator<'a, R>
+impl<R> Iterator for WaveFileIterator<'_, R>
 where
     R: Read + Seek + Debug + BufRead,
 {

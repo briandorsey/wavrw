@@ -684,7 +684,7 @@ pub struct FmtPcmIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for FmtPcmIterator<'a> {
+impl Iterator for FmtPcmIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -867,7 +867,7 @@ pub struct FmtAdpcmIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for FmtAdpcmIterator<'a> {
+impl Iterator for FmtAdpcmIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -1028,7 +1028,7 @@ pub struct FmtDviAdpcmIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for FmtDviAdpcmIterator<'a> {
+impl Iterator for FmtDviAdpcmIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -1172,7 +1172,7 @@ pub struct FmtExtendedIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for FmtExtendedIterator<'a> {
+impl Iterator for FmtExtendedIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
@@ -1321,9 +1321,9 @@ mod test {
     fn parse_fmt_adpcm() {
         let expected = FormatTag::Adpcm;
 
-        let mut buff =
-            hex_to_cursor(
-        "666D7420 32000000 02000100 80BB0000 4D5E0000 00040400 2000F407 07000001 00000002 00FF0000 0000C000 4000F000 0000CC01 30FF8801 18FF");
+        let mut buff = hex_to_cursor(
+            "666D7420 32000000 02000100 80BB0000 4D5E0000 00040400 2000F407 07000001 00000002 00FF0000 0000C000 4000F000 0000CC01 30FF8801 18FF",
+        );
         let chunk = FmtChunk::read(&mut buff).expect("error parsing WAV chunks");
         if let FmtEnum::Adpcm(fmt) = chunk.data {
             assert_eq!(fmt.format_tag(), expected);

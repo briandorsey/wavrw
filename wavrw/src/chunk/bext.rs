@@ -138,7 +138,7 @@ pub struct BextDataIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for BextDataIterator<'a> {
+impl Iterator for BextDataIterator<'_> {
     type Item = (String, String);
     fn next(&mut self) -> Option<(String, String)> {
         self.index += 1;
