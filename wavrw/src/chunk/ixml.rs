@@ -29,7 +29,6 @@ use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 // TODO: review strct String values. Ex: numbers, time, bits... which ones should have conversions and typed values? But... because XML, everything needs a string backup for safety/round-tripping?
 // TODO: determine how to deal with string case variations in tags
 // TODO: meta to all of the above: is round-trip consistency a goal of the library, or OK to write logically consistent, but perhaps with differening text or XML nodes?
-// TODO: improve summary line
 
 /// Ixml errors.
 #[derive(Debug)]
@@ -312,13 +311,20 @@ impl Default for Ixml {
 impl Summarizable for Ixml {
     fn summary(&self) -> String {
         let mut out = Vec::<&String>::new();
-        if let Some(value) = &self.ixml_version {
-            out.push(value);
-        }
+        let fields = format!("{} fields", self.items().count());
         if let Some(value) = &self.project {
             out.push(value);
         }
-        out.into_iter().join(", ")
+        if let Some(value) = &self.scene {
+            out.push(value);
+        }
+        if let Some(value) = &self.tape {
+            out.push(value);
+        }
+        if let Some(value) = &self.take {
+            out.push(value);
+        }
+        format!("{}: {}, ...", fields, out.into_iter().join(", "))
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
@@ -326,7 +332,7 @@ impl Summarizable for Ixml {
     }
 
     fn item_summary_header(&self) -> String {
-        String::new()
+        "DRAFT: WIP parser, missing most repeating fields".to_string()
     }
 }
 
