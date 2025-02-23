@@ -10,6 +10,9 @@ use core::fmt::{Debug, Display, Formatter};
 /// which can be expanded in the future. If this tag is absent or empty
 /// or contains just the word `DEFAULT`, the take should be considered to be
 /// standard `TAKE`.
+///
+/// Enum variants as defined by
+/// [the iXML spec](https://www.gallery.co.uk/ixml/taketype_dictionary.html)
 #[allow(missing_docs)] // TODO: remove this after finding AFSI reference.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TakeType {
@@ -25,6 +28,9 @@ pub enum TakeType {
 }
 
 impl TakeType {
+    /// Create a `Vec<TakeType>` from a comma delimited String.
+    ///
+    /// Defers to [`TakeType::from<String>`] after splitting the string.
     pub fn from_multiple(value: String) -> Vec<Self> {
         let pat = ',';
         if value.contains(pat) {

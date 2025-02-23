@@ -25,7 +25,7 @@ use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
 mod taketype;
-use crate::chunk::ixml::taketype::TakeType;
+pub use crate::chunk::ixml::taketype::TakeType;
 use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 
 // TODO: review struct String values. Ex: numbers, time, bits... which ones should have conversions and typed values? But... because XML, everything needs a string backup for safety/round-tripping?
