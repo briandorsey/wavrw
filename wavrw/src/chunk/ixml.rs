@@ -26,8 +26,8 @@ use xml::reader::{EventReader, XmlEvent};
 
 use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 
-// TODO: review strct String values. Ex: numbers, time, bits... which ones should have conversions and typed values? But... because XML, everything needs a string backup for safety/round-tripping?
-// TODO: determine how to deal with string case variations in tags
+// TODO: review struct String values. Ex: numbers, time, bits... which ones should have conversions and typed values? But... because XML, everything needs a string backup for safety/round-tripping?
+// TODO: decide how to deal with string case variations in tags
 // TODO: meta to all of the above: is round-trip consistency a goal of the library, or OK to write logically consistent, but perhaps with differening text or XML nodes?
 
 /// Ixml errors.
@@ -555,6 +555,156 @@ mod test {
             println!("{:?}", ixml);
             assert_eq!(expected, ixml.take_type);
         }
+    }
+
+    #[test]
+    fn parse_ixml_spec_ex01() {
+        let example = r#"<?xml version="1.0" encoding="UTF-8"?>
+<BWFXML>
+    <IXML_VERSION>1.27</IXML_VERSION>
+    <PROJECT>A New Movie</PROJECT>
+    <SCENE>21A</SCENE>
+    <TAKE>10</TAKE>
+    <TAPE>15</TAPE>
+    <NOTE>free text note</NOTE>
+    <TRACK_LIST>
+        <TRACK_COUNT>1</TRACK_COUNT>
+        <TRACK>
+            <CHANNEL_INDEX>1</CHANNEL_INDEX>
+            <INTERLEAVE_INDEX>1</INTERLEAVE_INDEX>
+            <NAME>left</NAME>
+            <FUNCTION>LEFT</FUNCTION>
+        </TRACK>
+    </TRACK_LIST>
+</BWFXML>"#;
+        let ixml = Ixml::from_reader(example.as_bytes()).expect("error parsing xml");
+        println!("{:?}", ixml);
+        assert_eq!(Some("1.27"), ixml.ixml_version.as_deref());
+        assert_eq!(Some("A New Movie"), ixml.project.as_deref());
+        assert_eq!(Some("21A"), ixml.scene.as_deref());
+        assert_eq!(Some("15"), ixml.tape.as_deref());
+        assert_eq!(Some("10"), ixml.take.as_deref());
+        assert_eq!(0, ixml.take_type.len());
+        assert!(!ixml.circled);
+        assert_eq!(None, ixml.file_uid);
+        assert_eq!(None, ixml.ubits);
+        assert_eq!(Some("free text note"), ixml.note.as_deref());
+        // TODO: impement the rest of the fields.
+    }
+
+    #[test]
+    fn parse_ixml_spec_ex02() {
+        let example = r#"<?xml version="1.0" encoding="UTF-8"?>
+<BWFXML>
+	<IXML_VERSION>1.52</IXML_VERSION>
+	<PROJECT>ANewMovie</PROJECT>
+	<SCENE>21</SCENE>
+	<TAKE>33</TAKE>
+	<TAPE>10</TAPE>
+	<CIRCLED>TRUE</CIRCLED>
+	<NO_GOOD>FALSE</NO_GOOD>
+	<FALSE_START>FALSE</FALSE_START>
+	<WILD_TRACK>FALSE</WILD_TRACK>
+	<FILE_UID>MTIPMX17654200508051445053840001</FILE_UID>
+	<SPEED>
+		<NOTE>camera overcranked</NOTE>
+		<MASTER_SPEED>24/1</MASTER_SPEED>
+		<CURRENT_SPEED>48/1</CURRENT_SPEED>
+		<TIMECODE_FLAG>NDF</TIMECODE_FLAG>
+		<TIMECODE_RATE>24000/1001</TIMECODE_RATE>
+		<FILE_SAMPLE_RATE>48000</FILE_SAMPLE_RATE>
+		<AUDIO_BIT_DEPTH>24</AUDIO_BIT_DEPTH>
+		<DIGITIZER_SAMPLE_RATE>48048</DIGITIZER_SAMPLE_RATE>
+		<TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI>0</TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI>
+		<TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_LO>48048000</TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_LO>
+		<TIMESTAMP_SAMPLE_RATE>48000</TIMESTAMP_SAMPLE_RATE>
+	</SPEED>
+	<UBITS>00000000</UBITS>
+	<SYNC_POINT_LIST>
+		<SYNC_POINT_COUNT>2</SYNC_POINT_COUNT>
+		<SYNC_POINT>
+			<SYNC_POINT_TYPE>RELATIVE</SYNC_POINT_TYPE>
+			<SYNC_POINT_FUNCTION>PRE_RECORD_SAMPLECOUNT</SYNC_POINT_FUNCTION>
+			<SYNC_POINT_LOW>480000</SYNC_POINT_LOW>
+			<SYNC_POINT_HIGH>0</SYNC_POINT_HIGH>
+			<SYNC_POINT_EVENT_DURATION>0</SYNC_POINT_EVENT_DURATION>
+		</SYNC_POINT>
+		<SYNC_POINT>
+			<SYNC_POINT_TYPE>RELATIVE</SYNC_POINT_TYPE>
+			<SYNC_POINT_FUNCTION>SLATE_GENERIC</SYNC_POINT_FUNCTION>
+			<SYNC_POINT_COMMENT>Camera A</SYNC_POINT_COMMENT>
+			<SYNC_POINT_LOW>6544645</SYNC_POINT_LOW>
+			<SYNC_POINT_HIGH>0</SYNC_POINT_HIGH>
+			<SYNC_POINT_EVENT_DURATION>0</SYNC_POINT_EVENT_DURATION>
+		</SYNC_POINT>
+	</SYNC_POINT_LIST>
+	<NOTE>freetextnote</NOTE>
+	<HISTORY>
+		<ORIGINAL_FILENAME>myname_1.wav</ORIGINAL_FILENAME>
+		<PARENT_FILENAME>myname.bwf</PARENT_FILENAME>
+		<PARENT_UID>9876543210</PARENT_UID>
+	</HISTORY>
+	<FILE_SET>
+		<TOTAL_FILES>1</TOTAL_FILES>
+		<FAMILY_UID>MTIPMX17654200508051445053840000</FAMILY_UID>
+		<FAMILY_NAME>21/33</FAMILY_NAME>
+		<FILE_SET_INDEX>A</FILE_SET_INDEX>
+	</FILE_SET>
+	<TRACK_LIST>
+		<TRACK_COUNT>2</TRACK_COUNT>
+		<TRACK>
+			<CHANNEL_INDEX>1</CHANNEL_INDEX>
+			<INTERLEAVE_INDEX>1</INTERLEAVE_INDEX>
+			<NAME>Mid</NAME>
+			<FUNCTION>M-MID_SIDE</FUNCTION>
+		</TRACK>
+		<TRACK>
+			<CHANNEL_INDEX>2</CHANNEL_INDEX>
+			<INTERLEAVE_INDEX>2</INTERLEAVE_INDEX>
+			<NAME>Side</NAME>
+			<FUNCTION>S-MID_SIDE</FUNCTION>
+		</TRACK>
+	</TRACK_LIST>
+	<BEXT>
+		<BWF_DESCRIPTION>all the old stuff</BWF_DESCRIPTION>
+		<BWF_ORIGINATOR>METACORDER</BWF_ORIGINATOR>
+		<BWF_ORIGINATOR_REFERENCE>123456</BWF_ORIGINATOR_REFERENCE>
+		<BWF_ORIGINATION_DATE>2003-10-30</BWF_ORIGINATION_DATE>
+		<BWF_ORIGINATION_TIME>03:27:17</BWF_ORIGINATION_TIME>
+		<BWF_TIME_REFERENCE_LOW>123674376</BWF_TIME_REFERENCE_LOW>
+		<BWF_TIME_REFERENCE_HIGH>0</BWF_TIME_REFERENCE_HIGH>
+		<BWF_VERSION>1.0</BWF_VERSION>
+		<BWF_UMID>MTIPMX17654200508051445053840001</BWF_UMID>
+		<BWF_RESERVED>00000000000000000000000000000000000000000</BWF_RESERVED>
+		<BWF_CODING_HISTORY>some info</BWF_CODING_HISTORY>
+	</BEXT>
+	<USER>
+Production : iXML Test Movie Production
+Mixer : Mark Gilbert
+Recorder : MetaCorder 1.5
+Contact : fieldsound@gallery.co.uk
+Location : Leavesden Studios Sound Stage 5
+Day : 5
+Reference Level : -20dBf
+Microphones : Sennheiser MKH-70, Sanken COS-11
+</USER>
+</BWFXML>"#;
+        let ixml = Ixml::from_reader(example.as_bytes()).expect("error parsing xml");
+        println!("{:?}", ixml);
+        assert_eq!(Some("1.52"), ixml.ixml_version.as_deref());
+        assert_eq!(Some("ANewMovie"), ixml.project.as_deref());
+        assert_eq!(Some("21"), ixml.scene.as_deref());
+        assert_eq!(Some("10"), ixml.tape.as_deref());
+        assert_eq!(Some("33"), ixml.take.as_deref());
+        assert_eq!(0, ixml.take_type.len()); // all marked FALSE
+        assert!(ixml.circled);
+        assert_eq!(
+            Some("MTIPMX17654200508051445053840001"),
+            ixml.file_uid.as_deref()
+        );
+        assert_eq!(Some("00000000"), ixml.ubits.as_deref());
+        assert_eq!(Some("freetextnote"), ixml.note.as_deref());
+        // TODO: impement the rest of the fields.
     }
 
     #[test]
