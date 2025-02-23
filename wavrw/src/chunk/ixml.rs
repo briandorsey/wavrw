@@ -265,7 +265,7 @@ impl Ixml {
                 "UBITS" => self.ubits = value,
                 "NOTE" => self.note = value,
                 &_ => {
-                    self.extra.insert(path.join("/"), value);
+                    self.extra.insert(path[1..].join("/"), value);
                 }
             }
         }
