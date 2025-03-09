@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 # name = "wavrw"
-version = "0.3.0"
+version = "0.2.0"
 edition = "2024"
 description = "WAV file metadata read/write utility"
 authors = ["Brian Dorsey"]

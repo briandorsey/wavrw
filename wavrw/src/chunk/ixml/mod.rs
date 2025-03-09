@@ -5,13 +5,14 @@
 //! (key, value) in an `extra` field.
 //!
 //! All fields are containers or wrapped in `Option` because any tag could
-//! be missing an a valid XML document.
+//! be missing in a valid XML document.
 //!
-//! The implimentation is defaulting to being fairly picky about following
-//! the iXML spec... open to loosing up to meet common in-use patterns.
+//! The implementation is fairly picky about following the iXML spec... open
+//! to loosening up to meet common in-use patterns.
 //!
-//! Since XML tags could have any string content, some fields are defined with
-//! enums of specified values, plus `Custom(String)`.
+//! Some fields are defined in the spec to contain one or more of a specific
+//! list of string values. Since XML tags could have any string content, these
+//! are implemented as enums of the specified values, plus `Custom(String)`.
 
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::IntoIter;
@@ -36,7 +37,7 @@ use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum IxmlError {
-    /// An error occurred in the underlying reader while reading or seeking to data.
+    /// An error occurred in the underlying reader while reading or seeking.
     ///
     /// Contains an [`std::io::Error`]
     Io(std::io::Error),
