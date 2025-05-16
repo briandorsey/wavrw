@@ -13,6 +13,7 @@ fn main() -> Result<()> {
 
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=../Cargo.toml");
+    println!("cargo:rerun-if-changed=../Cargo.lock");
     let root_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
     println!("root: {root_dir:?}");
     let dest_path = Path::new(&root_dir).join("generated/licenses.txt");
