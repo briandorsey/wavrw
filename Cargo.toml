@@ -22,6 +22,10 @@ itertools = "0.14"
 [profile.release]
 overflow-checks = true
 
+# minimize release binary size
+strip = true
+lto = true
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
