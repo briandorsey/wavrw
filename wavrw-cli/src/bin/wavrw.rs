@@ -1,6 +1,7 @@
 //! wavrw Command Line Interface
 
 #![deny(missing_docs)]
+#![forbid(unsafe_code)]
 
 use std::fmt::Write;
 use std::fs;

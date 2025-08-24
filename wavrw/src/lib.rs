@@ -70,6 +70,8 @@
 //! do run into this situation, please consider filing an issue and if possible,
 //! sharing sample files to test against so I can improve codepage handling.
 
+#![forbid(unsafe_code)]
+
 extern crate alloc;
 
 use core::default::Default;
