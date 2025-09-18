@@ -781,7 +781,7 @@ pub struct FmtAdpcm {
     /// `format_tag` through `extra_size` inclusive (all fields except `id`, `size` and
     /// the `extra_bytes`))
     #[br()]
-    #[bw(map = |_| (self.coefficient_count * 4 + 4) )]
+    #[bw(map = |_| self.coefficient_count * 4 + 4 )]
     pub extra_size: u16,
 
     /// Count of number of samples per block.
