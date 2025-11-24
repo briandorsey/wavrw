@@ -92,6 +92,8 @@ use crate::chunk::cue::CueChunk;
 use crate::chunk::data::DataChunk;
 use crate::chunk::fact::FactChunk;
 use crate::chunk::fmt::FmtChunk;
+#[cfg(doc)] // only used in a doc link
+use crate::chunk::info::ListInfo;
 use crate::chunk::info::ListInfoChunk;
 use crate::chunk::inst::InstChunk;
 use crate::chunk::ixml::IxmlChunk;
@@ -179,7 +181,7 @@ where
 
 /// RIFF FOURCC type. Four bytes, often readable id of a chunk.
 ///
-/// Used as chunk ids, [`ListInfoData.list_type`], etc.
+/// Used as chunk ids, [`ListInfo::list_type`], etc.
 #[binrw]
 #[brw(big)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
