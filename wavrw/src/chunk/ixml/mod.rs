@@ -4,18 +4,21 @@
 //! fields where possible and store unspecified (outside of iXML spec) items as
 //! (key, value) in an `extra` field.
 //!
+//! Event though some fileds are documented as storing various types (numbers,
+//! dates, times, etc), values are currently all stored as `String`s, since XML
+//! elements could contain any text. Very open to design recommendations here.
+//!
 //! All fields are containers or wrapped in `Option` because any tag could
 //! be missing in a valid XML document.
 //!
 //! The implementation is fairly picky about following the iXML spec... open
-//! to loosening up to meet common in-use patterns.
+//! to loosening up to meet commonly used patterns.
 //!
 //! Some fields are defined in the spec to contain one or more of a specific
 //! list of string values. Since XML tags could have any string content, these
 //! are implemented as enums of the specified values, plus `Custom(String)`.
 
 use alloc::collections::BTreeMap;
-use alloc::collections::btree_map::IntoIter;
 use core::fmt::{Debug, Display, Formatter};
 use core::{error, fmt};
 use itertools::Itertools;
@@ -26,6 +29,9 @@ use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
 mod taketype;
+pub use crate::chunk::ixml::aswg::Aswg;
+mod aswg;
+// use crate::chunk::ixml::aswg::AswgDataIterator;
 pub use crate::chunk::ixml::taketype::TakeType;
 use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 
@@ -133,6 +139,12 @@ pub struct Ixml {
     /// or to warn of noise interruptions - PLANE OVERHEAD etc.
     pub note: Option<String>,
 
+    /// Metadata for interactive media development applications and workflows.
+    ///
+    /// Defined in [ASWG-G006](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf).
+    /// See [Aswg] for details.
+    pub aswg: Option<Aswg>,
+
     /// Additional tags found in the XML document beyond those listed in
     /// the iXML spec.
     pub extra: BTreeMap<String, String>,
@@ -157,10 +169,11 @@ impl Ixml {
             file_uid: None,
             ubits: None,
             note: None,
+            aswg: None,
         }
     }
 
-    /// Helper to set an IXML value by path.
+    /// Helper to set an Ixml value by path.
     ///
     /// ```
     /// use wavrw::chunk::ixml::Ixml;
@@ -197,8 +210,12 @@ impl Ixml {
                 "FILE_UID" => self.file_uid = Some(value),
                 "UBITS" => self.ubits = Some(value),
                 "NOTE" => self.note = Some(value),
+                "ASWG" => {
+                    let aswg = self.aswg.get_or_insert(Aswg::new());
+                    aswg.set(&path[1..], value);
+                }
                 &_ => {
-                    self.extra.insert(format!("TODO:{}", path.join("/")), value);
+                    self.extra.insert(path.join("/"), value);
                 }
             }
         }
@@ -243,7 +260,7 @@ impl Default for Ixml {
 impl Summarizable for Ixml {
     fn summary(&self) -> String {
         let mut out = Vec::<&String>::new();
-        let fields = format!("{} fields", self.items().count());
+        let fields = format!("{} keys", self.items().count());
         if let Some(value) = &self.project {
             out.push(value);
         }
@@ -260,68 +277,45 @@ impl Summarizable for Ixml {
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
-        Box::new(self.into_iter())
+        let mut items: Vec<(String, String)> = Vec::new();
+        fn push(items: &mut Vec<(String, String)>, key: &str, value: &Option<String>) {
+            if let Some(val) = value {
+                items.push((key.to_string(), val.clone()));
+            }
+        }
+
+        push(&mut items, "IXML_VERSION", &self.ixml_version);
+        push(&mut items, "PROJECT", &self.project);
+        push(&mut items, "SCENE", &self.scene);
+        push(&mut items, "TAPE", &self.tape);
+        push(&mut items, "TAKE", &self.take);
+        if !self.take_type.is_empty() {
+            items.push((
+                "TAKE_TYPE".to_string(),
+                self.take_type.iter().map(|tt| tt.to_string()).join(", "),
+            ));
+        }
+        push(&mut items, "CIRCLED", &Some(self.circled.to_string()));
+        push(&mut items, "FILE_UID", &self.file_uid);
+        push(&mut items, "UBITS", &self.ubits);
+        push(&mut items, "NOTE", &self.note);
+
+        // structs and extra items
+        if let Some(aswg) = &self.aswg {
+            for (k, v) in aswg.items() {
+                items.push((format!("ASWG/{}", k), v));
+            }
+        }
+
+        for (k, v) in &self.extra {
+            items.push((format!("(extra) {}", k), v.clone()));
+        }
+
+        Box::new(items.into_iter())
     }
 
     fn item_summary_header(&self) -> String {
         "DRAFT: WIP parser, missing most repeating fields".to_string()
-    }
-}
-
-impl<'a> IntoIterator for &'a Ixml {
-    type Item = (String, String);
-    type IntoIter = IxmlDataIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IxmlDataIterator {
-            data: self,
-            index: 0,
-            extra_iter: self.extra.clone().into_iter(),
-        }
-    }
-}
-
-/// Iterate over fields as tuple of Strings (name, value).
-#[derive(Debug)]
-pub struct IxmlDataIterator<'a> {
-    data: &'a Ixml,
-    index: usize,
-    extra_iter: IntoIter<String, String>,
-}
-
-impl Iterator for IxmlDataIterator<'_> {
-    type Item = (String, String);
-
-    fn next(&mut self) -> Option<(String, String)> {
-        fn repr(f: &Option<String>) -> String {
-            f.clone().unwrap_or("(absent)".to_string())
-        }
-
-        self.index += 1;
-        match self.index {
-            1 => Some(("ixml_version".to_string(), repr(&self.data.ixml_version))),
-            2 => Some(("project".to_string(), repr(&self.data.project))),
-            3 => Some(("scene".to_string(), repr(&self.data.scene))),
-            4 => Some(("tape".to_string(), repr(&self.data.tape))),
-            5 => Some(("take".to_string(), repr(&self.data.take))),
-            6 => Some((
-                "take_type".to_string(),
-                match self.data.take_type.len() {
-                    0 => repr(&None),
-                    _ => self
-                        .data
-                        .take_type
-                        .iter()
-                        .map(|tt| tt.to_string())
-                        .join(", "),
-                },
-            )),
-            7 => Some(("circled".to_string(), self.data.circled.to_string())),
-            8 => Some(("file_uid".to_string(), repr(&self.data.file_uid))),
-            9 => Some(("ubits".to_string(), repr(&self.data.ubits))),
-            10 => Some(("note".to_string(), repr(&self.data.note))),
-            _ => self.extra_iter.next(),
-        }
     }
 }
 
@@ -452,7 +446,6 @@ mod test {
         assert_eq!(None, ixml.file_uid);
         assert_eq!(None, ixml.ubits);
         assert_eq!(Some("free text note"), ixml.note.as_deref());
-        // TODO: impement the rest of the fields.
     }
 
     #[test]
@@ -567,7 +560,6 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
         );
         assert_eq!(Some("00000000"), ixml.ubits.as_deref());
         assert_eq!(Some("freetextnote"), ixml.note.as_deref());
-        // TODO: impement the rest of the fields.
     }
 
     #[test]

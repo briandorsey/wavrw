@@ -158,6 +158,8 @@ pub trait Summarizable: ChunkID {
         self.id().to_string().trim().to_string()
     }
 
+    // TODO: try to remove this Box<_>. Maybe unneeded? Might need to make a specific
+    // iterator type somewhere?
     /// Returns an iterator over a sequence of contents of the
     /// chunk as strings (field, value).
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
@@ -663,7 +665,7 @@ pub enum SizedChunkEnum {
     Fllr(FllrChunk),
     Junk(JunkChunk),
     Pad(PadChunk),
-    Ixml(IxmlChunk),
+    Ixml(Box<IxmlChunk>),
     Unknown(UnknownChunk),
 }
 
