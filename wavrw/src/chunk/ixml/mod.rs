@@ -166,12 +166,12 @@ impl Ixml {
     /// use wavrw::chunk::ixml::Ixml;
     /// let mut ixml = Ixml::new();
     /// assert_eq!(None, ixml.project);
-    /// ixml.set(&["BWFXML".to_string(), "PROJECT".to_string()], "My Project".to_string());
+    /// ixml.set(&["PROJECT".to_string()], "My Project".to_string());
     /// assert_eq!("My Project", ixml.project.unwrap());
     /// ```
     pub fn set(&mut self, path: &[String], value: String) {
-        if let Some(last) = path.last() {
-            match last.as_str() {
+        if let Some(first) = path.first() {
+            match first.as_str() {
                 "IXML_VERSION" => self.ixml_version = Some(value),
                 "PROJECT" => self.project = Some(value),
                 "SCENE" => self.scene = Some(value),
@@ -198,7 +198,7 @@ impl Ixml {
                 "UBITS" => self.ubits = Some(value),
                 "NOTE" => self.note = Some(value),
                 &_ => {
-                    self.extra.insert(path[1..].join("/"), value);
+                    self.extra.insert(format!("TODO:{}", path.join("/")), value);
                 }
             }
         }
@@ -215,7 +215,8 @@ impl Ixml {
                     path.push(name.local_name);
                 }
                 Ok(XmlEvent::Characters(chars)) => {
-                    ixml.set(&path, chars);
+                    // explicitly strip the `BWFXML` root node before passing on.
+                    ixml.set(&path[1..], chars);
                 }
                 Ok(XmlEvent::EndElement { name: _ }) => {
                     path.pop();
