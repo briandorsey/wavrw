@@ -203,6 +203,10 @@ fn view_line(file: BufReader<File>) -> Result<String> {
                     chunk.data.sample_loops.len()
                 ));
             }
+            // special case iXML to show certain keys
+            Ok(SizedChunkEnum::Ixml(chunk)) => {
+                chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));
+            }
             // match on id() to catch all current and future LIST variants
             Ok(chunk) if chunk.id() == b"LIST" => {
                 chunk_strings.push(format!("{}[{}]", chunk.name(), chunk.summary()));

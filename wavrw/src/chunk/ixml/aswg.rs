@@ -298,6 +298,11 @@ pub struct Aswg {
 }
 
 impl Aswg {
+    /// User friendly name of the element's key
+    pub fn name(&self) -> String {
+        "ASWG".to_string()
+    }
+
     /// Create a new Aswg struct.
     pub fn new() -> Self {
         Aswg {

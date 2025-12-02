@@ -259,21 +259,12 @@ impl Default for Ixml {
 
 impl Summarizable for Ixml {
     fn summary(&self) -> String {
-        let mut out = Vec::<&String>::new();
-        let fields = format!("{} keys", self.items().count());
-        if let Some(value) = &self.project {
-            out.push(value);
-        }
-        if let Some(value) = &self.scene {
-            out.push(value);
-        }
-        if let Some(value) = &self.tape {
-            out.push(value);
-        }
-        if let Some(value) = &self.take {
-            out.push(value);
-        }
-        format!("{}: {}, ...", fields, out.into_iter().join(", "))
+        let mut keys = Vec::<String>::new();
+        // TODO: SPEED, LOUDNESS, HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
+        if let Some(ref aswg) = self.aswg {
+            keys.push(aswg.name());
+        };
+        format!("{}: {}, ...", self.items().count(), keys.join(", "),)
     }
 
     fn items<'a>(&'a self) -> Box<dyn Iterator<Item = (String, String)> + 'a> {
@@ -303,7 +294,7 @@ impl Summarizable for Ixml {
         // structs and extra items
         if let Some(aswg) = &self.aswg {
             for (k, v) in aswg.items() {
-                items.push((format!("ASWG/{}", k), v));
+                items.push((format!("{}/{}", aswg.name(), k), v));
             }
         }
 
