@@ -1,7 +1,6 @@
 #![doc = include_str!("fixedstring.md")]
 
 use alloc::string::FromUtf8Error;
-use core::cmp::min;
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
@@ -65,7 +64,9 @@ impl From<FromUtf8Error> for FixedStringError {
 
 #[doc = include_str!("fixedstring.md")]
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct FixedString<const N: usize>(String);
+pub struct FixedString<const N: usize> {
+    inner: String,
+}
 // This is only immutable because it would be a lot of work to correctly DeRef
 // to the inner string while still enforcing the length constraint. Design
 // quesion: is it worth the work? Maybe if it turns out to be annoying to work
@@ -81,7 +82,7 @@ impl<const N: usize> Debug for FixedString<N> {
 
 impl<const N: usize> Display for FixedString<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", &self.inner)
     }
 }
 
@@ -140,7 +141,7 @@ impl<const N: usize> FixedString<N> {
         }
         let s = alloc::string::String::from_utf8(vec)?;
         let s = s.trim_end_matches('\0').to_string();
-        Ok(Self(s))
+        Ok(Self { inner: s })
     }
 
     /// Create a new [u8; N] from &self
@@ -163,16 +164,20 @@ impl<const N: usize> FixedString<N> {
     /// ```
     pub fn to_bytes(&self) -> [u8; N] {
         let mut array_tmp = [0u8; N];
-        let bytes = self.0.as_bytes();
-        let l = min(bytes.len(), N);
-        array_tmp[..l].copy_from_slice(&bytes[..l]);
+        let bytes = self.inner.as_bytes();
+        // copy_from_slice requires slices of same length or it panics
+        // self.inner.len() <= N bytes because it's also defined by N (enforced by
+        // constructors and From impls - inner is not public.
+        array_tmp[..bytes.len()].copy_from_slice(bytes);
         array_tmp
     }
 }
 
 impl<const N: usize> Default for FixedString<N> {
     fn default() -> Self {
-        FixedString::<N>(String::new())
+        FixedString::<N> {
+            inner: String::new(),
+        }
     }
 }
 
@@ -186,7 +191,9 @@ impl<const N: usize> FromStr for FixedString<N> {
                 len: s.len(),
             });
         }
-        Ok(FixedString(s.to_string()))
+        Ok(FixedString {
+            inner: s.to_string(),
+        })
     }
 }
 
@@ -201,6 +208,7 @@ impl<const N: usize> BinRead for FixedString<N> {
         let mut values: [u8; N] = [0; N];
         let mut index = 0;
 
+        #[allow(clippy::indexing_slicing)]
         loop {
             if index >= N {
                 return match Self::from_utf8(values.to_vec()) {
@@ -231,6 +239,9 @@ impl<const N: usize> BinRead for FixedString<N> {
                     }),
                 };
             }
+            // #[allow(clippy::indexing_slicing)] set above because attributes on
+            // expressions are experimental (at the time of writing).
+            // index >= N checked at top of loop
             values[index] = val;
             index += 1;
         }
@@ -246,7 +257,7 @@ impl<const N: usize> BinWrite for FixedString<N> {
         endian: Endian,
         args: Self::Args<'_>,
     ) -> BinResult<()> {
-        let bytes = self.0.as_bytes();
+        let bytes = self.inner.as_bytes();
         let padding_size = N - bytes.len();
         bytes.write_options(writer, endian, args)?;
         for _ in 0..padding_size {
@@ -266,7 +277,7 @@ mod test {
 
     #[test]
     fn fixed_string() {
-        let fs = FixedString::<6>("abc".to_string());
+        let fs = FixedString::<6>::from_str("abc").unwrap();
         assert_eq!(6, fs.len());
         let s = fs.to_string();
         assert_eq!("abc".to_string(), s);
@@ -289,10 +300,10 @@ mod test {
     fn fixed_string_long() {
         // strings longer than fixed size should get truncated
 
-        // initializing with ::new() truncates without error
-        // let long_str = "this is a longer str";
-        // let fs = FixedString::<6>::new(long_str);
-        // assert_eq!(fs.to_string(), "this i");
+        // initializing with ::from_utf8() truncates without error
+        let long_str = "this is a longer str";
+        let err = FixedString::<6>::from_utf8(long_str.to_string().into());
+        assert_eq!(err, Err(FixedStringError::Truncated { limit: 6, len: 20 }));
 
         // via FromStr returns an error
         let long_str = "this is a longer str";

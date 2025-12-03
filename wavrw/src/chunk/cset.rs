@@ -31,14 +31,14 @@ pub struct Cset {
 
     /// Specify the language and dialect used for file elements.
     ///
-    /// See cset_ld_map, for a list of language and dialect codes. If the CSET
+    /// See `cset_ld_map`, for a list of language and dialect codes. If the CSET
     /// chunk is not present, or if these fields have value zero, assume US
     /// English (language code 9, dialect code 1).
     pub language: u16,
 
     /// Specify the language and dialect used for file elements.
     ///
-    /// See cset_ld_map, for a list of language and dialect codes. If the CSET
+    /// See `cset_ld_map`, for a list of language and dialect codes. If the CSET
     /// chunk is not present, or if these fields have value zero, assume US
     /// English (language code 9, dialect code 1).
     pub dialect: u16,

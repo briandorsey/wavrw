@@ -1,1 +1,5 @@
 allow-unwrap-in-tests = true
+
+# Has to be specified here, Cargo.toml can't handle these configs at workspace level. :/ 
+#  https://github.com/rust-lang/cargo/issues/12917#issuecomment-1795069197
+doc-valid-idents = ["BWFMetaEdit", ".."] 

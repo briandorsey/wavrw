@@ -183,7 +183,7 @@ impl Ixml {
     /// assert_eq!("My Project", ixml.project.unwrap());
     /// ```
     pub fn set(&mut self, path: &[String], value: String) {
-        if let Some(first) = path.first() {
+        if let Some((first, remaining_path)) = path.split_first() {
             match first.as_str() {
                 "IXML_VERSION" => self.ixml_version = Some(value),
                 "PROJECT" => self.project = Some(value),
@@ -212,7 +212,7 @@ impl Ixml {
                 "NOTE" => self.note = Some(value),
                 "ASWG" => {
                     let aswg = self.aswg.get_or_insert(Aswg::new());
-                    aswg.set(&path[1..], value);
+                    aswg.set(remaining_path, value);
                 }
                 &_ => {
                     self.extra.insert(path.join("/"), value);
@@ -233,7 +233,13 @@ impl Ixml {
                 }
                 Ok(XmlEvent::Characters(chars)) => {
                     // explicitly strip the `BWFXML` root node before passing on.
-                    ixml.set(&path[1..], chars);
+                    if let Some(remaining_path) = &path.get(1..) {
+                        ixml.set(remaining_path, chars);
+                    } else {
+                        // TODO: actual error handling
+                        eprintln!("Error: XmlEvent::Characters, no remaining path: {path:?}");
+                        break;
+                    }
                 }
                 Ok(XmlEvent::EndElement { name: _ }) => {
                     path.pop();

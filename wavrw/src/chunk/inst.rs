@@ -19,7 +19,7 @@ pub struct Inst {
     /// Pitch shift adjustment in cents.
     ///
     /// Pitch shift adjustment in cents. (or 100ths of a semitone) needed to
-    /// hit `unshifted_note` value exactly.  fine_tune can be used to compensate
+    /// hit `unshifted_note` value exactly.  `fine_tune` can be used to compensate
     /// for tuning errors in the sampling process. Valid values range from -50
     /// to 50.
     pub fine_tune: i8,

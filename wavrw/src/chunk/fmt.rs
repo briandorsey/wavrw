@@ -13,7 +13,7 @@ use crate::{FourCC, KnownChunk, KnownChunkID, Summarizable};
 
 /// A number indicating the WAVE format category of the file.
 ///
-/// The content of the format-specific-fields [ed: everything after block_align]
+/// The content of the format-specific-fields [ed: everything after `block_align`]
 /// portion of the fmt chunk, and the interpretation of the waveform data, depend on
 /// this value. [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 #[allow(dead_code, missing_docs)]
@@ -592,7 +592,7 @@ pub trait Tag {
 }
 
 //---------------------------
-/// Format of PCM audio samples in `data`. (WAVE_FORMAT_PCM) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
+/// Format of PCM audio samples in `data`. (`WAVE_FORMAT_PCM`) [RIFF1991](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -729,7 +729,7 @@ impl Display for AdpcmCoefficients {
     }
 }
 
-/// Format of ADPCM audio samples in `data`. (WAVE_FORMAT_ADPCM) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
+/// Format of ADPCM audio samples in `data`. (`WAVE_FORMAT_ADPCM`) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -907,7 +907,7 @@ impl Iterator for FmtAdpcmIterator<'_> {
 
 //---------------------------
 
-/// Format of DVI ADPCM audio samples in `data`. (WAVE_FORMAT_DVI_ADPCM) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
+/// Format of DVI ADPCM audio samples in `data`. (`WAVE_FORMAT_DVI_ADPCM`) [RIFF1994](https://wavref.til.cafe/chunk/fmt/)
 #[binrw]
 #[brw(little)]
 #[br(import(_size: u32))]
@@ -939,7 +939,7 @@ pub struct FmtDviAdpcm {
     /// of data at a time, so the value of `block_align` can be used for
     /// buffer alignment.
     ///
-    /// |bits_per_sample | block_align |
+    /// |`bits_per_sample` | `block_align `|
     /// |-|-|
     /// |3 | (( N * 3 ) + 1 ) * 4 * channels |
     /// |4 | (N + 1) * 4 * channels |
@@ -1105,8 +1105,8 @@ pub struct FmtExtended {
     ///
     /// The size in bytes of the extra information in the WAVE format header not
     /// including the size of the `FmtExtended` structure. (size of fields from
-    /// format_tag through extra_size inclusive (all fields except id, size and
-    /// the extra_bytes))
+    /// `format_tag` through `extra_size` inclusive (all fields except id, size and
+    /// the `extra_bytes`))
     #[br()]
     #[bw(map = |_| self.extra_bytes.len() as u16)]
     pub extra_size: u16,

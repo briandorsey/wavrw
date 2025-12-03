@@ -125,7 +125,7 @@ pub struct Ltxt {
     /// Specifies the cue point name. This value must match one of the names listed in the `cue` chunk's [CuePoint][super::cue::CuePoint] table.
     pub name: u32,
 
-    /// Specifies the number of samples in the segment of waveform data. 	...>sample_length
+    /// Specifies the number of samples in the segment of waveform data.
     pub sample_length: u32,
 
     /// Specifies the type or purpose of the text. For example, dwPurpose can specify a FOURCC code like `scrp` for script text or `capt` for close-caption text. `rgn ` is commonly used for "region notes"

@@ -127,7 +127,7 @@ pub struct Aswg {
     /// UCS compliant SFX creator/publisher. category:Sound Effects
     pub creator_id: Option<String>,
 
-    /// UCS compliant SFX SourceID. category:Sound Effects
+    /// UCS compliant SFX `SourceID`. category:Sound Effects
     pub source_id: Option<String>,
 
     /// RMS power of file. category:Audio Features

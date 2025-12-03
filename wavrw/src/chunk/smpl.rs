@@ -73,7 +73,7 @@ pub struct Smpl {
     /// Period of one sample in nanoseconds.
     ///
     /// Specifies the period of one sample in nanoseconds (normally 1/
-    /// samples_per_second from the WAVEFORMAT structure for the RIFF WAVE file
+    /// `samples_per_second` from the WAVEFORMAT structure for the RIFF WAVE file
     /// -- however, this field allows fine tuning). For example, 44.1 kHz would
     /// be specified as 22675 (0x00005893).
     pub sample_period: u32,
@@ -88,15 +88,15 @@ pub struct Smpl {
     /// Fine tune pitch as fraction of a semitone.
     ///
     /// Specifies the fraction of a semitone up from the specified
-    /// midi_unity_note. A value of 0x80000000 is 1/2 semitone (50 cents); a
+    /// `midi_unity_note. A value of 0x80000000 is 1/2 semitone (50 cents); a
     /// value of 0x00000000 represents no fine tuning between semitones.
     pub midi_pitch_fraction: u32,
 
     /// SMPTE time format.
     ///
-    /// Specifies the SMPTE time format used in the smpte_offset field. Possible
+    /// Specifies the SMPTE time format used in the `smpte_offset` field. Possible
     /// values are (unrecognized formats should be ignored): 0 - specifies
-    /// no SMPTE offset (smpte_offset should also be zero). 24 - specifies 24
+    /// no SMPTE offset (`smpte_offset` should also be zero). 24 - specifies 24
     /// frames per second. 25 - specifies 25 frames per second. 29 - specifies
     /// 30 frames per second with frame dropping ('30 drop'). 30 - specifies 30
     /// frames per second.
@@ -108,7 +108,7 @@ pub struct Smpl {
     /// calibrated according to a start time other than 0. The format of this
     /// value is 0xhhmmssff. hh is a signed Hours value [-23..23]. mm is an
     /// unsigned Minutes value [0..59]. ss is unsigned Seconds value [0..59]. ff
-    /// is an unsigned value [0..(smpte_format - 1)].
+    /// is an unsigned value [0..(`smpte_format` - 1)].
     pub smpte_offset: u32,
 
     /// Count of sample loops (for serialization/deserialization)

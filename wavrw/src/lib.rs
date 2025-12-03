@@ -71,6 +71,7 @@
 //! sharing sample files to test against so I can improve codepage handling.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::indexing_slicing))]
 
 extern crate alloc;
 
