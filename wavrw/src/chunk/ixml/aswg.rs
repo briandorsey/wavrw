@@ -2,7 +2,7 @@
 use alloc::collections::BTreeMap;
 use core::fmt::Debug;
 
-/// `iXML/ASWG` Audio Standards Working Group (ASWG) metadata.
+/// `ASWG` Audio Standards Working Group (ASWG) metadata.
 /// [ASWG-G006](https://wavref.til.cafe/spec/aswg-g006/)
 ///
 /// Represents iXML `ASWG` values as defined in [ASWG-G006 - iXML Extension Specification v1.1.pdf](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf)

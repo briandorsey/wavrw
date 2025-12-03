@@ -1,9 +1,9 @@
 use core::fmt;
 use core::fmt::{Debug, Display, Formatter};
 
-/// Represents iXML `TAKE_TYPE` dictionary
+/// iXML `TAKE_TYPE` dictionary (enum).
 ///
-/// the `TAKE_TYPE` tag contains a comma delimited list of values from the
+/// The `TAKE_TYPE` tag contains a comma delimited list of values from the
 /// dictionary below, following recommendations by AFSI. This tag supercedes
 /// the older explicit tags for `WILD_TRACK`, `NO_GOOD`, `FALSE_START` and
 /// replaces them with a comma delimited list from the dictionary below

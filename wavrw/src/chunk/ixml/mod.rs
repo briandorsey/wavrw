@@ -1,6 +1,6 @@
 //! `iXML` Production workflow file & project metadata.  [IXML2021](https://wavref.til.cafe/spec/ixml2021/)
 //!
-//! The general approach in this module is to map specified items to specific
+//! The general approach used in this module is to map specified items to specific
 //! fields where possible and store unspecified (outside of iXML spec) items as
 //! (key, value) in an `extra` field.
 //!
@@ -11,12 +11,12 @@
 //! All fields are containers or wrapped in `Option` because any tag could
 //! be missing in a valid XML document.
 //!
-//! The implementation is fairly picky about following the iXML spec... open
-//! to loosening up to meet commonly used patterns.
-//!
 //! Some fields are defined in the spec to contain one or more of a specific
 //! list of string values. Since XML tags could have any string content, these
 //! are implemented as enums of the specified values, plus `Custom(String)`.
+//!
+//! The implementation is fairly picky about following the iXML spec... open
+//! to loosening up to meet commonly used patterns.
 
 use alloc::collections::BTreeMap;
 use core::fmt::{Debug, Display, Formatter};
@@ -28,10 +28,11 @@ use binrw::binrw;
 use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
+mod aswg;
+mod syncpoint;
 mod taketype;
 pub use crate::chunk::ixml::aswg::Aswg;
-mod aswg;
-// use crate::chunk::ixml::aswg::AswgDataIterator;
+pub use crate::chunk::ixml::syncpoint::{SyncPoint, SyncPointFunction, SyncPointType};
 pub use crate::chunk::ixml::taketype::TakeType;
 use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
 
@@ -139,6 +140,9 @@ pub struct Ixml {
     /// or to warn of noise interruptions - PLANE OVERHEAD etc.
     pub note: Option<String>,
 
+    /// List of sample based counts which represents a sync point for this recording.
+    pub sync_point_list: Vec<SyncPoint>,
+
     /// Metadata for interactive media development applications and workflows.
     ///
     /// Defined in [ASWG-G006](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf).
@@ -169,6 +173,7 @@ impl Ixml {
             file_uid: None,
             ubits: None,
             note: None,
+            sync_point_list: Vec::new(),
             aswg: None,
         }
     }
@@ -210,6 +215,18 @@ impl Ixml {
                 "FILE_UID" => self.file_uid = Some(value),
                 "UBITS" => self.ubits = Some(value),
                 "NOTE" => self.note = Some(value),
+                "SYNC_POINT_LIST" => {
+                    if let Some((first, remaining_path)) = remaining_path.split_first() {
+                        match first.as_str() {
+                            "SYNC_POINT_COUNT" => {} // ignored, computed from Vec
+                            _ => {
+                                if let Some(sp) = self.sync_point_list.last_mut() {
+                                    sp.set(remaining_path, value);
+                                }
+                            }
+                        }
+                    }
+                }
                 "ASWG" => {
                     let aswg = self.aswg.get_or_insert(Aswg::new());
                     aswg.set(remaining_path, value);
@@ -226,10 +243,14 @@ impl Ixml {
         let mut ixml = Ixml::new();
         let parser = EventReader::new(reader);
         let mut path = Vec::<String>::new();
+
         for e in parser {
             match e {
                 Ok(XmlEvent::StartElement { name, .. }) => {
-                    path.push(name.local_name);
+                    path.push(name.local_name.clone());
+                    if name.local_name == "SYNC_POINT" {
+                        ixml.sync_point_list.push(SyncPoint::new());
+                    }
                 }
                 Ok(XmlEvent::Characters(chars)) => {
                     // explicitly strip the `BWFXML` root node before passing on.
@@ -264,9 +285,15 @@ impl Default for Ixml {
 }
 
 impl Summarizable for Ixml {
+    /// Returns a short text summary of the contents of the chunk.
+    ///
+    /// `iXML` uses abbreviations for keys since some iXML keys are long
     fn summary(&self) -> String {
         let mut keys = Vec::<String>::new();
         // TODO: SPEED, LOUDNESS, HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
+        if !self.sync_point_list.is_empty() {
+            keys.push("S_P_L".to_string());
+        }
         if let Some(ref aswg) = self.aswg {
             keys.push(aswg.name());
         };
@@ -298,6 +325,13 @@ impl Summarizable for Ixml {
         push(&mut items, "NOTE", &self.note);
 
         // structs and extra items
+
+        for (i, syncpoint) in self.sync_point_list.iter().enumerate() {
+            for (k, v) in syncpoint.items() {
+                items.push((format!("[{}] {}", i, k), v));
+            }
+        }
+
         if let Some(aswg) = &self.aswg {
             for (k, v) in aswg.items() {
                 items.push((format!("{}/{}", aswg.name(), k), v));
@@ -557,6 +591,34 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
         );
         assert_eq!(Some("00000000"), ixml.ubits.as_deref());
         assert_eq!(Some("freetextnote"), ixml.note.as_deref());
+
+        assert_eq!(2, ixml.sync_point_list.len());
+        println!("\nixml.sync_point_list[0]: {:?}", ixml.sync_point_list[0]);
+        assert_eq!(
+            Some(SyncPointType::Relative),
+            ixml.sync_point_list[0].sync_point_type
+        );
+        assert_eq!(
+            Some(SyncPointFunction::PreRecordSampleCount),
+            ixml.sync_point_list[0].function
+        );
+        assert_eq!(Some("480000"), ixml.sync_point_list[0].low.as_deref());
+        assert_eq!(Some("0"), ixml.sync_point_list[0].high.as_deref());
+        assert_eq!(Some("0"), ixml.sync_point_list[0].event_duration.as_deref());
+
+        println!("\nixml.sync_point_list[1]: {:?}", ixml.sync_point_list[1]);
+        assert_eq!(
+            Some(SyncPointType::Relative),
+            ixml.sync_point_list[1].sync_point_type
+        );
+        assert_eq!(
+            Some(SyncPointFunction::SlateGeneric),
+            ixml.sync_point_list[1].function
+        );
+        assert_eq!(Some("Camera A"), ixml.sync_point_list[1].comment.as_deref());
+        assert_eq!(Some("6544645"), ixml.sync_point_list[1].low.as_deref());
+        assert_eq!(Some("0"), ixml.sync_point_list[1].high.as_deref());
+        assert_eq!(Some("0"), ixml.sync_point_list[0].event_duration.as_deref());
     }
 
     #[test]
