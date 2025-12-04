@@ -29,9 +29,11 @@ use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
 mod aswg;
+mod speed;
 mod syncpoint;
 mod taketype;
 pub use crate::chunk::ixml::aswg::Aswg;
+pub use crate::chunk::ixml::speed::Speed;
 pub use crate::chunk::ixml::syncpoint::{SyncPoint, SyncPointFunction, SyncPointType};
 pub use crate::chunk::ixml::taketype::TakeType;
 use crate::{ChunkID, FourCC, KnownChunkID, SizedChunk, Summarizable};
@@ -143,6 +145,9 @@ pub struct Ixml {
     /// List of sample based counts which represents a sync point for this recording.
     pub sync_point_list: Vec<SyncPoint>,
 
+    /// The ratio of recorded speed to target playback speed
+    pub speed: Option<Speed>,
+
     /// Metadata for interactive media development applications and workflows.
     ///
     /// Defined in [ASWG-G006](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf).
@@ -174,6 +179,7 @@ impl Ixml {
             ubits: None,
             note: None,
             sync_point_list: Vec::new(),
+            speed: None,
             aswg: None,
         }
     }
@@ -226,6 +232,10 @@ impl Ixml {
                             }
                         }
                     }
+                }
+                "SPEED" => {
+                    let speed = self.speed.get_or_insert(Speed::new());
+                    speed.set(remaining_path, value);
                 }
                 "ASWG" => {
                     let aswg = self.aswg.get_or_insert(Aswg::new());
@@ -290,9 +300,12 @@ impl Summarizable for Ixml {
     /// `iXML` uses abbreviations for keys since some iXML keys are long
     fn summary(&self) -> String {
         let mut keys = Vec::<String>::new();
-        // TODO: SPEED, LOUDNESS, HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
+        // TODO: LOUDNESS, HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
         if !self.sync_point_list.is_empty() {
             keys.push("S_P_L".to_string());
+        }
+        if self.speed.is_some() {
+            keys.push("SPEED".to_string());
         }
         if let Some(ref aswg) = self.aswg {
             keys.push(aswg.name());
@@ -329,6 +342,12 @@ impl Summarizable for Ixml {
         for (i, syncpoint) in self.sync_point_list.iter().enumerate() {
             for (k, v) in syncpoint.items() {
                 items.push((format!("[{}] {}", i, k), v));
+            }
+        }
+
+        if let Some(speed) = &self.speed {
+            for (k, v) in speed.items() {
+                items.push((format!("{}/{}", speed.name(), k), v));
             }
         }
 
@@ -592,6 +611,7 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
         assert_eq!(Some("00000000"), ixml.ubits.as_deref());
         assert_eq!(Some("freetextnote"), ixml.note.as_deref());
 
+        // SYNC_POINT_LIST
         assert_eq!(2, ixml.sync_point_list.len());
         println!("\nixml.sync_point_list[0]: {:?}", ixml.sync_point_list[0]);
         assert_eq!(
@@ -619,10 +639,26 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
         assert_eq!(Some("6544645"), ixml.sync_point_list[1].low.as_deref());
         assert_eq!(Some("0"), ixml.sync_point_list[1].high.as_deref());
         assert_eq!(Some("0"), ixml.sync_point_list[0].event_duration.as_deref());
+
+        let speed = ixml.speed.unwrap();
+        assert_eq!("camera overcranked", speed.note.unwrap());
+        assert_eq!("24/1", speed.master_speed.unwrap());
+        assert_eq!("48/1", speed.current_speed.unwrap());
+        assert_eq!("24000/1001", speed.timecode_rate.unwrap());
+        assert_eq!("NDF", speed.timecode_flag.unwrap());
+        assert_eq!("48000", speed.file_sample_rate.unwrap());
+        assert_eq!("24", speed.audio_bit_depth.unwrap());
+        assert_eq!("48048", speed.digitizer_sample_rate.unwrap());
+        assert_eq!("0", speed.timestamp_samples_since_midnight_hi.unwrap());
+        assert_eq!(
+            "48048000",
+            speed.timestamp_samples_since_midnight_lo.unwrap()
+        );
+        assert_eq!("48000", speed.timestamp_sample_rate.unwrap());
     }
 
     #[test]
-    fn parse_ixml() {
+    fn parse_ixml_from_bwfmetaedit() {
         // example bext chunk data from BWF MetaEdit
         let mut buff = hex_to_cursor(
             r#"
@@ -757,5 +793,6 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
         let ixml = IxmlChunk::read(&mut buff).expect("error parsing ixmlchunk");
         print!("{:?}", ixml);
         // assert!(false);
+        // TODO: write assertions for parsed structs
     }
 }
