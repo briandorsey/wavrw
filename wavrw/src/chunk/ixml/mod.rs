@@ -29,10 +29,12 @@ use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
 mod aswg;
+mod loudness;
 mod speed;
 mod syncpoint;
 mod taketype;
 pub use crate::chunk::ixml::aswg::Aswg;
+pub use crate::chunk::ixml::loudness::Loudness;
 pub use crate::chunk::ixml::speed::Speed;
 pub use crate::chunk::ixml::syncpoint::{SyncPoint, SyncPointFunction, SyncPointType};
 pub use crate::chunk::ixml::taketype::TakeType;
@@ -148,6 +150,9 @@ pub struct Ixml {
     /// The ratio of recorded speed to target playback speed
     pub speed: Option<Speed>,
 
+    /// Equivalent to the loudness fields from [`Bext`](crate::chunk::bext::Bext).
+    pub loudness: Option<Loudness>,
+
     /// Metadata for interactive media development applications and workflows.
     ///
     /// Defined in [ASWG-G006](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf).
@@ -180,6 +185,7 @@ impl Ixml {
             note: None,
             sync_point_list: Vec::new(),
             speed: None,
+            loudness: None,
             aswg: None,
         }
     }
@@ -236,6 +242,10 @@ impl Ixml {
                 "SPEED" => {
                     let speed = self.speed.get_or_insert(Speed::new());
                     speed.set(remaining_path, value);
+                }
+                "LOUDNESS" => {
+                    let loudness = self.loudness.get_or_insert(Loudness::new());
+                    loudness.set(remaining_path, value);
                 }
                 "ASWG" => {
                     let aswg = self.aswg.get_or_insert(Aswg::new());
@@ -300,12 +310,15 @@ impl Summarizable for Ixml {
     /// `iXML` uses abbreviations for keys since some iXML keys are long
     fn summary(&self) -> String {
         let mut keys = Vec::<String>::new();
-        // TODO: LOUDNESS, HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
+        // TODO: HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
         if !self.sync_point_list.is_empty() {
             keys.push("S_P_L".to_string());
         }
         if self.speed.is_some() {
             keys.push("SPEED".to_string());
+        }
+        if self.loudness.is_some() {
+            keys.push("LOUD".to_string());
         }
         if let Some(ref aswg) = self.aswg {
             keys.push(aswg.name());
@@ -345,9 +358,16 @@ impl Summarizable for Ixml {
             }
         }
 
+        // TODO: extract this into helper function
         if let Some(speed) = &self.speed {
             for (k, v) in speed.items() {
                 items.push((format!("{}/{}", speed.name(), k), v));
+            }
+        }
+
+        if let Some(loudness) = &self.loudness {
+            for (k, v) in loudness.items() {
+                items.push((format!("{}/{}", loudness.name(), k), v));
             }
         }
 
@@ -655,6 +675,32 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
             speed.timestamp_samples_since_midnight_lo.unwrap()
         );
         assert_eq!("48000", speed.timestamp_sample_rate.unwrap());
+    }
+
+    #[test]
+    fn parse_ixml_loudness() {
+        let example = r#"<?xml version="1.0" encoding="UTF-8"?>
+<BWFXML>
+    <IXML_VERSION>1.27</IXML_VERSION>
+    <PROJECT>Loudness test</PROJECT>
+    <LOUDNESS>
+        <LOUDNESS_VALUE>1</LOUDNESS_VALUE>
+        <LOUDNESS_RANGE>2</LOUDNESS_RANGE>
+        <MAX_TRUE_PEAK_LEVEL>3</MAX_TRUE_PEAK_LEVEL>
+        <MAX_MOMENTARY_LOUDNESS>4</MAX_MOMENTARY_LOUDNESS>
+        <MAX_SHORT_TERM_LOUDNESS>5</MAX_SHORT_TERM_LOUDNESS>
+    </LOUDNESS>
+</BWFXML>"#;
+        let ixml = Ixml::from_reader(example.as_bytes()).expect("error parsing xml");
+        println!("{:?}", ixml);
+        assert_eq!(Some("1.27"), ixml.ixml_version.as_deref());
+        assert_eq!(Some("Loudness test"), ixml.project.as_deref());
+        let loudness = ixml.loudness.unwrap();
+        assert_eq!(Some("1"), loudness.loudness_value.as_deref());
+        assert_eq!(Some("2"), loudness.loudness_range.as_deref());
+        assert_eq!(Some("3"), loudness.max_true_peak_level.as_deref());
+        assert_eq!(Some("4"), loudness.max_momentary_loudness.as_deref());
+        assert_eq!(Some("5"), loudness.max_short_term_loudness.as_deref());
     }
 
     #[test]
