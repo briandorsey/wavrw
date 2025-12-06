@@ -29,11 +29,13 @@ use binrw::io::TakeSeekExt;
 use xml::reader::{EventReader, XmlEvent};
 
 mod aswg;
+mod history;
 mod loudness;
 mod speed;
 mod syncpoint;
 mod taketype;
 pub use crate::chunk::ixml::aswg::Aswg;
+pub use crate::chunk::ixml::history::History;
 pub use crate::chunk::ixml::loudness::Loudness;
 pub use crate::chunk::ixml::speed::Speed;
 pub use crate::chunk::ixml::syncpoint::{SyncPoint, SyncPointFunction, SyncPointType};
@@ -153,6 +155,9 @@ pub struct Ixml {
     /// Equivalent to the loudness fields from [`Bext`](crate::chunk::bext::Bext).
     pub loudness: Option<Loudness>,
 
+    /// Tracking of a file's origins.
+    pub history: Option<History>,
+
     /// Metadata for interactive media development applications and workflows.
     ///
     /// Defined in [ASWG-G006](https://github.com/Sony-ASWG/iXML-Extension/blob/main/ASWG-G006%20-%20iXML%20Extension%20Specification%20v1.1.pdf).
@@ -186,6 +191,7 @@ impl Ixml {
             sync_point_list: Vec::new(),
             speed: None,
             loudness: None,
+            history: None,
             aswg: None,
         }
     }
@@ -246,6 +252,10 @@ impl Ixml {
                 "LOUDNESS" => {
                     let loudness = self.loudness.get_or_insert(Loudness::new());
                     loudness.set(remaining_path, value);
+                }
+                "HISTORY" => {
+                    let history = self.history.get_or_insert(History::new());
+                    history.set(remaining_path, value);
                 }
                 "ASWG" => {
                     let aswg = self.aswg.get_or_insert(Aswg::new());
@@ -310,7 +320,7 @@ impl Summarizable for Ixml {
     /// `iXML` uses abbreviations for keys since some iXML keys are long
     fn summary(&self) -> String {
         let mut keys = Vec::<String>::new();
-        // TODO: HISTORY, FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
+        // TODO: FILE_SET, TRACK_LIST, BEXT, USER, LOCATION
         if !self.sync_point_list.is_empty() {
             keys.push("S_P_L".to_string());
         }
@@ -319,6 +329,9 @@ impl Summarizable for Ixml {
         }
         if self.loudness.is_some() {
             keys.push("LOUD".to_string());
+        }
+        if self.history.is_some() {
+            keys.push("HIST".to_string());
         }
         if let Some(ref aswg) = self.aswg {
             keys.push(aswg.name());
@@ -368,6 +381,12 @@ impl Summarizable for Ixml {
         if let Some(loudness) = &self.loudness {
             for (k, v) in loudness.items() {
                 items.push((format!("{}/{}", loudness.name(), k), v));
+            }
+        }
+
+        if let Some(history) = &self.history {
+            for (k, v) in history.items() {
+                items.push((format!("{}/{}", history.name(), k), v));
             }
         }
 
@@ -675,6 +694,13 @@ Microphones : Sennheiser MKH-70, Sanken COS-11
             speed.timestamp_samples_since_midnight_lo.unwrap()
         );
         assert_eq!("48000", speed.timestamp_sample_rate.unwrap());
+
+        // <PARENT_FILENAME>myname.bwf</PARENT_FILENAME>
+        // <PARENT_UID>9876543210</PARENT_UID>
+        let history = ixml.history.unwrap();
+        assert_eq!("myname_1.wav", history.original_filename.unwrap());
+        assert_eq!("myname.bwf", history.parent_filename.unwrap());
+        assert_eq!("9876543210", history.parent_uid.unwrap());
     }
 
     #[test]
