@@ -27,7 +27,7 @@ pub struct Loudness {
     pub max_short_term_loudness: Option<String>,
 
     /// Additional tags found in the XML document beyond those listed in
-    /// the ASWG spec.
+    /// the iXML spec.
     pub extra: BTreeMap<String, String>,
 }
 

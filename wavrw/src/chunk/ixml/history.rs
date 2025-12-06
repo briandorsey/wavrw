@@ -18,7 +18,7 @@ pub struct History {
     pub parent_uid: Option<String>,
 
     /// Additional tags found in the XML document beyond those listed in
-    /// the ASWG spec.
+    /// the iXML spec.
     pub extra: BTreeMap<String, String>,
 }
 

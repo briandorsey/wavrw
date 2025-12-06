@@ -53,7 +53,7 @@ pub struct Speed {
     pub timestamp_sample_rate: Option<String>,
 
     /// Additional tags found in the XML document beyond those listed in
-    /// the ASWG spec.
+    /// the iXML spec.
     pub extra: BTreeMap<String, String>,
 }
 
