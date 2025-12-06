@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> Renamed to `wavdeets` and moved to: [https://codeberg.org/briandorsey/wavdeets](https://codeberg.org/briandorsey/wavdeets)
+> 
+> All future activity and updated releases are there.
+
 # wavrw
 
 `wavrw` is a command line tool to read (and someday write) WAV files with a focus on visualizing the structure of files and parsing metadata.
@@ -13,7 +18,7 @@ Take care,
 
 # Installation
 
-See [Release Notes](https://github.com/briandorsey/wavrw/releases/) for installation instructions. Currently only have Linux and MacOS builds, happy to add a Windows release if someone requests it.
+See [https://codeberg.org/briandorsey/wavdeets](https://codeberg.org/briandorsey/wavdeets) for updated installation info.
 
 # Details
 
